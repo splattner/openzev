@@ -55,8 +55,9 @@ The outcome: each audience sees the information that helps it.
    `document_marking.kind`; the `tr.status` entry goes because the default
    template no longer uses it (a custom template can still write
    `{{ tr.status }}`). Customised templates in the database are not rewritten.
-3. **Participant screens: derived from data already served.** My invoices, the
-   dashboard invoices card, the invoice detail page for a participant and the
+3. **Participant screens: derived from data already served.** My documents (the
+   invoice rows; the dashboard card and the participant invoice detail page this
+   list replaced are gone, #862), and the
    public invoice page show **Payment due**, **Overdue**, **Paid** (and
    **Cancelled** for a cancelled invoice). The state is derived in
    `paymentState` (`features/invoices/invoiceStatus.ts`) from `status`,

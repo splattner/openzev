@@ -28,7 +28,6 @@ const ReportsPage = lazy(async () => ({ default: (await import('../pages/Reports
 const InvoiceDetailPage = lazy(async () => ({ default: (await import('../pages/InvoiceDetailPage')).InvoiceDetailPage }))
 const MyMeteringPointsPage = lazy(async () => ({ default: (await import('../pages/MyMeteringPointsPage')).MyMeteringPointsPage }))
 const DocumentsPage = lazy(async () => ({ default: (await import('../pages/DocumentsPage')).DocumentsPage }))
-const MyInvoicesPage = lazy(async () => ({ default: (await import('../pages/MyInvoicesPage')).MyInvoicesPage }))
 const LoginPage = lazy(async () => ({ default: (await import('../pages/LoginPage')).LoginPage }))
 const MeteringChartPage = lazy(async () => ({ default: (await import('../pages/MeteringChartPage')).MeteringChartPage }))
 const MeteringPointsPage = lazy(async () => ({ default: (await import('../pages/MeteringPointsPage')).MeteringPointsPage }))
@@ -286,16 +285,9 @@ export function AppRoutes() {
               </ProtectedRoute>
             }
           />
-          {/* Recorded exception 2 (spec §4): participant's own invoices — reuses
-              the existing role-scoped backend list, no new grant. */}
-          <Route
-            path="me/invoices"
-            element={
-              <ProtectedRoute allowedRoles={['participant', 'former']}>
-                <MyInvoicesPage />
-              </ProtectedRoute>
-            }
-          />
+          {/* My invoices was folded into My documents (invoices and credit notes carry their amounts there); the
+              old address, the bell and bookmarks land on the list that has them. */}
+          <Route path="me/invoices" element={<AliasNavigate to="/me/documents" />} />
           {/* The participant document inbox (SPEC-2026-11-participant-document-inbox §7.1): what was
               delivered to the account. A former participant keeps reading what it was sent; a manager who
               is also a participant reads what was addressed to them. */}

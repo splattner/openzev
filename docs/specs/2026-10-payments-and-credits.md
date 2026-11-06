@@ -490,7 +490,7 @@ SPEC-2026-04. All text goes through i18n (de, fr, it, en).
   which passes the optional `invoiceNumber` for a line naming the invoice.
 - **Partly paid** (`invoiceStatus.ts` `isPartlyPaid`): a `sent` invoice with `paid_chf ≠ 0`.
   `InvoiceStatusBadge` takes an optional `paidChf` and then reads "Partly paid" (detail page, admin
-  invoice list, My invoices). In the period table's progress
+  invoice list, My documents). In the period table's progress
   (`invoiceRowState.ts`), the paid step is `active` with reason `partlyPaid`.
 - API client (`lib/api/invoices.ts`): `recordPayment(invoiceId, body)`,
   `deletePayment(invoiceId, paymentId)`, `markInvoicePaid(invoiceId, paidOn?)`.
@@ -526,13 +526,13 @@ export interface Payment {
   reason, PDF) that also carries the "Correct invoice" action. The original lists its own credit notes;
   the cancelled original and its replacement link to each other (`replaced_by` / `replaces`, phase 3). Removing a payment is hidden once
   credits exist.
-- **`MyInvoicesPage.tsx`**: the participant's credit notes with PDF download.
+- **`DocumentsList.tsx`** (My documents): the participant's credit notes with PDF download, amount and what is left.
 - `Credit` type and `listCredits`, `getCredit`, `correctInvoice`, `downloadCreditPdf`.
 
 ### 7.3 Phase 3
 
-- Invoice totals in `InvoicePresentation.tsx`, `InvoicePeriodRowsTable.tsx`, `MyInvoicesPage.tsx`,
-  `PublicInvoicePage.tsx` and `InvoiceDocuments.tsx` (My invoices) show "Amount due" when it differs from
+- Invoice totals in `InvoicePresentation.tsx`, `InvoicePeriodRowsTable.tsx`, `DocumentsList.tsx`,
+  `PublicInvoicePage.tsx` and `DocumentsList.tsx` (My documents) show "Amount due" when it differs from
   the total.
 - **`InvoiceDetailPage.tsx`**: the accent "Total" tile carries "Amount due after credit: CHF x" as its
   hint, and a "Credit applied" card (`InvoiceAppliedCreditsCard`, below the figures, above the payments)

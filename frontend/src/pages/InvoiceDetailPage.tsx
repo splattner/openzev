@@ -72,7 +72,7 @@ export function InvoiceDetailPage() {
     // an old link, a saved bookmark or an email lands on the list that has them, not on an error
     // that a retry cannot fix.
     if (invoiceQuery.isError && user && !hasCommunityWideAccess(user)) {
-        return <Navigate to="/me/invoices" replace />
+        return <Navigate to="/me/documents" replace />
     }
     if (invoiceQuery.isError || !invoiceQuery.data) {
         return <div className="page-stack">{pendingHeader}<Notice tone="error" onRetry={() => void invoiceQuery.refetch()} isRetrying={invoiceQuery.isFetching}>{t('common.error')}</Notice></div>
@@ -82,7 +82,7 @@ export function InvoiceDetailPage() {
 
     // Return link follows its origin (the invoice period it came from, or My
     // invoices); participants without
-    // one fall back to /me/invoices.
+    // one fall back to /me/documents.
     const invoiceShellRole = shellRoleForZev(user, invoiceQuery.data?.zev)
     // The invoice's own community, which may not be the selected one.
     const invoiceScopeNoteKey = scopeNoteKey(invoiceShellRole)
@@ -99,9 +99,9 @@ export function InvoiceDetailPage() {
             ? `/billing/invoices?period_start=${origin.period_start}&period_end=${origin.period_end}`
             : null
     const backHref = isParticipant
-        ? origin?.from === '/' || origin?.from === '/me/invoices' || origin?.from === '/me/statement' || origin?.from === '/me/documents'
+        ? origin?.from === '/' || origin?.from === '/me/statement' || origin?.from === '/me/documents'
             ? origin.from
-            : '/me/invoices'
+            : '/me/documents'
         : origin?.from === '/'
             ? '/'
             : user?.role === 'admin' && origin?.from === '/admin/invoices'

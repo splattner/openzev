@@ -627,8 +627,7 @@ or cannot load. Use **Retry** if the consumption profile fails.
 
 Login as a participant (Anna or Ben):
 - **Dashboard** shows your selected community's energy overview
-- **My invoices** lists your invoices and credit notes with their amounts, payment state and PDFs
-- **My documents** lists everything delivered to you: invoices, credit notes, statements, the contract and notices
+- **My documents** lists everything delivered to you: invoices with their amounts and payment state, credit notes, statements, the contract and notices
 - **Annual statement** shows the yearly statement and financial summary your community issued to you
 
 Anna's demo account includes invoice PDFs and so lists her invoices; Ben's

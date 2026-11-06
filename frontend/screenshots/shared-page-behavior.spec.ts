@@ -242,7 +242,7 @@ test('an invoice deletion dialog does not survive a community switch', async ({ 
   expect(errors).toEqual([])
 })
 
-test('my invoices show only the account\u2019s own participant rows', async ({ page }) => {
+test('my documents show only the account\u2019s own participant rows', async ({ page }) => {
   const state: ApiState = {
     populated: true,
     preferred: '42',
@@ -257,7 +257,7 @@ test('my invoices show only the account\u2019s own participant rows', async ({ p
     ],
   }
   const errors = await mockApi(page, state)
-  await page.goto('/me/invoices')
+  await page.goto('/me/documents')
   await expect(page.locator('tbody tr')).toHaveCount(1)
   await expect(page.locator('tbody')).toContainText('R-1')
   await expect(page.locator('tbody')).not.toContainText('R-9')

@@ -22,7 +22,7 @@ import { StandingBadge, useDownloadDocument } from './DocumentsList'
 import { IssueReportsDialog, issueYears } from './IssueReportsDialog'
 import { UploadDocumentDialog } from './UploadDocumentDialog'
 import './inbox.css'
-import './InvoiceDocuments.css'
+import './DocumentCards.css'
 
 /**
  * The manager's *Participant documents* page body (spec §7.2): what the community delivered to

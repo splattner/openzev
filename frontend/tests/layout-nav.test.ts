@@ -402,12 +402,13 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         }
     })
 
-    it('participant sees Dashboard, My invoices, My documents and Annual statement only', async () => {
+    it('participant sees Dashboard, My documents and Annual statement only', async () => {
         mockSession('participant')
         const page = await renderLayout()
         expect(page.hasHref('/')).toBe(true)
         expect(page.hasHref('/dashboard')).toBe(false)
-        expect(page.hasHref('/me/invoices')).toBe(true)
+        // Invoices are in My documents (no entry of their own since #862).
+        expect(page.hasHref('/me/invoices')).toBe(false)
         expect(page.hasHref('/me/documents')).toBe(true)
         expect(page.hasHref('/me/statement')).toBe(true)
         for (const href of ['/reports', '/documents', '/metering/imports', '/participants', '/tariffs', '/zev-settings', '/audit-logs', '/admin']) {
@@ -432,7 +433,7 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
 
     it('does not highlight My metering points on other participant pages', async () => {
         mockSession('participant')
-        const page = await renderLayoutAt('/me/invoices')
+        const page = await renderLayoutAt('/me/documents')
         try {
             expect(page.link('/me/metering-points')?.classList.contains('active')).toBe(false)
         } finally {
@@ -440,17 +441,16 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         }
     })
 
-    it.each([false, true])('keeps former-participant invoice and document navigation accessible when collapsed=%s', async (collapsed) => {
+    it.each([false, true])('keeps former-participant document navigation accessible when collapsed=%s', async (collapsed) => {
         window.localStorage.setItem('openzev.sidebarCollapsed', String(collapsed))
         mockSession('former')
         const page = await renderLayout()
         try {
             const links = page.container.querySelectorAll('nav.nav-list a')
-            // What it was sent: the invoices and, since the inbox has no end date, the documents.
-            expect([...links].map((link) => link.getAttribute('href'))).toEqual(['/me/invoices', '/me/documents'])
-            expect(links[0].getAttribute('aria-label') ?? links[0].textContent).toBe('nav.myInvoices')
-            expect(links[0].getAttribute('title')).toBe(collapsed ? 'nav.myInvoices' : null)
-            expect(links[1].getAttribute('aria-label') ?? links[1].textContent).toBe('nav.myDocuments')
+            // What it was sent, invoices included: the inbox has no end date.
+            expect([...links].map((link) => link.getAttribute('href'))).toEqual(['/me/documents'])
+            expect(links[0].getAttribute('aria-label') ?? links[0].textContent).toBe('nav.myDocuments')
+            expect(links[0].getAttribute('title')).toBe(collapsed ? 'nav.myDocuments' : null)
         } finally {
             page.unmount()
         }

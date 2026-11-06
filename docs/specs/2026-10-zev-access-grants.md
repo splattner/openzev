@@ -822,7 +822,7 @@ Public authentication and bearer-link routes remain outside these guards:
 | `/admin/**`, `/admin/system-settings` | `admin` | `['admin']` |
 | `/participants`, `/zev-settings`, `/zev-settings/:tab`, `/metering/quality`, `/tariffs`, `/billing/periods`, `/billing/invoices`, `/billing/emails`, `/feasibility`, `/metering/imports` | `admin`, `zev_owner` | `ZEV_SCOPE` = `['admin', 'manager', 'viewer']` |
 | `/me/statement` | `participant` | `['participant']` |
-| `/me/invoices` | `participant` | `['participant', 'former']` |
+| `/me/invoices` | `participant` | `['participant', 'former']` (since #862 an alias of `/me/documents`) |
 | `/reports` | `admin`, `zev_owner`, `participant` | `[...ZEV_SCOPE, 'participant']` |
 
 ### 9.4 Navigation (`components/Layout.tsx`)
@@ -830,7 +830,7 @@ Public authentication and bearer-link routes remain outside these guards:
 The sidebar follows the selected entry's shell role: `isZevScope` → Overview,
 Energy balance, Metering, Billing, Reports and the Setup group (the owner
 navigation as before), Feasibility when enabled; `participant` → Dashboard, My
-invoices, Annual statement; `former` → My invoices only. The Platform group
+documents, Annual statement; `former` → My documents only (My invoices was folded into it, #862). The Platform group
 stays admin-only. Shell role `none` gets only the Account navigation entry.
 
 The **switcher** shows when the account can manage something or has more than
@@ -852,7 +852,7 @@ dashboard.
 **Community labels (PR 7).** Pages that list across every membership (My
 invoices, metering points, the chart) name the community only when the account
 has exactly one membership (`soleCommunityName(user)` in `lib/membership.ts`);
-My invoices adds a community column with more than one. The participant
+My documents adds a community column with more than one. The participant
 dashboard and Reports name the selected entry, because they ask about it:
 `ReportsPage` passes `zevId` to `ParticipantYearDocuments` (statement and tax
 overview downloads) when the account has more than one entry.
@@ -1193,7 +1193,7 @@ rules) and `tests/templates-hub.test.ts` (9 template tabs).
   switchable with two entries, an admin always).
 - `tests/route-guard-matrix.test.ts`: the route matrix per shell role, plus
   relation cases (a viewer reads the ZEV pages, a participant-only selection
-  gets the participant routes, `former` reaches My invoices only, a manager
+  gets the participant routes, `former` reaches My documents only, a manager
   relation opens the ZEV pages for a `participant`-role account).
 - `tests/layout-nav.test.ts`: navigation per role with `entries` in the mock
   (single-relationship accounts unchanged).

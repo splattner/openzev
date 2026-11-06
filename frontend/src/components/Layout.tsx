@@ -315,19 +315,15 @@ export function Layout() {
                             <>
                                 <SidebarLink to="/" label={t('nav.dashboard')} icon={<DashboardIcon />} collapsed={isNavigationCollapsed} />
                                 {showMyEnergy && <SidebarLink to="/my-energy" label={t('nav.myEnergy')} icon={<LiveIcon />} collapsed={isNavigationCollapsed} />}
-                                <SidebarLink to="/me/invoices" label={t('nav.myInvoices')} icon={<InvoiceIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/me/documents" label={t('nav.myDocuments')} icon={<DocumentIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/me/statement" label={t('nav.annualStatement')} icon={<ReportsIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/me/metering-points" label={t('nav.myMeteringPoints')} icon={<PlugIcon />} active={myMeteringPointsActive} collapsed={isNavigationCollapsed} />
                             </>
                         )}
 
-                        {/* A former participant keeps only the invoices it was sent. */}
+                        {/* A former participant keeps only what was delivered to it. */}
                         {isFormerParticipant && (
-                            <>
-                                <SidebarLink to="/me/invoices" label={t('nav.myInvoices')} icon={<InvoiceIcon />} collapsed={isNavigationCollapsed} />
-                                <SidebarLink to="/me/documents" label={t('nav.myDocuments')} icon={<DocumentIcon />} collapsed={isNavigationCollapsed} />
-                            </>
+                            <SidebarLink to="/me/documents" label={t('nav.myDocuments')} icon={<DocumentIcon />} collapsed={isNavigationCollapsed} />
                         )}
 
                         {canManage && (

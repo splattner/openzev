@@ -493,7 +493,7 @@ live on Reports; participant invoice PDF actions remain on the dashboard.
   3. `ConsumptionSplitCard`: stacked from-ZEV / from-grid kWh bars plus a
      right-hand 0–100 % axis with the `from_zev_rate` line.
   4. `HourlyProfileCard` when the profile has data.
-  There is no invoice list on the participant dashboard (removed with the document inbox, #862): *My invoices* and *My documents* are the places for invoices, so the dashboard keeps to energy.
+  There is no invoice list on the participant dashboard (removed with the document inbox, #862): *My documents* is the place for invoices, so the dashboard keeps to energy.
 Invoice actions, email retries and admin deletion invalidate the shared cache.
 
 ### 7.10 TypeScript types

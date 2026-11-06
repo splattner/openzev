@@ -83,7 +83,6 @@ vi.mock('../src/pages/MeteringPointsPage', () => ({ MeteringPointsPage: marker('
 vi.mock('../src/pages/MeteringChartPage', () => ({ MeteringChartPage: marker('metering-chart') }))
 vi.mock('../src/pages/TariffsPage', () => ({ TariffsPage: marker('tariffs') }))
 vi.mock('../src/pages/InvoicesPage', () => ({ InvoicesContent: marker('invoices') }))
-vi.mock('../src/pages/MyInvoicesPage', () => ({ MyInvoicesPage: marker('my-invoices') }))
 vi.mock('../src/pages/DocumentsPage', () => ({ DocumentsPage: marker('my-documents') }))
 vi.mock('../src/pages/ParticipantDocumentsPage', () => ({ ParticipantDocumentsPage: marker('participant-documents') }))
 vi.mock('../src/pages/MyMeteringPointsPage', () => ({ MyMeteringPointsPage: marker('my-metering-points') }))
@@ -181,7 +180,8 @@ const MATRIX: Array<{ path: string; marker: string; allow: Record<ShellRole, boo
     { path: '/billing/statements', marker: 'reports', allow: { admin: true, manager: true, viewer: true, participant: true, former: false, none: false } },
     { path: '/billing/invoices/42', marker: 'invoice-detail', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: false } },
     { path: '/me/statement', marker: 'reports', allow: { admin: false, manager: false, viewer: false, participant: true, former: false, none: false } },
-    { path: '/me/invoices', marker: 'my-invoices', allow: { admin: false, manager: false, viewer: false, participant: true, former: true, none: false } },
+    // My invoices was folded into My documents: the old address lands there.
+    { path: '/me/invoices', marker: 'my-documents', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: false } },
     // Open to management shells too: a manager who is also a participant reads what was addressed to them.
     { path: '/me/documents', marker: 'my-documents', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: false } },
     // Open to management shells too: a manager who is also a participant sets up their own energy data there.
@@ -297,7 +297,7 @@ describe('route guard by relation to the selected community', () => {
         { relation: 'viewer', path: '/zev-settings/access', marker: 'zev-settings', allow: true },
         { relation: 'viewer', path: '/me/statement', marker: 'reports', allow: false },
         { relation: 'manager', path: '/billing/invoices', marker: 'billing-hub', allow: true },
-        { relation: 'former', path: '/me/invoices', marker: 'my-invoices', allow: true },
+        { relation: 'former', path: '/me/invoices', marker: 'my-documents', allow: true },
         { relation: 'former', path: '/me/statement', marker: 'reports', allow: false },
         { relation: 'former', path: '/participants', marker: 'participants', allow: false },
         { relation: 'former', path: '/dashboard', marker: 'dashboard', allow: false },

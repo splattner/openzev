@@ -100,18 +100,18 @@ describe('InvoiceDetailPage return link', () => {
         container.remove()
     })
 
-    it('sends participants back to their own invoices list', async () => {
+    it('sends participants back to their documents', async () => {
         mockRole('participant')
         const container = await renderDetail()
         const link = container.querySelector('header a.button') as HTMLAnchorElement
-        expect(link.getAttribute('href')).toBe('/me/invoices')
+        expect(link.getAttribute('href')).toBe('/me/documents')
         expect(link.textContent).toBe('common.back')
         container.remove()
     })
 
-    it('honours a participant origin of My invoices or the statement page', async () => {
+    it('honours a participant origin of My documents or the statement page', async () => {
         mockRole('participant')
-        for (const from of ['/me/invoices', '/me/statement', '/']) {
+        for (const from of ['/me/documents', '/me/statement', '/']) {
             const container = await renderDetail([{ pathname: '/billing/invoices/1', state: { from } }])
             const link = container.querySelector('header a.button') as HTMLAnchorElement
             expect(link.getAttribute('href')).toBe(from)

@@ -518,7 +518,6 @@ test.describe('User Guide Screenshots', () => {
     await screenshotViewport(page, '08i-correct-invoice-dialog')
   })
 
-  // 08c — Participant My Invoices (via impersonation)
   // 08j — the period's one-off charges, under its invoices. The demo bills the
   // seeded charges in the last complete quarter, so the section shows them
   // together with the note that approved invoices freeze the period.
@@ -529,16 +528,6 @@ test.describe('User Guide Screenshots', () => {
     await resetHover(page)
     await section.screenshot({ path: path.join(SCREENSHOT_DIR, '08j-period-charges.png') })
     await quantizePng(path.join(SCREENSHOT_DIR, '08j-period-charges.png'))
-  })
-
-  test('08c-my-invoices', async ({ page }) => {
-    await impersonateDemoParticipant(page, { requireSentInvoice: true })
-    await navigateTo(page, '/me/invoices')
-    await page.waitForSelector('table, .card', { timeout: 10_000 })
-    // Rows appear even without a PDF — the state the guide's list section shows.
-    await page.waitForSelector('tbody tr, .invoice-row', { timeout: 10_000 })
-    await page.waitForTimeout(400)
-    await screenshotFull(page, '08c-my-invoices')
   })
 
   // 08k — what the community delivered, for the manager (the inbox's outbox page).

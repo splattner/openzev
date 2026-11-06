@@ -68,43 +68,27 @@ approving. It asks you to regenerate draft invoices that were created before a
 charge was added or changed, and warns about a charge nobody can be billed for
 (no member on its date). It stays out of the list for periods without charges.
 
-## Participant View: My Invoices
-
-Participants open **My invoices** (`/me/invoices`) in the sidebar to see the
-invoices and credit notes issued to them. It is the invoice and credit note part
-of **My documents** (below), so what is listed is what was delivered: an invoice
-appears once it has been sent (drafts and approved invoices that haven't gone out
-yet stay with the operator), a credit note once its PDF exists.
-
-Each invoice shows its number, period, total, and whether payment is **due**,
-**overdue** or **paid**; where a credit note was set against it, the amount due
-is shown beneath the total. A **Download** button gives the PDF that was
-delivered. A sent invoice that is cancelled later stays listed, marked as
-cancelled. Credit notes are listed in their own table with their amount, what is
-left and where it was set against an invoice. Participants with several
-communities see which community issued each row. A failed refresh keeps the last
-loaded rows visible with a warning and **Retry**.
-
-The amounts and the payment state are read from the invoice, so they stay
-current; the PDF is the copy that was sent and does not change. The list is
-read-only. There is no separate page for one invoice any more: the PDF carries
-the details, and an old link to `/billing/invoices/{id}` takes a participant to
-**My invoices**. On a phone each invoice is a small card with a full-width
-**Download**.
-
-![Participant My Invoices](screenshots/08c-my-invoices.png)
-
 ## Participant View: My Documents
 
-**My documents** (`/me/documents`) is the participant's mailbox: everything the
-community has delivered to them, newest first, in the same table as the other
-lists — sent
-invoices, credit notes, annual statements, financial summaries, tariff
-overviews, the participation contract, and notices from the operator. Each row shows the type,
-the year, the delivery date and a **Download** button; use the type filter to
-narrow the list, the year filter when documents span several years, and the
+**My documents** (`/me/documents`) is where a participant finds everything the
+community has delivered to them, invoices included, newest first, in the same
+table as the other lists: sent invoices, credit notes, annual statements,
+financial summaries, tariff overviews, the participation contract, and notices
+from the operator. Each row shows the type, the year, the delivery date and a
+**Download** button; use the type filter to narrow the list (**Invoice** gives
+the invoices alone), the year filter when documents span several years, and the
 community filter when you take part in more than one. On a phone each document
 is a small card.
+
+An **invoice** row shows its total and, where a credit note was set against it,
+the amount due beneath it, and whether payment is **due**, **overdue** or
+**paid**. A **credit note** row shows its amount, what is left of it, and where it
+was set against an invoice. These figures are read from the invoice or credit
+note, so they stay current; the PDF is the copy that was sent and does not
+change. An invoice appears once it has been sent (drafts and approved invoices
+that haven't gone out yet stay with the operator), a credit note once its PDF
+exists. There is no separate page for one invoice: the PDF carries the details,
+and an old link to an invoice or to **My invoices** takes a participant here.
 
 ![Participant My documents](screenshots/08l-my-documents.png)
 
@@ -118,7 +102,6 @@ is a small card.
   stays listed, marked **Superseded**. A sent invoice that was cancelled stays
   listed, marked **Cancelled**. A notice the operator **withdrew** disappears from
   your list.
-- **My invoices** shows the invoice and credit note rows of this list, with the amounts and payment state.
 
 ## Invoice Lifecycle
 
@@ -617,10 +600,9 @@ and click **Correct invoice** in the **Credit notes** card, then choose:
 Enter a **reason**; it is printed on the credit note. Credit notes have their
 own numbers (prefix **CN** by default, changeable in the community settings
 under *Billing & payment*) and a PDF you can open from the card, based on the
-**Credit Note PDF Template** that admins can edit under *Templates*. Participants see their
-credit notes on the invoice and under **My invoices**; each one also appears in
-**My documents** (type *Credit note*) as soon as its PDF exists, and the
-participant is notified. That copy is fixed: rendering the credit note's PDF again later
+**Credit Note PDF Template** that admins can edit under *Templates*. Participants find their
+credit notes in **My documents** (type *Credit note*) as soon as the PDF exists,
+and are notified. That copy is fixed: rendering the credit note's PDF again later
 does not change what they were given.
 
 ![Credit note on a reversed invoice](screenshots/08g-invoice-credit-note.png)

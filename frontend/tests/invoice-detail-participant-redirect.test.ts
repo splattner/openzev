@@ -34,7 +34,7 @@ async function renderAt(path: string) {
             createElement(QueryClientProvider, { client }, createElement(MantineProvider, null,
                 createElement(Routes, null,
                     createElement(Route, { path: '/billing/invoices/:invoiceId', element: createElement(InvoiceDetailPage) }),
-                    createElement(Route, { path: '/me/invoices', element: createElement('p', null, 'MY INVOICES') }),
+                    createElement(Route, { path: '/me/documents', element: createElement('p', null, 'MY DOCUMENTS') }),
                 ),
             )),
         ))
@@ -53,10 +53,10 @@ function account(access: 'manager' | null, role: 'user' | 'admin' = 'user') {
 }
 
 describe('an invoice link a participant can no longer open', () => {
-    it('lands on My invoices instead of an error that a retry cannot fix', async () => {
+    it('lands on My documents instead of an error that a retry cannot fix', async () => {
         account(null)
         const container = await renderAt('/billing/invoices/42')
-        expect(container.textContent).toContain('MY INVOICES')
+        expect(container.textContent).toContain('MY DOCUMENTS')
         expect(container.textContent).not.toContain('common.error')
         container.remove()
     })
@@ -64,7 +64,7 @@ describe('an invoice link a participant can no longer open', () => {
     it.each([['manager' as const, 'user' as const], [null, 'admin' as const]])('keeps the error and retry for an account that manages (%s, %s)', async (access, role) => {
         account(access, role)
         const container = await renderAt('/billing/invoices/42')
-        expect(container.textContent).not.toContain('MY INVOICES')
+        expect(container.textContent).not.toContain('MY DOCUMENTS')
         expect(container.textContent).toContain('common.error')
         container.remove()
     })

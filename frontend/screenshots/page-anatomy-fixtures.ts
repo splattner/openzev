@@ -242,6 +242,19 @@ export async function mockApi(page: Page, state: ApiState = {}) {
       '/invoices/invoices/': (state.invoices ?? [invoice]).map(entry => ({
         period_start: invoiceFrom, period_end: invoiceTo, ...entry,
       })),
+      // The participant's documents: each fixture invoice was delivered into the inbox.
+      '/inbox/documents/': (state.invoices ?? [invoice]).map(entry => ({
+        id: `doc-${entry.id}`, zev: entry.zev, zev_name: entry.zev_name, participant: entry.participant,
+        participant_name: entry.participant_name, kind: 'invoice', title: entry.invoice_number,
+        document_number: entry.invoice_number, period_start: invoiceFrom, period_end: invoiceTo,
+        file_name: `${entry.invoice_number}.pdf`, size_bytes: 1000, sha256: '', delivered_at: '2026-09-30T10:00:00Z',
+        delivered_by_name: null, superseded_at: null, superseded_by: null, withdrawn_at: null, batch_id: null,
+        invoice: entry.id, invoice_status: entry.status, contract_issue: null, credit_figures: null,
+        invoice_figures: {
+          status: entry.status, due_date: null, total_chf: entry.total_chf, credit_applied_chf: '0.00',
+          amount_due_chf: entry.total_chf, paid_chf: '0.00', outstanding_chf: entry.total_chf, open_data_impact_count: 0,
+        },
+      })),
       '/metering/import-logs/': [],
       '/auth/users/': [{ ...user(), id: 2, username: 'account@example.test', email: 'account@example.test',
         is_active: true, mfa_methods: [], mfa_compliance: null, last_login: null, date_joined: '2026-01-01T00:00:00Z',

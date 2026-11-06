@@ -16,7 +16,7 @@ vi.mock('../src/lib/auth', () => ({ useAuth: () => ({ user: auth.user }) }))
 vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast: vi.fn() }) }))
 vi.mock('../src/lib/appSettings', () => ({ useAppSettings: () => ({ settings: {} }), formatShortDate: (date: string) => date }))
 
-import { MyInvoicesPage } from '../src/pages/MyInvoicesPage'
+import { DocumentsPage } from '../src/pages/DocumentsPage'
 import { issuedDocumentFor, issuedYears } from '../src/features/reports/ParticipantYearDocuments'
 
 function user(zevs: string[] = ['Community A'], participant = 'p1') {
@@ -78,46 +78,46 @@ async function mount(body: ReactNode) {
   return { container, client }
 }
 
-describe('MyInvoicesPage (the invoice and credit note rows of the inbox)', () => {
-  it('lists the account\'s invoices with what is owed and a download, and no link to a live invoice', async () => {
+describe('DocumentsPage (invoices and credit notes carry their amounts and where they stand)', () => {
+  it('lists an invoice with what is owed and a download, and no link to a live invoice', async () => {
     api.list.mockResolvedValue([invoiceRow()])
-    const { container } = await mount(createElement(MyInvoicesPage))
+    const { container } = await mount(createElement(DocumentsPage))
 
     expect(api.list).toHaveBeenCalledWith()
     expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
-    expect(container.textContent).toContain('INV-1')
-    expect(container.textContent).toContain('CHF 108.10')
+    expect(container.querySelector('thead')?.textContent).toContain('inbox.col.amount')
+    const row = container.querySelector('tbody tr')!.textContent!
+    expect(row).toContain('INV-1')
+    expect(row).toContain('CHF 108.10')
     // Credit set against the invoice: the amount due is shown beneath the total.
-    expect(container.textContent).toContain('CHF 58.10')
-    expect(container.textContent).toContain('invoice.payment.due')
-    expect(container.textContent).not.toContain('invoice.status.sent')
+    expect(row).toContain('CHF 58.10')
+    expect(row).toContain('invoice.payment.due')
     expect(container.querySelector('tbody a')).toBeNull()
 
     await act(async () => container.querySelector<HTMLButtonElement>('tbody button')!.click())
     expect(api.download).toHaveBeenCalledWith('d1')
   })
 
-  it('keeps only rows addressed to the account\'s own participations and only invoices in the invoice table', async () => {
+  it('shows only the account\'s own rows and leaves the amount column out when nothing has one', async () => {
     api.list.mockResolvedValue([
-      invoiceRow(),
       invoiceRow({ id: 'd2', participant: 'someone-else', title: 'INV-2' }),
       { ...invoiceRow({ id: 'd3', kind: 'operator', title: 'House rules' }), invoice: null, invoice_figures: null },
     ])
-    const { container } = await mount(createElement(MyInvoicesPage))
+    const { container } = await mount(createElement(DocumentsPage))
 
     expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
-    expect(container.textContent).toContain('INV-1')
+    expect(container.textContent).toContain('House rules')
     expect(container.textContent).not.toContain('INV-2')
-    expect(container.textContent).not.toContain('House rules')
+    expect(container.querySelector('thead')?.textContent).not.toContain('inbox.col.amount')
   })
 
-  it('marks an overdue invoice and a cancelled one by what the participant needs to know', async () => {
+  it('says what an overdue and a cancelled invoice need from the participant', async () => {
     const figures = invoiceRow().invoice_figures!
     api.list.mockResolvedValue([
       invoiceRow({ id: 'late', title: 'INV-LATE', invoice_figures: { ...figures, due_date: '2020-01-01' } }),
       invoiceRow({ id: 'void', title: 'INV-VOID', invoice_figures: { ...figures, status: 'cancelled', outstanding_chf: '0.00' } }),
     ])
-    const { container } = await mount(createElement(MyInvoicesPage))
+    const { container } = await mount(createElement(DocumentsPage))
 
     expect(container.textContent).toContain('invoice.payment.overdue')
     expect(container.textContent).toContain('invoice.status.cancelled')
@@ -126,57 +126,42 @@ describe('MyInvoicesPage (the invoice and credit note rows of the inbox)', () =>
   it('flags an invoice with open reading corrections without showing their evidence', async () => {
     const figures = invoiceRow().invoice_figures!
     api.list.mockResolvedValue([invoiceRow({ invoice_figures: { ...figures, open_data_impact_count: 2 } })])
-    const { container } = await mount(createElement(MyInvoicesPage))
+    const { container } = await mount(createElement(DocumentsPage))
 
     expect(container.textContent).toContain('pages.invoices.dataReview.badge')
   })
 
-  it('lists credit notes with what is left and where it was set off', async () => {
-    api.list.mockResolvedValue([invoiceRow(), creditRow()])
-    const { container } = await mount(createElement(MyInvoicesPage))
+  it('shows a credit note with what is left, where it was set off and the invoice it corrects', async () => {
+    api.list.mockResolvedValue([creditRow()])
+    const { container } = await mount(createElement(DocumentsPage))
 
-    const credits = container.querySelector('#my-credits-title')!.closest('section')!
-    expect(credits.textContent).toContain('CN-00001')
-    expect(credits.textContent).toContain('INV-0')
-    expect(credits.textContent).toContain('30.00')
-    expect(credits.textContent).toContain('pages.invoiceDetail.credits.status.open')
-    expect(credits.textContent).toContain('pages.invoiceDetail.credits.appliedTo')
-    await act(async () => credits.querySelector<HTMLButtonElement>('tbody button')!.click())
+    const row = container.querySelector('tbody tr')!.textContent!
+    expect(row).toContain('CN-00001')
+    expect(row).toContain('CHF 50.00')
+    expect(row).toContain('inbox.credit.remaining')
+    expect(row).toContain('inbox.credit.forInvoice INV-0')
+    expect(row).toContain('pages.invoiceDetail.credits.status.open')
+    expect(row).toContain('pages.invoiceDetail.credits.appliedTo')
+    await act(async () => container.querySelector<HTMLButtonElement>('tbody button')!.click())
     expect(api.download).toHaveBeenCalledWith('c1')
-  })
-
-  it('shows the empty state only when nothing was delivered', async () => {
-    const { container } = await mount(createElement(MyInvoicesPage))
-    expect(container.textContent).toContain('pages.myInvoices.empty.title')
   })
 
   it('names the community per row for an account in several', async () => {
     auth.user = user(['Community A', 'Community B'])
     api.list.mockResolvedValue([invoiceRow(), invoiceRow({ id: 'd2', participant: 'p1-1', zev: 'z1', zev_name: 'Community B', title: 'INV-2' })])
-    const { container } = await mount(createElement(MyInvoicesPage))
+    const { container } = await mount(createElement(DocumentsPage))
 
-    expect(container.querySelector('.eyebrow')?.textContent).toBe('pages.myInvoices.allCommunities')
-    expect(container.textContent).toContain('pages.myInvoices.col.community')
+    expect(container.querySelector('.eyebrow')?.textContent).toBe('inbox.allCommunities')
+    expect(container.querySelector('thead')?.textContent).toContain('inbox.col.community')
     expect(container.textContent).toContain('Community B')
   })
 
-  it('keeps the rows and warns when a later load fails', async () => {
-    api.list.mockResolvedValue([invoiceRow()])
-    const { container, client } = await mount(createElement(MyInvoicesPage))
-    api.list.mockRejectedValue(new Error('Offline'))
-    await act(async () => { await client.refetchQueries() })
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)) })
+  it('renders a card per document for a phone alongside the table', async () => {
+    api.list.mockResolvedValue([invoiceRow(), creditRow()])
+    const { container } = await mount(createElement(DocumentsPage))
 
-    expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
-    expect(container.querySelector('.warning-banner')).not.toBeNull()
-  })
-
-  it('shows only the error when the first load fails', async () => {
-    api.list.mockRejectedValue(new Error('Offline'))
-    const { container } = await mount(createElement(MyInvoicesPage))
-
-    expect(container.querySelector('.error-banner')).not.toBeNull()
-    expect(container.querySelector('table')).toBeNull()
+    expect(container.querySelectorAll('.doc-cards .doc-card')).toHaveLength(2)
+    expect(container.querySelector('.doc-cards')!.textContent).toContain('CHF 108.10')
   })
 })
 

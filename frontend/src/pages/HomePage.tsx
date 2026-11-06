@@ -10,7 +10,7 @@ import { OverviewPage } from './OverviewPage'
 export function HomePage() {
     const { isZevScope, shellRole } = useCommunityAccess()
 
-    if (shellRole === 'former') return <Navigate to="/me/invoices" replace />
+    if (shellRole === 'former') return <Navigate to="/me/documents" replace />
 
     if (isZevScope) return <OverviewPage />
     if (shellRole === 'none') return <GuestHomePage />

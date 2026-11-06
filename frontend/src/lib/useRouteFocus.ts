@@ -5,7 +5,7 @@ import { useLocation, useNavigationType } from 'react-router-dom'
  * After a pathname change, focus the new page's h1 (else `main`) — unless
  * focus is still inside the page or an open dialog, or the change is a
  * redirect while loading: a REPLACE before any user input or other
- * navigation (`/` → `/me/invoices`). Navigations
+ * navigation (`/` → `/me/documents`). Navigations
  * run as transitions, so a lazy page's h1 is present when this runs.
  * Contract: SPEC-2026-04 §7.1.
  */

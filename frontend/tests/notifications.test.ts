@@ -19,14 +19,14 @@ function make(overrides: Partial<Notification> = {}): Notification {
 }
 
 describe('notificationLink', () => {
-    it('sends a participant to their invoice list and a manager to the invoice', () => {
-        expect(notificationLink(make())).toBe('/me/invoices')
+    it('sends a participant to their documents and a manager to the invoice', () => {
+        expect(notificationLink(make())).toBe('/me/documents')
         expect(notificationLink(make({ audience: 'manager' }))).toBe('/billing/invoices/inv-1')
     })
 
-    it('sends a participant to the inbox once the invoice was delivered into it, and to the list before', () => {
+    it('sends a participant to the documents whether or not the notification names the delivered document', () => {
         expect(notificationLink(make({ type: 'invoice.sent', payload: { invoice_number: 'INV-1', document_id: 'd1' } }))).toBe('/me/documents')
-        expect(notificationLink(make({ type: 'invoice.sent' }))).toBe('/me/invoices')
+        expect(notificationLink(make({ type: 'invoice.sent' }))).toBe('/me/documents')
     })
 
     it('sends a delivered document to the inbox', () => {

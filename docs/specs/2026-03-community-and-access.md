@@ -1704,7 +1704,7 @@ reaches every ZEV-scope route and sees its pages read-only
 
 | Route | Allowed roles | Page component |
 |---|---|---|
-| `/` | any authenticated | `HomePage`: `OverviewPage` in ZEV scope, `DashboardPage` for current participants, `/me/invoices` redirect for former participants, `GuestHomePage` for shell role `none` (linking explanation + secondary account link) |
+| `/` | any authenticated | `HomePage`: `OverviewPage` in ZEV scope, `DashboardPage` for current participants, `/me/documents` redirect for former participants, `GuestHomePage` for shell role `none` (linking explanation + secondary account link) |
 | `/dashboard` | ZEV scope, `participant` | `DashboardPage` (manager title/navigation: Energy balance; participant root remains `/`) |
 | `/my-energy` | ZEV scope, `participant` | `MyEnergyPage` ("My energy system"): live energy of the selected community and the own-system history, Today / 7 days / Period via `?range=` (SPEC-2026-live-energy-data §7.1); shows notices while the live flag or the energy data feature is off |
 | `/live` | alias | `AliasNavigate` to `/my-energy` (query and hash kept) |
@@ -1742,7 +1742,7 @@ reaches every ZEV-scope route and sees its pages read-only
 | `/invoices/:invoiceId` · `/billing/invoices/:invoiceId` | any authenticated | `InvoiceDetailPage` (managers and admins; a participant has no live invoice, #862) |
 | `/me/statement` | `participant` | `ReportsPage` (participant branch; impersonating admins carry the target account's relations) |
 | `/me/documents` | `participant`, `former`, and the management shells for an account that holds a participation (nav entry only then) | `DocumentsPage` (what was delivered to the account; read-only list over `/api/v1/inbox/documents/`, own rows only; [participant document inbox §7.1](2026-11-participant-document-inbox.md)) |
-| `/me/invoices` | `participant`, `former` | `MyInvoicesPage` (the invoice and credit note rows of the participant's document inbox with their live figures; [participant document inbox §7.1](2026-11-participant-document-inbox.md)) |
+| `/me/invoices` | any authenticated | alias → `/me/documents` (My invoices was folded into My documents, #862; the bell, bookmarks and the former-participant home land there) |
 | `/me/metering-points` | `participant`, `manager`, `viewer`, `admin` | `MyMeteringPointsPage` (the participant's own metering points and the energy data setup of those with generation behind the meter; a management shell shows only the flagged meters the user holds personally; see [supplementary energy data §7.1](2026-10-supplementary-energy-data.md)) |
 | `/reports` | ZEV scope, `participant` | `ReportsPage` (participants: own downloads; owners/admins: annual ZEV report, tax overview, and annual-statement ZIP) |
 | `/login` | public | `LoginPage` |
@@ -1803,8 +1803,7 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 | Account (`/account`) | shell role `none` (only nav entry; landing page explains the unlinked state) |
 | Dashboard (`/`) | shell role `participant` |
 | My energy system (`/my-energy`, right after Dashboard) | shell role `participant` (not `former`) + (live flag effective, or the energy data feature on and a held meter an own system can be connected to) |
-| My invoices (`/me/invoices`) | shell role `participant` or `former` |
-| My documents (`/me/documents`, after My invoices) | shell role `participant` or `former` (a former participant sees only these two entries: what it was sent stays readable, the inbox has no end date); also in a management shell, when the account holds a participation in any community (`ownParticipantIds`), in the *Personal* block (below) |
+| My documents (`/me/documents`, after My energy system) | shell role `participant` or `former` (a former participant sees only these two entries: what it was sent stays readable, the inbox has no end date); also in a management shell, when the account holds a participation in any community (`ownParticipantIds`), in the *Personal* block (below) |
 | Annual statement (`/me/statement`) | shell role `participant` (consumption is available on the participant dashboard) |
 | My metering points (`/me/metering-points`) | shell role `participant` (not `former`); for a participant it also lights on `/metering/chart` and `/metering/points`, which they reach from it (they have no Metering hub entry); also `admin`, `manager` or `viewer` who personally hold a flagged metering point in the selected community while the energy data feature is on, in the *Personal* block (below) |
 | Personal group (*Personal*, `nav.personalGroup`: My metering points and My documents), after the Setup group and Feasibility and before the Platform group | `isZevScope` and the account holds a flagged meter (My metering points) or a participation (My documents); empty, the group is not drawn. It keeps a manager's own side apart from the community they manage, and is styled like the Setup group |
@@ -1846,7 +1845,7 @@ fallbacks, the dirty-draft flow and fixed selections. Pages with the switch:
 Overview, Energy balance (`DashboardPage`), Metering chart and imports,
 Metering points, Billing hub and invoices, Reports, Participants, Tariffs, ZEV
 settings, and the owner audit log (not its `/admin` view). The invoice
-detail page (the invoice's own community), My invoices and every `/admin/*`
+detail page (the invoice's own community), My documents and every `/admin/*`
 page keep a plain eyebrow. The sidebar names no scope: it holds the logo, the
 navigation and the account. On mobile, Escape closes the sidebar drawer and
 returns focus to its menu button. Mobile navigation ignores the saved desktop
@@ -1872,10 +1871,10 @@ mark (the name as its tooltip) and expands the sidebar before opening. There is 
 holds only the mobile app bar (`.mobile-bar`, ≤768px: menu button plus the
 decorative logo lockup, sticky) and, during impersonation, the impersonation
 banner; on desktop it is empty otherwise.
-My invoices, the one participant page that lists across
+My documents, the one participant page that lists across
 every membership, shows the community name only when the account has exactly
 one membership (`soleCommunityName(user)`, from `/auth/me` `memberships`) and
-otherwise names the broader scope (`pages.myInvoices.allCommunities`), so a
+otherwise names the broader scope (`inbox.allCommunities`), so a
 single name never mislabels it. The participant dashboard, statement page,
 metering points and chart name the selected community, because they ask about
 it (`zev_id`): `selectedCommunityName` (`frontend/src/lib/membership.ts`) takes

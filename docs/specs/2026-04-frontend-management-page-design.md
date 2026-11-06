@@ -331,7 +331,7 @@ The single-column `.page-stack` and `.app-tabs` grids use
 `grid-template-columns: minmax(0, 1fr)`. This lets embedded tables scroll
 inside `.table-scroll` without their minimum content width expanding the
 hub or the whole page on mobile. The Billing email
-delivery table and My invoices table use `.billing-workflow-table` (48rem
+delivery table and the participant documents table use `.billing-workflow-table` (48rem
 minimum width) inside `.table-scroll`,
 with `.billing-period-cell` preventing date-range wrapping. Narrow screens
 scroll the table instead of squeezing its dates into tall rows.
@@ -420,7 +420,7 @@ URL edits preserve the hash). After a pathname change, `useRouteFocus`
 - only the search or hash changed (filters, query tabs), or this is the first
   render;
 - it is a `REPLACE` before any user input or other navigation — a redirect while
-  loading, such as a former participant's `/` → `/me/invoices`.
+  loading, such as a former participant's `/` → `/me/documents`.
 
 It runs in the shell after the page's own effects. Navigations run as
 transitions, so a lazy page's `h1` is present in the same commit. The `h1` is
