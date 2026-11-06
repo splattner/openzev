@@ -1,18 +1,25 @@
+import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AppTabs } from '../../components/AppTabs'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faDownload } from '@fortawesome/free-solid-svg-icons'
+import { Notice } from '../../components/Notice'
 import { PdfPreview } from '../../components/PdfPreview'
 import { YearPicker } from '../../components/YearPicker'
 import { PageSkeleton } from '../../components/PageSkeleton'
+import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { downloadBlob } from '../../lib/downloadBlob'
-import { downloadAnnualStatement, downloadFinancialSummary } from '../../lib/api/invoices'
+import { downloadInboxDocument, listInboxDocuments } from '../../lib/api/inbox'
+import { queryKeys } from '../../lib/api/queryKeys'
+import { useAuth } from '../../lib/auth'
+import { ownParticipantIds } from '../../lib/membership'
 import { usePdfObjectUrl } from '../../lib/usePdfObjectUrl'
+import type { DeliveredDocument } from '../../types/api'
 
 type ParticipantYearDocumentsProps = {
   userId: number
-  /** The community to ask about; omitted, the server picks the account's first current membership. */
+  /** The community to read from; omitted, every community the account takes part in. */
   zevId?: string
   year: number
   years: number[]
@@ -29,7 +36,8 @@ type DocumentDescriptor = {
     | 'pages.reports.financialSummary.description'
   errorKey: 'pages.reports.annualStatement.error' | 'pages.reports.financialSummary.error'
   filenamePrefix: string
-  load: (year: number, signal: AbortSignal, zevId?: string) => Promise<Blob>
+  /** The inbox kind this tab reads: what the operator issued, not a live render. */
+  inboxKind: 'annual_statement' | 'financial_summary'
 }
 
 const DESCRIPTORS: DocumentDescriptor[] = [
@@ -39,7 +47,7 @@ const DESCRIPTORS: DocumentDescriptor[] = [
     descriptionKey: 'pages.reports.annualStatement.description',
     errorKey: 'pages.reports.annualStatement.error',
     filenamePrefix: 'annual-statement',
-    load: (year, signal, zevId) => downloadAnnualStatement({ year, ...(zevId ? { zev_id: zevId } : {}) }, signal),
+    inboxKind: 'annual_statement',
   },
   {
     kind: 'tax-overview',
@@ -47,22 +55,24 @@ const DESCRIPTORS: DocumentDescriptor[] = [
     descriptionKey: 'pages.reports.financialSummary.description',
     errorKey: 'pages.reports.financialSummary.error',
     filenamePrefix: 'financial-summary',
-    load: (year, signal, zevId) => downloadFinancialSummary({ year, ...(zevId ? { zev_id: zevId } : {}) }, signal),
+    inboxKind: 'financial_summary',
   },
 ]
 
 function AnnualDocumentPanel({
   descriptor,
   year,
-  zevId,
+  document,
   active,
 }: {
   descriptor: DocumentDescriptor
   year: number
-  zevId?: string
+  /** The issued document for this year, or `undefined` when the operator has not issued one. */
+  document: DeliveredDocument | undefined
   active: boolean
 }) {
   const { t } = useTranslation()
+  const { settings } = useAppSettings()
   const [requested, setRequested] = useState(() => active)
   const [retryAttempt, setRetryAttempt] = useState(0)
   const statusRef = useRef<HTMLDivElement>(null)
@@ -72,11 +82,13 @@ function AnnualDocumentPanel({
     if (active) setRequested(true)
   }, [active])
 
+  const documentId = document?.id
   const fetcher = useMemo(() => {
-    return (signal: AbortSignal) => descriptor.load(year, signal, zevId)
+    if (!documentId) return null
+    return (signal: AbortSignal) => downloadInboxDocument(documentId, signal)
     // Retry changes the fetcher identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, zevId, descriptor, retryAttempt])
+  }, [documentId, retryAttempt])
 
   const { url, blob, loading, error } = usePdfObjectUrl(fetcher, requested)
 
@@ -89,7 +101,7 @@ function AnnualDocumentPanel({
 
   const documentLabel = t(descriptor.titleKey) as string
   const frameTitle = t('pages.reports.documentTitle', { document: documentLabel, year }) as string
-  const filename = `${descriptor.filenamePrefix}-${year}.pdf`
+  const filename = document?.file_name || `${descriptor.filenamePrefix}-${year}.pdf`
 
   const downloadButton = (
     <button
@@ -109,63 +121,102 @@ function AnnualDocumentPanel({
     <AppTabs.Panel value={descriptor.kind} aria-busy={loading}>
       <div className="page-stack">
         <p className="muted m-0">{t(descriptor.descriptionKey)}</p>
-        {/* Keep focus here when Retry replaces the error with the viewer. */}
-        <div
-          ref={statusRef}
-          tabIndex={-1}
-          aria-busy={loading}
-          aria-label={frameTitle}
-          className="yearly-document-status"
-        >
-          {url && blob ? (
-            <PdfPreview
-              src={url}
-              title={frameTitle}
-              actions={downloadButton}
-              openInNewTabFetcher={() => Promise.resolve(blob)}
-            />
-          ) : (
-            <>
-              <div className="actions-row actions-row-wrap">
-                {downloadButton}
-              </div>
-              {loading ? (
+        {!document ? (
+          <div className="card">
+            <p className="muted m-0">{t('pages.reports.notIssued', { document: documentLabel, year })}</p>
+          </div>
+        ) : (
+          <>
+            <p className="muted m-0">
+              {t('pages.reports.issuedOn', { date: formatShortDate(document.delivered_at.slice(0, 10), settings) })}
+            </p>
+            {/* Keep focus here when Retry replaces the error with the viewer. */}
+            <div
+              ref={statusRef}
+              tabIndex={-1}
+              aria-busy={loading}
+              aria-label={frameTitle}
+              className="yearly-document-status"
+            >
+              {url && blob ? (
+                <PdfPreview
+                  src={url}
+                  title={frameTitle}
+                  actions={downloadButton}
+                  openInNewTabFetcher={() => Promise.resolve(blob)}
+                />
+              ) : (
                 <>
-                  <p className="muted m-0" role="status" aria-live="polite">
-                    {t('pages.reports.preparingDocument', { document: documentLabel, year })}
-                  </p>
-                  <div className="yearly-document-skeleton">
-                    <PageSkeleton variant="card" />
+                  <div className="actions-row actions-row-wrap">
+                    {downloadButton}
                   </div>
+                  {loading ? (
+                    <>
+                      <p className="muted m-0" role="status" aria-live="polite">
+                        {t('pages.reports.preparingDocument', { document: documentLabel, year })}
+                      </p>
+                      <div className="yearly-document-skeleton">
+                        <PageSkeleton variant="card" />
+                      </div>
+                    </>
+                  ) : error ? (
+                    <div className="card error-banner page-stack" role="alert">
+                      <p className="m-0">{t(descriptor.errorKey)}</p>
+                      <div className="actions-row">
+                        <button
+                          className="button button-secondary button-compact"
+                          type="button"
+                          onClick={() => {
+                            retryFocusPending.current = true
+                            setRetryAttempt((n) => n + 1)
+                          }}
+                        >
+                          {t('common.retry')}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </>
-              ) : error ? (
-                <div className="card error-banner page-stack" role="alert">
-                  <p className="m-0">{t(descriptor.errorKey)}</p>
-                  <div className="actions-row">
-                    <button
-                      className="button button-secondary button-compact"
-                      type="button"
-                      onClick={() => {
-                        retryFocusPending.current = true
-                        setRetryAttempt((n) => n + 1)
-                      }}
-                    >
-                      {t('common.retry')}
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-            </>
-          )}
-        </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </AppTabs.Panel>
   )
 }
 
+/**
+ * The newest current document of ``kind`` for ``year`` that was issued to one of the account's own
+ * participations (in ``zevId`` when given).
+ */
+export function issuedDocumentFor(
+  documents: readonly DeliveredDocument[],
+  kind: DocumentDescriptor['inboxKind'],
+  year: number,
+  ownIds: ReadonlySet<string>,
+  zevId?: string,
+): DeliveredDocument | undefined {
+  return documents
+    .filter((document) =>
+      document.kind === kind
+      && document.participant != null && ownIds.has(document.participant)
+      && (!zevId || document.zev === zevId)
+      && !document.superseded_at && !document.withdrawn_at
+      && document.period_start?.slice(0, 4) === String(year))
+    .sort((a, b) => b.delivered_at.localeCompare(a.delivered_at))[0]
+}
+
 export function ParticipantYearDocuments({ userId, zevId, year, years, onYearChange }: ParticipantYearDocumentsProps) {
   const { t } = useTranslation()
+  const { user } = useAuth()
   const [active, setActive] = useState<DocumentKind>('annual-statement')
+  // Its own cache entry: the filter makes it a different list from *My documents*.
+  const query = useQuery({
+    queryKey: queryKeys.inbox.list('mine', { kinds: ['annual_statement', 'financial_summary'] }),
+    queryFn: () => listInboxDocuments({ kinds: ['annual_statement', 'financial_summary'] }),
+  })
+  const ownIds = useMemo(() => ownParticipantIds(user), [user])
 
   return (
     <div className="page-stack">
@@ -180,6 +231,11 @@ export function ParticipantYearDocuments({ userId, zevId, year, years, onYearCha
         />
       </div>
 
+      {query.isError && (
+        <Notice tone="error" onRetry={() => void query.refetch()} isRetrying={query.isFetching}>{t('inbox.failed')}</Notice>
+      )}
+      {query.isLoading && <PageSkeleton variant="card" />}
+      {query.data && (
       <section id="yearly-documents-preview" aria-label={t('pages.reports.participantDescription')}>
         <AppTabs
           value={active}
@@ -201,12 +257,13 @@ export function ParticipantYearDocuments({ userId, zevId, year, years, onYearCha
               key={`${descriptor.kind}-${userId}-${zevId ?? ''}-${year}`}
               descriptor={descriptor}
               year={year}
-              zevId={zevId}
+              document={issuedDocumentFor(query.data, descriptor.inboxKind, year, ownIds, zevId)}
               active={active === descriptor.kind}
             />
           ))}
         </AppTabs>
       </section>
+      )}
     </div>
   )
 }

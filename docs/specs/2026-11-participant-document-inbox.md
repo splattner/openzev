@@ -1,12 +1,12 @@
 # Feature Spec: Participant document inbox
 
 - Spec ID: SPEC-2026-11-participant-document-inbox
-- Status: Draft
+- Status: Implemented (phases 1–6b; 6b ships a release after the rest)
 - Scope: Major
 - Type: Feature
 - Owners: Sebastian Plattner
 - Created: 2026-11-05
-- Target Release: next minor (phases 1–3), the release after (phase 6)
+- Target Release: next minor (phases 1–6a), the release after (phase 6b)
 - Related Issues: [#862](https://github.com/splattner/openzev/issues/862); see also #761 (parties vs. accounts, shipped), #861 (draft invoices, shipped), #793 (anonymisation, open), #989 (notification center, shipped)
 - Related ADRs: [ADR 0045](../adr/0045-delivered-documents-are-immutable-and-addressed-to-the-participant.md), [ADR 0037](../adr/0037-issued-invoices-are-corrected-not-deleted.md), [ADR 0027](../adr/0027-per-zev-access-grants.md)
 - Impacted Areas: backend | frontend | async jobs | docs
@@ -24,7 +24,7 @@
 | 5 | Links and the bell: the public invoice PDF serves the delivered snapshot, `{inbox_url}` in the invoice email, `invoice.sent` carries `document_id`, new `document.delivered` notification | stacked on #1210 |
 | 5b | Email for documents: opt-in `notify` on upload, issue and deliver-contract (checkbox on upload and issue), `document_delivered` template | stacked on #1213 |
 | 6a | Credit notes: kind `credit_note`, delivered when the credit note's PDF first exists, backfill, bell | stacked on #1214 |
-| 6b | Cut-over (follow-up release): participants lose the live invoice, credit note and report endpoints | — |
+| 6b | Cut-over (follow-up release): participants lose the live invoice, credit note and report endpoints; *My invoices*, the dashboard card and *Annual statement* read the inbox, whose invoice and credit note rows carry live figures | stacked on #1215 |
 
 Each increment is its own PR and can ship alone. Phases 1–6a add; only phase 6b removes anything.
 
@@ -152,7 +152,7 @@ New Django app `inbox` (`backend/inbox/`, registered in `INSTALLED_APPS`). One m
 - `is_current` — `superseded_at is None and withdrawn_at is None`.
 - `open_file()` — returns a binary file object: `file.open("rb")` or `io.BytesIO(contract_issue.pdf)`.
 
-**Serializer:** `DeliveredDocumentSerializer` — fields `id, zev, zev_name, participant, participant_name, kind, title, document_number, period_start, period_end, file_name, size_bytes, sha256, delivered_at, delivered_by_name, superseded_at, superseded_by, withdrawn_at, batch_id, invoice, contract_issue`. All read-only, plus `invoice_status` (the source invoice's raw status, `null` for other kinds, so a cancelled invoice reads as cancelled). A participant only ever receives their own rows, so `participant_name` is their own name.
+**Serializer:** `DeliveredDocumentSerializer` — fields `id, zev, zev_name, participant, participant_name, kind, title, document_number, period_start, period_end, file_name, size_bytes, sha256, delivered_at, delivered_by_name, superseded_at, superseded_by, withdrawn_at, batch_id, invoice, contract_issue`. All read-only, plus `invoice_status` (the source invoice's raw status, `null` for other kinds, so a cancelled invoice reads as cancelled) and, since phase 6b, the live figures `invoice_figures` and `credit_figures` (below). A participant only ever receives their own rows, so `participant_name` is their own name.
 
 ### 4.2 Retention and storage
 
@@ -207,14 +207,26 @@ Everything is rendered before anything is written, in one transaction: a generat
 - `GET /api/v1/public/invoices/<prefix>/pdf/` (`views_public.public_invoice_pdf`) serves the invoice's **delivered** snapshot when one exists; with none (an invoice sent before the backfill), it keeps today's behaviour. The token still resolves to the invoice; the inbox row is looked up through `DeliveredDocument.invoice`.
 - The invoice email template variable set gains `{inbox_url}`: `{FRONTEND_URL}/me/documents` (`inbox.links.inbox_url`) for a participant with a login, empty otherwise. It points at the list, not at one entry, because the email is rendered before the invoice is delivered, so there is no row to name yet. It is in the field catalogue (`admin.emailTemplates.fields.inboxUrl`), not in the default body: stored templates and the shipped text keep reading as they do. The attachment is unchanged.
 
-### 5.5 Phase 6: removed for participants
+**Live figures (phase 6b).** The delivered file is a copy and never changes, but what a participant owes does. So that the pages that used to list live invoices keep their amounts, the serializer reads two read-only objects **from the invoice or credit at request time** and never stores them in the row (the file stays the immutable fact, ADR 0045):
 
-After the cut-over, a participant caller gets 404 (the existing scoping answer) from:
+| Field | Present for | Content |
+|---|---|---|
+| `invoice_figures` | rows with an `invoice` | `{status, due_date, total_chf, credit_applied_chf, amount_due_chf, paid_chf, outstanding_chf, open_data_impact_count}`: money as 2-decimal strings; `paid_chf` is the sum of the invoice's payments, `outstanding_chf` is `amount_due_chf − paid_chf` (`"0.00"` when cancelled); `open_data_impact_count` is how many unresolved reading corrections may have outdated the invoice (the count only: the import evidence stays with managers) |
+| `credit_figures` | `credit_note` rows | `{amount_chf, remaining_chf, status, source_invoice_number, applied_to: [{invoice_number, amount_chf}]}`: found by `(zev, credit number)`; `applied_to` lists the applications that were not released; `null` when the credit note no longer exists |
 
-- `GET /api/v1/invoices/invoices/`, `/{id}/`, `/{id}/pdf/`;
-- `GET /api/v1/invoices/invoices/annual-statement/`, `/financial-summary/`, `/tariff-overview/` as self-service (`_self_service` in `views_reports.py`).
+Both are `null` otherwise. The list adds one query for the invoices' payments (`prefetch_related("invoice__payments")`), one for the open corrections (a subquery annotation) and, through `DeliveredDocumentListSerializer`, one for the credit notes of the page, so the query count does not grow with the rows.
 
-Managers and admins keep every one of these. `participant_visible`, `participant_access_survives_end` and `sent_to_participant()` remain, because they serve the MCP tools and `explain_invoice` until those are moved (§6.4). The *My invoices* data comes from the inbox.
+### 5.5 Phase 6b: removed for participants
+
+After the cut-over a participant reaches no live invoice, credit note or report. The viewsets have no participant path (`participant_path = None`, "a manager-only resource" in `ZevScopedQuerySetMixin`), which is the existing scoping answer rather than a new rule:
+
+- `GET /api/v1/invoices/invoices/` is an empty list; `/{id}/`, `/{id}/pdf/` and the other detail routes are 404 (the actions that already demand a manager stay 403, `payments/` among them);
+- `GET /api/v1/invoices/credits/` is an empty list and `credits/{id}/`, `credits/{id}/pdf/` are 404;
+- `GET /api/v1/invoices/invoices/annual-statement/` and `/financial-summary/` answer a participant call with 404 `{"error": "Participant not found."}` (`_is_participant_call` in `views_reports.py`, which replaces `_self_service`): an account that only participates, a participant of the ZEV it names, and a former participant. The tariff overview never had a self-service branch. An account that never took part is still served as a manager (400 without ids, 403 for a ZEV it may not read). The `sent_only` argument of `generate_annual_statement_pdf` stays, for the inbox issuing.
+
+This also holds for a manager who is a participant of another community: that community's invoices are not reachable live, and their own are in their inbox.
+
+Managers and admins keep every route. `participant_visible` and `participant_access_survives_end` stay in `ZevScopedQuerySetMixin` (the inbox uses both); `sent_to_participant()` stays, because the inbox backfill and the annual statement decide by it.
 
 ## 6. Async and integration behavior
 
@@ -253,7 +265,7 @@ Decision for this spec, to be honoured by #793:
 
 - **Backups.** `inbox.DeliveredDocument` is a ZEV-scoped part (`ZevPart("inbox.DeliveredDocument", "zev")`) in `backups/registry.py`, and `("inbox.DeliveredDocument", "file", "zev")` joins the file-field list beside `invoices.Invoice`. The coverage test (`backups/test_archive.py`) fails until both are in place, as intended. The section `delivered_documents` comes after `invoices` and `contract_issues`, which its rows point at. A per-ZEV restore gains the overridable conflict `delivered_document_deleted` (a delivered document the backup lacks would be deleted, as for `contract_issue_deleted`), with the new key in `RestoreConflictKind` and in the four locale files.
 - **Transfer archive (increment 1b).** `FORMAT_VERSION` 10 → 11 adds the `delivered_documents` section (`delivered_documents.json` and one `delivered_documents/<id>.pdf` per document; it depends on `participants` only), specified in `2026-08-zev-transfer-archive.md`. Documents arrive as they were (delivery time, supersession, withdrawal), with no account reference and no audit event, and the importer checks each file against its `sha256`. Participants and invoices are remapped by archive id and invoice number. The transfer archive carries no `ContractIssue`, so a contract arrives holding its own file: `inbox_document_has_one_body` allows a document with no issue to carry a file (migration `inbox/0002`). Version 10 archives import unchanged and create no rows; a re-imported ZEV re-derives nothing, because delivery is a fact, not a derivation.
-- **MCP.** The read-only participant tools (`find_invoices`, `explain_invoice`) keep working through the live endpoints in phases 1–5. Phase 6 either leaves them on `participant_visible` or moves them to the inbox; decided in the phase 6 PR.
+- **MCP.** Decided in phase 6b: nothing moves. The MCP endpoint refuses an account that manages or views nothing (403, `2026-09-mcp-server.md` §5), so a participant never reached `find_invoices` or `explain_invoice`, and both stay manager and viewer tools over the live endpoints, which keep serving managers.
 
 ### 6.5 Notifications and email
 
@@ -275,13 +287,13 @@ Decision for this spec, to be honoured by #793:
 
 **Files:** `frontend/src/pages/DocumentsPage.tsx`, `frontend/src/features/inbox/DocumentsList.tsx`, `documentPresentation.ts`, `DocumentsList.css`.
 
-- Route `/me/documents` (participant shell, nav entry *My documents* after *My invoices*, also for a former participant, who reads what it was sent); *My invoices* (`MyInvoicesPage.tsx`) is kept in phases 1–5 and becomes a filtered view of this page in phase 6.
+- Route `/me/documents` (participant shell, nav entry *My documents* after *My invoices*, also for a former participant, who reads what it was sent); *My invoices* (`MyInvoicesPage.tsx`) was kept in phases 1–5 and, since 6b, is the invoice and credit note part of the same inbox query (§7.3).
 - Query: `useQuery({ queryKey: queryKeys.inbox.list('mine'), queryFn: listInboxDocuments })`, all pages. A manager who is also a participant gets outbox rows in the same response, so the page keeps only rows whose `participant` is one of the account's own participant ids (`ownParticipantIds`, the rule `personalInvoiceFilter` uses for invoices).
-- A list grouped by year (the period's year, else the delivery year; newest first), a kind filter (`FilterTabs` with counts; a kind with no document is left out), a community select shown only when the account has more than one membership. Per row: icon by kind, title, type, delivery date, size, status badge, **Download**. Status is one of *Withdrawn*, *Cancelled* (an invoice whose status is `cancelled`) and *Superseded*, in that order of precedence, from `documentStanding()`. An invoice row links to the existing invoice detail (return link `/me/documents`, whitelisted in `InvoiceDetailPage`).
+- A list grouped by year (the period's year, else the delivery year; newest first), a kind filter (`FilterTabs` with counts; a kind with no document is left out), a community select shown only when the account has more than one membership. Per row: icon by kind, title, type, delivery date, size, status badge, **Download**. Status is one of *Withdrawn*, *Cancelled* (an invoice whose status is `cancelled`) and *Superseded*, in that order of precedence, from `documentStanding()`. An invoice row is no longer a link (phase 6b): a participant has no live invoice to open, and the PDF carries the details.
 - Download fetches the PDF through the API as a blob and saves it under the row's `file_name`; nothing is served from a media URL.
 - Container: a page with a list and download actions, no dialogs, per the catalogue in `2026-10-ui-patterns-and-component-catalog.md`. Empty state: "Nothing has been delivered to you yet." Loading and error states as on *My invoices* (`PageSkeleton`, `Notice` with retry).
 - Mobile (~400px): single column, download as a full-width row action.
-- **Not in this increment:** the *Issued on …* line on the participant *Reports* page (`ParticipantYearDocuments.tsx`). It moves with phase 6, when the live report endpoints go away and the page reads the issued row instead.
+- The *Issued on …* line on the participant *Reports* page moved with phase 6b (§7.3).
 
 ### 7.2 Manager outbox and upload
 
@@ -295,6 +307,17 @@ Decision for this spec, to be honoured by #793:
 - **`notify`:** a `NotifyField` checkbox (off by default, "Also notify participants by email", with a hint that the email has a link and no file) in the upload and issue dialogs, and the result view adds `inbox.result.emailed` and `inbox.result.withoutEmail`. The bell notification is not optional. Deliver contract does not offer the checkbox: a single, deliberate action that the participant is told about by the bell; the API accepts `notify` for it.
 - All user-facing text in the locale files (`frontend/src/i18n/locales`), a top-level `inbox` block in `de`, `fr`, `it` and `en` (plus `nav.myDocuments` and `pages.billingHub.tabs.documents`).
 - **Demo data:** `seed_demo` clears and refills the inbox of both demo communities after the invoice PDFs are written (backfill of the sent invoices, plus a tariff overview and a notice for every current participant with an account of the main community), so the guide screenshots have something to show and a re-seed never lists a document twice.
+
+### 7.3 Participant pages on the inbox (phase 6b)
+
+**Files:** `frontend/src/pages/MyInvoicesPage.tsx`, `frontend/src/features/inbox/InvoiceDocuments.tsx`, `frontend/src/components/dashboard/ParticipantInvoicesCard.tsx`, `frontend/src/features/dashboard/ParticipantDashboardBody.tsx`, `frontend/src/features/reports/ParticipantYearDocuments.tsx`.
+
+- All three read the same query as *My documents* (`queryKeys.inbox.list('mine')`, kept to the account's own participations with `ownParticipantIds`); none calls a live invoice endpoint. `personalInvoiceFilter` is gone.
+- **`InvoiceDocumentsTable`** (shared by *My invoices* and the dashboard card): title, community column when the account has several, period, total (with the amount due beneath it when credit was set against the invoice, `InvoiceTotal`), payment state (*due*, *overdue*, *paid* or *cancelled*, `InvoicePaymentState`), the data-review warning when `open_data_impact_count > 0`, and a **Download** button. There is no link to a live invoice and no PDF-pending state: a delivered invoice always has its copy. **`CreditNoteDocumentsTable`**: number, the invoice it corrects, date, amount, what is left, status and where it was set off, **Download**.
+- *My invoices* shows the invoice rows and, when there are any, the credit note rows below; the empty state and error handling are those of *My documents*. The dashboard card shows the invoice rows only.
+- **Annual statement** (`/me/statement`, `ReportsPage`): the two tabs read the newest current *annual statement* and *financial summary* of the selected year from the inbox (`issuedDocumentFor`: own participation, optionally one community, not superseded or withdrawn, `period_start` in that year), show *Issued on …* and the PDF through `downloadInboxDocument`. A year without a document says that the community has not issued it yet. Nothing is rendered live any more.
+- An invoice that was never given a stored PDF cannot be delivered (§6.6), so it does not appear on these pages until the backfill report is cleared; that is what gates the release.
+- Deleted with the live reads: the invoice detail link and the participant's live credit note list. `InvoiceDetailPage` is for managers; a participant who follows an old link there gets its error state.
 
 ### TypeScript types
 
@@ -327,7 +350,21 @@ export interface DeliveredDocument {
   batch_id: string | null
   invoice: string | null
   invoice_status: InvoiceStatus | null
+  invoice_figures: InvoiceFigures | null   // 6b
+  credit_figures: CreditFigures | null     // 6b
   contract_issue: string | null
+}
+
+export interface InvoiceFigures {
+  status: string; due_date: string | null
+  total_chf: string; credit_applied_chf: string; amount_due_chf: string
+  paid_chf: string; outstanding_chf: string; open_data_impact_count: number
+}
+
+export interface CreditFigures {
+  amount_chf: string; remaining_chf: string; status: CreditStatus
+  source_invoice_number: string | null
+  applied_to: { invoice_number: string; amount_chf: string }[]
 }
 
 export interface DeliveryResult {
@@ -378,7 +415,7 @@ Decisions the issue left open, and how this spec settles them:
 | A participant's browser or proxy caches a downloaded document | Low | `Cache-Control: private, no-store`; `nosniff`; `attachment` |
 | Disk growth from uploads | Low | 10 MiB limit, one file per broadcast; quotas out of scope |
 | A hidden deletion path destroys a file another row uses | Medium | `remove_file_if_unreferenced()`; the only deletion is the failed-insert rollback |
-| Phase 6 breaks the dashboard card, MCP tools or saved links | High | Separate release; the backfill report gates it; the invoice link and public page already resolve to the inbox (phase 5) |
+| Phase 6 breaks the dashboard card, saved links or the amounts a participant sees | High | Separate release; the backfill report gates it; the invoice link and public page already resolve to the inbox (phase 5); the card, *My invoices* and *Annual statement* are rebuilt on the inbox and its live figures; the MCP tools never served participants. A participant who opens a saved `/billing/invoices/{id}` link gets an error page |
 | The disabled-ZEV exception in the mixin is copied elsewhere | Medium | Off by default, named for what it does, and the inbox is the only user; a scoping regression test pins every other viewset |
 
 ## 9. Test plan
@@ -449,12 +486,14 @@ The statement and summary generators are mocked, so these tests pin who is eligi
 - `invoices/test_public_invoice_access.py` (increment 5, 3 added): the public PDF serves the delivered snapshot over the current file, serves it when the invoice file is gone, and falls back to the invoice file when the snapshot file is missing.
 - `frontend/tests/inbox-notify.test.ts` (increment 5b, 4 tests): `notify` is sent with an upload or an issue only when set, and the result notice reports emails queued and recipients without an address only when there are some.
 - `frontend/tests/notifications.test.ts` (increment 5, 2 added): links for `invoice.sent` with and without `document_id`, and for `document.delivered`.
-- Phase 6: `invoices/test_participant_invoice_visibility.py` is rewritten so a participant gets 404 on every live endpoint and managers are unchanged (≈6 changed).
+- Phase 6b: `invoices/test_participant_invoice_visibility.py` is rewritten (13 tests) so a participant gets an empty list or 404 on every live endpoint, a former participant too, a manager who rents elsewhere no live access there, and managers are unchanged; the statement and summary tests (`test_reports.py`, `test_disabled_zev_reports.py`, `tests.py`) assert 404 for a participant call. About 35 existing tests that expected participant access were changed to the new answer (`test_access_regression`, `test_access_scoping`, `test_credits`, `test_credit_application`, `test_reading_impact`, `test_payments`, `test_invoice_list_filter`, `test_pdf_approval`, `test_template_admin`, the seed test). `inbox/test_figures.py` (10 tests): what an invoice row carries (total, credit applied, amount due, paid, outstanding), that it is read live while the file's checksum stays, a cancelled invoice owes nothing, open corrections are counted without their evidence, other kinds carry no figures, a credit note's balance and applications, a released application is not listed, the invoice it corrects, the detail route, and a query count that does not grow with the rows.
 
 ### Frontend
 
 - `tests/inbox-documents.test.ts` (9): the presentation helpers: the year of a document (period, else delivery), grouping newest year first, the precedence of *withdrawn* over *cancelled* over *superseded*, counts per kind, the advisory upload check (empty, oversize, not a PDF; the server decides), file size formatting, the years offered when issuing.
-- `tests/inbox-documents-page.test.ts` (4): the empty state, grouping by year with a superseded badge and only the account's own rows, an invoice linking to its detail page with a *Cancelled* badge and a download through the API, the community filter only with more than one membership.
+- `tests/inbox-documents-page.test.ts` (4): the empty state, grouping by year with a superseded badge and only the account's own rows, a cancelled invoice as plain text (no live invoice to open since 6b) with its *Cancelled* badge and a download through the API, the community filter only with more than one membership.
+- `tests/participant-invoices-inbox.test.ts` (increment 6b, 13 tests): *My invoices* lists the account's invoices with the total, the amount due beneath it and the payment state and no link to a live invoice, keeps only rows addressed to the account and only invoices in the invoice table, marks an overdue and a cancelled invoice, flags open reading corrections without evidence, lists credit notes with what is left and where they were set off, the empty state, the community column, rows kept with a warning when a later load fails, only the error when the first load fails; and `issuedDocumentFor` (the annual document a participant reads: right kind, year, person and community, the newest current one, never a superseded or withdrawn one).
+- Changed in 6b: `tests/participant-documents.test.ts` (the *Annual statement* page now reads the issued documents: the same 18 tests on the preview lifecycle, with the issued rows seeded and the abort signal forwarded), `tests/dashboard-behavior.test.ts` (the invoice card reads the inbox; the polling-for-a-pending-PDF tests are gone, replaced by tests that only the account's rows are listed, that a row shows what is owed and downloads the delivered copy, and that cached rows are kept with a warning), `tests/inbox-documents-page.test.ts` (an invoice row is not a link). The *My invoices* tests in `readiness-cockpit.test.ts` and `invoice-presentation.test.ts` moved to the new file.
 - Changed: `tests/billing-hub-order.test.ts` (the third tab) and `tests/layout-nav.test.ts` (*My documents* for a participant; a former participant now keeps two entries, not one).
 - `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-hex.mjs`, `npm run test:unit`, `npm run build`.
 - Screenshots (`08k-delivered-documents`, `08l-my-documents` in the guide set) and a check in a running stack, including a ~400px viewport: neither page overflows horizontally. A `ui-review` pass is still open for the PR review.
@@ -470,5 +509,5 @@ The statement and summary generators are mocked, so these tests pin who is eligi
 - [ ] An annual statement enters the inbox only when the operator issues it, and re-issuing supersedes the earlier one.
 - [ ] A manager can see what was delivered to whom and when, and can withdraw an operator document without losing the file.
 - [ ] The backup and transfer archives contain the rows and files and restore them; the backup coverage test passes.
-- [ ] Phase 6 only: participant calls to the live invoice and report endpoints return 404; managers and admins are unchanged.
+- [ ] Phase 6b only: a participant gets an empty list or 404 from the live invoice, credit note, annual statement and financial summary endpoints; managers and admins are unchanged; a participant still sees amounts and payment state through the inbox rows.
 - [ ] The user guide chapter, `2026-03-invoice-lifecycle-and-communication.md`, `2026-03-community-and-access.md`, `2026-08-zev-transfer-archive.md`, `2026-11-notification-center.md` and the `docs/specs/README.md` index are updated in the phase that changes them.

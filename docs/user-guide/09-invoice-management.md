@@ -71,21 +71,25 @@ charge was added or changed, and warns about a charge nobody can be billed for
 ## Participant View: My Invoices
 
 Participants open **My invoices** (`/me/invoices`) in the sidebar to see the
-invoices issued to them — invoice number, period, total, whether payment is
-**due**, **overdue** or **paid**, and a link to the details. An invoice appears here once it has been sent: drafts and
-approved invoices that haven't gone out yet stay with the operator, and the
-participant's annual statement counts only sent invoices too. A sent invoice
-that is cancelled later stays listed, marked as cancelled. The PDF button
-appears only on rows that have a document. This sent-only list also applies
-when you manage another community where you are a participant.
-Click the invoice number or **View details** to open the invoice. **Open PDF**
-has a text label; invoices without a document show whether the PDF is being
-prepared, failed, or missing. A failed refresh keeps the last loaded invoices
-visible with a warning and **Retry**.
-Participants with several communities see which community issued each invoice.
-The list is read-only; the deep link `/billing/invoices/{id}` shows a
-participant only their own invoice (enforced by the backend), and its return
-link leads back to **My invoices**.
+invoices and credit notes issued to them. It is the invoice and credit note part
+of **My documents** (below), so what is listed is what was delivered: an invoice
+appears once it has been sent (drafts and approved invoices that haven't gone out
+yet stay with the operator), a credit note once its PDF exists.
+
+Each invoice shows its number, period, total, and whether payment is **due**,
+**overdue** or **paid**; where a credit note was set against it, the amount due
+is shown beneath the total. A **Download** button gives the PDF that was
+delivered. A sent invoice that is cancelled later stays listed, marked as
+cancelled. Credit notes are listed in their own table with their amount, what is
+left and where it was set against an invoice. Participants with several
+communities see which community issued each row. A failed refresh keeps the last
+loaded rows visible with a warning and **Retry**.
+
+The amounts and the payment state are read from the invoice, so they stay
+current; the PDF is the copy that was sent and does not change. The list is
+read-only. There is no separate page for one invoice any more: the PDF carries
+the details, and the deep link `/billing/invoices/{id}` is for the operator
+(a participant who opens it gets an error).
 
 ![Participant My Invoices](screenshots/08c-my-invoices.png)
 
@@ -110,7 +114,7 @@ list, and the community filter when you take part in more than one.
   stays listed, marked **Superseded**. A sent invoice that was cancelled stays
   listed, marked **Cancelled**. A notice the operator **withdrew** disappears from
   your list.
-- Invoices are still also listed under **My invoices**, with their payment state.
+- **My invoices** shows the invoice and credit note rows of this list, with the amounts and payment state.
 
 ## Invoice Lifecycle
 
@@ -740,18 +744,23 @@ Below the report, under **Annual documents**:
 
 ![Reports page](screenshots/23-reports.png)
 
-**Participants:** Open **Annual statement** (`/me/statement`) to read your own
-statement or select the **Tax Overview** tab. Use **Download PDF** to save the
-document. **Open in new tab** shows the same PDF. Select **Retry** if generation
-fails, or reload the page for fresh documents. The tax overview shows producers'
-net local-energy revenue and feed-in compensation. The annual statement and the
-tax overview count the same invoices as the annual report: those that have
-been approved and not cancelled, whether or not they are paid yet.
+**Participants:** Open **Annual statement** (`/me/statement`) to read the annual
+statement your community **issued** to you, or select the **Tax Overview** tab for
+the financial summary. The page shows the date it was issued; use **Download PDF**
+to save the document. **Open in new tab** shows the same PDF. If your community has
+not issued the document for the selected year yet, the page says so; it appears here
+and under **My documents** as soon as it does. Select **Retry** if loading fails.
+Issuing a statement again replaces the earlier one on this page (the earlier one
+stays under **My documents**, marked **Superseded**). The tax overview shows
+producers' net local-energy revenue and feed-in compensation. The statement and the
+tax overview count the same invoices as the annual report: those that have been
+approved and not cancelled, whether or not they are paid yet.
 
 ![Participant annual documents with embedded statement](screenshots/23b-participant-annual-statement.png)
 
-These documents use your consumption, invoices, and savings. They become
-available after billing. The selected community appears above the page title.
+These documents use your consumption, invoices, and savings. They are issued by
+your community's operator, usually after the year's billing. The selected community
+appears above the page title.
 
 ## Troubleshooting
 

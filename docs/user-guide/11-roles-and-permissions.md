@@ -127,9 +127,9 @@ see [password setup and recovery](03-participant-management.md#a-participant-for
 The participant sidebar shows **Dashboard**, **My invoices**, **My documents**, and **Annual statement**; own consumption charts and trends stay reachable through the direct `/metering/chart` route.
 
 - **Dashboard:** View own energy consumption/production overview
-- **My invoices:** View and download own invoices (read-only; shows invoices even before a PDF exists)
+- **My invoices:** View and download own invoices and credit notes, with their amounts and payment state (read-only; the invoice and credit note part of **My documents**)
 - **My documents:** Read and download what the community delivered to them (invoices, credit notes, statements, contract, notices); a former participant keeps this access
-- **Annual statement:** View their own annual statement and tax overview
+- **Annual statement:** Read the annual statement and tax overview their community issued to them
 - **Metering Data:** Direct route to own consumption charts and trends
 - **Account Profile:** Update personal information
 

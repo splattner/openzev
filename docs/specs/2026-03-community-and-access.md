@@ -294,8 +294,9 @@ no relationship       →  authenticated, no domain access
 `User.role` is `admin` or `user` (#761 step 7); nothing but `is_admin` reads
 it. An account without a grant passes no management gate (403), whatever it
 did before. `ZevViewSet.self_setup` is gated by `User.may_create_zev`. In the
-reports self-service rule (`invoices/views_reports.py _self_service`) an
-account with no current participant row gets 404 when it has an ended one,
+reports rule (`invoices/views_reports.py _is_participant_call`; since the document inbox, #862, a participant
+call is answered 404 and the participant reads the issued document from the inbox) an
+account with no current participant row also gets 404 when it has an ended one,
 and is served as a manager (400 without ids) when it never took part.
 `User.is_zev_owner` no longer exists.
 
@@ -394,7 +395,8 @@ Class attributes each viewset declares:
 | `MeteringPointViewSet` | `zev` | `assignments__participant` | distinct |
 | `MeteringPointAssignmentViewSet` | `metering_point__zev` | `participant` | |
 | `TariffViewSet` / `TariffPeriodViewSet` | `zev` / `tariff__zev` | `None` | |
-| `InvoiceViewSet` | `zev` | `participant` | `participant_visible = sent_to_participant()`, `participant_access_survives_end = True`, `viewer_allowed_actions = {"download_pdfs"}` |
+| `InvoiceViewSet` | `zev` | `None` (since #862 a participant reads their invoices from the document inbox) | `viewer_allowed_actions = {"download_pdfs"}` |
+| `CreditViewSet` | `zev` | `None` (as above) | |
 | `MeterReadingViewSet` | `metering_point__zev` | (custom `_participant_q`) | readings inside the window of an assignment the caller holds, on a current participant row |
 
 **Read rule** (safe methods, and `viewer_allowed_actions`): admin → every
@@ -426,10 +428,14 @@ route to keep it that way.
 The filter can only narrow: it adds a conjunctive `filter()` to the
 already-scoped queryset, so it is not a route to another tenant's data.
 
-**Participant-only narrowing (`participant_visible`):** `InvoiceViewSet` sets
-it to `invoices.models.sent_to_participant()`, so a participant sees an
-invoice only once it has been sent to them (#861), and — because invoices set
-`participant_access_survives_end` — keeps seeing those after leaving the ZEV.
+**Participant-only narrowing (`participant_visible`):** no live viewset uses it for invoices
+any more. Until #862 `InvoiceViewSet` set it to `invoices.models.sent_to_participant()` (a participant
+saw an invoice only once it was sent, #861, and kept it after leaving the ZEV); a participant now
+reads those from the document inbox (`inbox.DeliveredDocumentViewSet`, which sets
+`participant_visible = Q(withdrawn_at__isnull=True)`, `participant_access_survives_end` and
+`participant_survives_disabled_zev`), and `InvoiceViewSet` / `CreditViewSet` have no participant path,
+so a participant gets an empty list and 404 on every detail route.
+`sent_to_participant()` remains: it decides which invoices the inbox backfill and the annual statement count.
 
 ### 4.5 Write scoping (`ZevScopedQuerySetMixin`)
 
@@ -1357,10 +1363,10 @@ disabled. Records `zev.enable`.
   `Participant`/`MeteringPointAssignment` rows specifically — a participant
   already gets `403` from every method on those two regardless of ZEV state
   (§12.1), so there was nothing for this change to alter there.
-- Participant self-service annual statements and financial summaries also
-  exclude disabled ZEVs through `own_participant_for_user`. A participant-only
-  account with no eligible row gets 404; management access to that ZEV still
-  permits reports. Data-quality status excludes disabled ZEVs only from its
+- Annual statements and financial summaries are no longer served to a participant (#862): the
+  participant call is a 404 whether or not the ZEV is disabled, and the issued document is read
+  from the inbox (which stays readable for a disabled ZEV, ADR 0045). Management access to that ZEV
+  still permits reports. Data-quality status excludes disabled ZEVs only from its
   participant-assignment branch, preserving manager/viewer/admin visibility.
 - Managers and viewers keep read access everywhere (the grant branch of the
   scoping is untouched by the disabled-ZEV rules) but lose write access to every ZEV-scoped model —
@@ -1732,10 +1738,10 @@ reaches every ZEV-scope route and sees its pages read-only
 | `/billing/invoices?period_start&period_end` | ZEV scope | deep link from the Overview period table preselects that period |
 | `/billing` | ZEV scope | alias → `/billing/invoices` |
 | `/invoices` | ZEV scope | alias → `/billing/invoices` (query preserved) |
-| `/invoices/:invoiceId` · `/billing/invoices/:invoiceId` | any authenticated | `InvoiceDetailPage` (own invoices only for participants, backend-enforced) |
+| `/invoices/:invoiceId` · `/billing/invoices/:invoiceId` | any authenticated | `InvoiceDetailPage` (managers and admins; a participant has no live invoice, #862) |
 | `/me/statement` | `participant` | `ReportsPage` (participant branch; impersonating admins carry the target account's relations) |
 | `/me/documents` | `participant`, `former` | `DocumentsPage` (what was delivered to the account; read-only list over `/api/v1/inbox/documents/`, own rows only; [participant document inbox §7.1](2026-11-participant-document-inbox.md)) |
-| `/me/invoices` | `participant`, `former` | `MyInvoicesPage` (own invoices, read-only; reuses the role-scoped invoice list — no new grant, recorded exception 2) |
+| `/me/invoices` | `participant`, `former` | `MyInvoicesPage` (the invoice and credit note rows of the participant's document inbox with their live figures; [participant document inbox §7.1](2026-11-participant-document-inbox.md)) |
 | `/me/metering-points` | `participant`, `manager`, `viewer`, `admin` | `MyMeteringPointsPage` (the participant's own metering points and the energy data setup of those with generation behind the meter; a management shell shows only the flagged meters the user holds personally; see [supplementary energy data §7.1](2026-10-supplementary-energy-data.md)) |
 | `/reports` | ZEV scope, `participant` | `ReportsPage` (participants: own downloads; owners/admins: annual ZEV report, tax overview, and annual-statement ZIP) |
 | `/login` | public | `LoginPage` |
@@ -2059,7 +2065,7 @@ a grant and disappear through a participant link.
 | User (list) | all (`IsAdmin`) | PermissionDenied | PermissionDenied | PermissionDenied |
 | ImportLog | all | read: all of the ZEV's, plus logs the caller imported; delete: logs of managed ZEVs (and own logs without a ZEV) | PermissionDenied | PermissionDenied |
 | MeterReading | all | all of the ZEV's | raw/chart readings only within own assignment dates (civil day); CRUD routes denied | PermissionDenied |
-| Invoice | all | all of the ZEV's | own invoices once sent (`sent_at` set or status `sent`/`paid`; #861), also after the row has ended | empty list |
+| Invoice | all | all of the ZEV's | none: empty list, 404 on detail (the invoices are in the document inbox, #862) | empty list |
 | AuditEvent | all | events of the ZEV | — | PermissionDenied |
 
 An account with no grant and no participant link passes no management gate

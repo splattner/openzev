@@ -373,24 +373,18 @@ class CreditApiTests(TestCase):
         auth(self.client, self.admin)
         self.assertEqual(ids(), {str(mine.pk), str(theirs.pk), str(stranger.pk)})
 
-    def test_participant_sees_only_their_own_credits(self):
+    def test_participant_reaches_no_live_credit_note(self):
+        # Credit notes reach a participant through the document inbox (#862, kind ``credit_note``).
         mine = correct_invoice(_paid(self.zev, self.participant), kind=CreditKind.REVERSAL, reason="x")["credit"]
-        other_participant = make_participant(self.zev, first="Max", last="Muster")
-        theirs = correct_invoice(_paid(self.zev, other_participant), kind=CreditKind.REVERSAL, reason="x")["credit"]
         auth(self.client, self.tenant)
-        response = self.client.get(f"{CREDITS}/")
-        self.assertEqual({row["id"] for row in response.data["results"]}, {str(mine.pk)})
-        self.assertEqual(self.client.get(f"{CREDITS}/{theirs.pk}/").status_code, 404)
-        self.assertEqual(self.client.get(f"{CREDITS}/{mine.pk}/").status_code, 200)
+        self.assertEqual(self.client.get(f"{CREDITS}/").data["results"], [])
+        self.assertEqual(self.client.get(f"{CREDITS}/{mine.pk}/").status_code, 404)
 
-    def test_participant_sees_the_credits_on_their_invoice(self):
+    def test_participant_gets_no_live_invoice_with_its_credits(self):
         invoice = _paid(self.zev, self.participant)
-        credit = correct_invoice(invoice, kind=CreditKind.ADJUSTMENT, reason="x", amount_chf=Decimal("5.00"))["credit"]
+        correct_invoice(invoice, kind=CreditKind.ADJUSTMENT, reason="x", amount_chf=Decimal("5.00"))
         auth(self.client, self.tenant)
-        detail = self.client.get(f"{INVOICES}/{invoice.pk}/")
-        self.assertEqual(detail.status_code, 200)
-        self.assertEqual([c["id"] for c in detail.data["credits"]], [str(credit.pk)])
-        self.assertIsNone(detail.data["payments"])
+        self.assertEqual(self.client.get(f"{INVOICES}/{invoice.pk}/").status_code, 404)
 
     def test_credit_pdf_is_404_before_the_render_and_served_after(self):
         credit = correct_invoice(_paid(self.zev, self.participant), kind=CreditKind.REVERSAL, reason="x")["credit"]
@@ -402,7 +396,7 @@ class CreditApiTests(TestCase):
         self.assertEqual(response["Content-Type"], "application/pdf")
         self.assertIn("CN-00001.pdf", response["Content-Disposition"])
         auth(self.client, self.tenant)
-        self.assertEqual(self.client.get(f"{CREDITS}/{credit.pk}/pdf/").status_code, 200)
+        self.assertEqual(self.client.get(f"{CREDITS}/{credit.pk}/pdf/").status_code, 404)
 
     def test_generate_pdf_queues_a_render_for_managers_only(self):
         credit = correct_invoice(_paid(self.zev, self.participant), kind=CreditKind.REVERSAL, reason="x")["credit"]

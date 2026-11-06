@@ -19,7 +19,7 @@ from allocation.validity import active_during
 from zev.models import Zev, Participant
 from zev import access
 from zev.scoping import ZevScopedQuerySetMixin
-from .models import Credit, CreditStatus, Invoice, InvoicePdfStatus, InvoiceReadingImpact, InvoiceStatus, EmailLog, Payment, sent_to_participant
+from .models import Credit, CreditStatus, Invoice, InvoicePdfStatus, InvoiceReadingImpact, InvoiceStatus, EmailLog, Payment
 from .serializers import (
     CorrectInvoiceSerializer, CreditSerializer, InvoiceListSerializer, InvoiceSerializer, GenerateInvoiceSerializer,
     GenerateZevInvoicesSerializer, MarkPaidSerializer, PaymentSerializer,
@@ -142,12 +142,12 @@ class InvoiceViewSet(
     serializer_class = InvoiceSerializer
     permission_classes = [IsAuthenticated]
     zev_lookup = "zev"
-    participant_path = "participant"
-    # A participant sees an invoice only once it has been sent to them (#861):
-    # list, detail and every detail action (``/pdf`` included) go through this.
-    participant_visible = sent_to_participant()
-    # ...and keeps seeing the ones they were sent after leaving the ZEV (#761).
-    participant_access_survives_end = True
+    # No participant path: the live invoices are for managers and admins. A
+    # participant reads what was delivered to them from the document inbox
+    # (``inbox/documents/``, ADR 0045), which also keeps the invoices they were
+    # sent after leaving the ZEV (#761). The list is empty for them and every
+    # detail route is a 404.
+    participant_path = None
     # A ZIP of the period's PDFs is a POST that only reads.
     viewer_allowed_actions = frozenset({"download_pdfs"})
 
@@ -161,7 +161,7 @@ class InvoiceViewSet(
         return super().get_serializer_class()
 
     def get_queryset(self):
-        # Participants see only their own invoices, and only once sent.
+        # Managers and admins only: a participant reaches no row (see participant_path).
         queryset = Invoice.objects.select_related("participant__party", "zev")
         # Prefetching what the list serializer does not render would keep the
         # database cost the payload change just removed. getattr because schema
@@ -1112,15 +1112,13 @@ class CreditViewSet(ZevScopedQuerySetMixin, mixins.ListModelMixin, mixins.Retrie
     """Credit notes (#388), read-only: they are issued by ``invoices/{id}/correct/``.
 
     Scoped like the invoices: an admin sees all, managers and viewers their
-    ZEVs, a participant their own — from the moment the credit exists, and
-    after they left the ZEV, as with their invoices.
+    ZEVs. A participant gets their credit notes from the document inbox.
     """
 
     serializer_class = CreditSerializer
     permission_classes = [IsAuthenticated]
     zev_lookup = "zev"
-    participant_path = "participant"
-    participant_access_survives_end = True
+    participant_path = None
 
     def get_queryset(self):
         queryset = Credit.objects.select_related(

@@ -930,7 +930,7 @@ export const de = {
         myInvoices: {
             title: 'Meine Rechnungen',
             allCommunities: 'Alle Ihre Gemeinschaften',
-            description: 'Rechnungen, die für Sie ausgestellt wurden. Klicken Sie auf eine Rechnung, um Details zu sehen oder das PDF zu öffnen.',
+            description: 'Rechnungen und Gutschriften, die für Sie ausgestellt wurden. Laden Sie ein PDF herunter; Beträge und Zahlungsstand sind aktuell.',
             failed: 'Rechnungen konnten nicht geladen werden.',
             empty: {
                 title: 'Noch keine Rechnungen',
@@ -944,8 +944,6 @@ export const de = {
                 community: 'Gemeinschaft',
                 actions: 'Aktionen',
             },
-            viewDetails: 'Details ansehen',
-            openPdf: 'Rechnung {{number}} als PDF öffnen',
             credits: {
                 title: 'Gutschriften',
                 description: 'Gutschriften, die Ihnen ausgestellt wurden. Was übrig bleibt, wird mit Ihrer nächsten Rechnung verrechnet.',
@@ -3593,7 +3591,6 @@ export const de = {
             description: 'Produktion, Verbrauch, Eigenverbrauch und Netzaustausch für die ausgewählte Periode.',
         },
         dashboard: {
-            openInvoicePdf: 'PDF für Rechnung {{number}} öffnen',
             participant: 'Teilnehmer',
             allParticipants: 'Alle Teilnehmer',
             resolution: 'Auflösung',
@@ -3732,15 +3729,6 @@ export const de = {
                 },
             },
             noInvoices: 'Keine Rechnungen verfügbar.',
-            invoiceCol: {
-                invoice: 'Rechnung',
-                period: 'Zeitraum',
-                total: 'Gesamt',
-                status: 'Zahlung',
-                community: 'Gemeinschaft',
-                actions: 'Aktionen',
-            },
-            viewDetails: 'Details anzeigen',
             energyFlow: {
                 title: 'Energiefluss',
                 gridImport: 'Netzbezug',
@@ -3754,12 +3742,14 @@ export const de = {
         reports: {
             title: 'Berichte',
             description: 'Energieauswertungen und verfügbare Jahresdokumente anzeigen.',
-            participantDescription: 'Lesen Sie Ihre Jahresdokumente und laden Sie sie herunter.',
+            participantDescription: 'Lesen Sie die Jahresdokumente, die Ihre Gemeinschaft für Sie ausgestellt hat, und laden Sie sie herunter.',
             year: 'Jahr',
             downloading: 'Wird erstellt…',
             download: 'Herunterladen',
             preparingDocument: '{{document}} für {{year}} wird erstellt…',
             documentTitle: '{{document}} — {{year}}',
+            issuedOn: 'Ausgestellt am {{date}}',
+            notIssued: 'Ihre Gemeinschaft hat Ihnen noch keine {{document}} für {{year}} ausgestellt. Sie erscheint hier und unter Meine Dokumente, sobald sie vorliegt.',
             documentTabs: 'Jahresdokumente',
             annualStatement: {
                 title: 'Jahresabrechnung',

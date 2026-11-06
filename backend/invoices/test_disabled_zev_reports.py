@@ -1,4 +1,4 @@
-"""Explicit report resolvers must hide disabled participant memberships."""
+"""The report endpoints serve managers and admins; a participant call is a 404 whatever the community state (#862)."""
 
 from unittest.mock import patch
 
@@ -34,9 +34,13 @@ def test_report_visibility(zev, participant, participant_user, admin_user, disab
             "year": "2026", "zev_id": str(zev.pk), "participant_id": str(participant.pk),
         })
 
+    # A participant's statement and summary are issued to their inbox (#862), so a participant
+    # call is a 404 here, also for an account that manages another community.
     expected = 200
-    if disabled and role in ("participant", "manager_elsewhere"):
-        expected = 403 if role == "manager_elsewhere" else 404
+    if role == "participant" or (role == "manager_elsewhere" and not disabled):
+        expected = 404
+    elif disabled and role == "manager_elsewhere":
+        expected = 403
     assert response.status_code == expected, response.content
     assert render.called == (expected == 200)
 
@@ -45,22 +49,18 @@ def test_report_visibility(zev, participant, participant_user, admin_user, disab
     ("annual-statement", "generate_annual_statement_pdf"),
     ("financial-summary", "generate_financial_summary_pdf"),
 ])
-def test_self_service_without_ids_returns_after_reenable(zev, participant, participant_user, participant_client, report, generator):
+def test_participant_is_refused_whether_the_community_is_enabled_or_not(
+    zev, participant, participant_user, participant_client, report, generator,
+):
     participant.user = participant_user
     participant.save()
-    zev.disabled_at = timezone.now()
-    zev.save()
+    url = f"/api/v1/invoices/invoices/{report}/"
     with patch(f"invoices.views_reports.{generator}", return_value=b"%PDF") as render:
-        url = f"/api/v1/invoices/invoices/{report}/"
-        response = participant_client.get(url, {"year": "2026"})
-        assert response.status_code == 404, response.content
+        for disabled_at in (timezone.now(), None):
+            zev.disabled_at = disabled_at
+            zev.save()
+            assert participant_client.get(url, {"year": "2026"}).status_code == 404
         render.assert_not_called()
-        zev.disabled_at = None
-        zev.save()
-        assert participant_client.get(url, {"year": "2026"}).status_code == 200
-        assert render.call_count == 1
-        assert participant in render.call_args.args
-        assert zev in render.call_args.args
 
 
 @pytest.mark.parametrize("selection", ["disabled", "enabled", "omitted", "foreign", "unknown", "malformed"])
@@ -68,7 +68,7 @@ def test_self_service_without_ids_returns_after_reenable(zev, participant, parti
     ("annual-statement", "generate_annual_statement_pdf"),
     ("financial-summary", "generate_financial_summary_pdf"),
 ])
-def test_explicit_zev_never_falls_back_to_another_membership(
+def test_no_selection_gets_a_participant_a_report_from_another_membership(
     zev, participant, participant_user, participant_client, selection, report, generator,
 ):
     participant.user = participant_user
@@ -76,7 +76,7 @@ def test_explicit_zev_never_falls_back_to_another_membership(
     zev.disabled_at = timezone.now()
     zev.save()
     enabled = ZevFactory()
-    own = ParticipantFactory(zev=enabled, user=participant_user)
+    ParticipantFactory(zev=enabled, user=participant_user)
     selected_id = {
         "disabled": str(zev.pk), "enabled": str(enabled.pk), "omitted": None,
         "foreign": str(ZevFactory().pk), "unknown": "00000000-0000-0000-0000-000000000000",
@@ -89,12 +89,5 @@ def test_explicit_zev_never_falls_back_to_another_membership(
     with patch(f"invoices.views_reports.{generator}", return_value=b"%PDF") as render:
         response = participant_client.get(f"/api/v1/invoices/invoices/{report}/", params)
 
-    if selection in ("enabled", "omitted"):
-        assert response.status_code == 200, response.content
-        if report == "annual-statement":
-            render.assert_called_once_with(own, enabled, 2026, sent_only=True)
-        else:
-            render.assert_called_once_with(enabled, own, 2026)
-    else:
-        assert response.status_code == 404, response.content
-        render.assert_not_called()
+    assert response.status_code == 404, response.content
+    render.assert_not_called()

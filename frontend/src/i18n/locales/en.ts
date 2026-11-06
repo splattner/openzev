@@ -939,7 +939,7 @@ export const en = {
         myInvoices: {
             title: 'My invoices',
             allCommunities: 'All your communities',
-            description: 'Invoices issued to you. Click an invoice to view its details or open the PDF.',
+            description: 'Invoices and credit notes issued to you. Download a PDF; amounts and payment state are kept up to date.',
             failed: 'Failed to load invoices.',
             empty: {
                 title: 'No invoices yet',
@@ -953,8 +953,6 @@ export const en = {
                 community: 'Community',
                 actions: 'Actions',
             },
-            viewDetails: 'View details',
-            openPdf: 'Open invoice {{number}} as PDF',
             credits: {
                 title: 'Credit notes',
                 description: 'Credit notes issued to you. What remains is deducted from your next invoice.',
@@ -3604,7 +3602,6 @@ export const en = {
             description: 'Review production, consumption, self-consumption, and grid exchange for the selected period.',
         },
         dashboard: {
-            openInvoicePdf: 'Open PDF for invoice {{number}}',
             participant: 'Participant',
             allParticipants: 'All participants',
             resolution: 'Resolution',
@@ -3743,15 +3740,6 @@ export const en = {
                 },
             },
             noInvoices: 'No invoices available.',
-            invoiceCol: {
-                invoice: 'Invoice',
-                period: 'Period',
-                total: 'Total',
-                status: 'Payment',
-                community: 'Community',
-                actions: 'Actions',
-            },
-            viewDetails: 'View details',
             energyFlow: {
                 title: 'Energy Flow',
                 gridImport: 'Grid Import',
@@ -3765,12 +3753,14 @@ export const en = {
         reports: {
             title: 'Reports',
             description: 'Review energy analytics and available annual documents.',
-            participantDescription: 'Read and download your annual documents.',
+            participantDescription: 'Read and download the annual documents your community has issued to you.',
             year: 'Year',
             downloading: 'Generating…',
             download: 'Download',
             preparingDocument: 'Preparing {{document}} for {{year}}…',
             documentTitle: '{{document}} — {{year}}',
+            issuedOn: 'Issued on {{date}}',
+            notIssued: 'Your community has not issued your {{document}} for {{year}} yet. It appears here, and in My documents, as soon as it does.',
             documentTabs: 'Annual documents',
             annualStatement: {
                 title: 'Annual Statement',

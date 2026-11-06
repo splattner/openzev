@@ -1,7 +1,6 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faDownload } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
 import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { downloadInboxDocument } from '../../lib/api/inbox'
 import { downloadBlob } from '../../lib/downloadBlob'
@@ -49,11 +48,7 @@ export function DocumentsList({ groups, showCommunity }: { groups: YearGroup[]; 
                 </span>
                 <div className="inbox-row-main">
                   <p className="inbox-row-title">
-                    {document.invoice ? (
-                      <Link to={`/billing/invoices/${document.invoice}`} state={{ from: '/me/documents' }}>{document.title}</Link>
-                    ) : (
-                      document.title
-                    )}
+                    {document.title}
                     <StandingBadge document={document} />
                   </p>
                   <p className="muted inbox-row-meta">

@@ -514,12 +514,18 @@ class InvoiceSerializerTests(TestCase):
             [(self.credit.pk, self.credit.credit_number, "50.00", None)],
         )
 
-    def test_the_participant_sees_the_credit_applied_to_their_invoice(self):
+    def test_the_participant_has_no_live_view_of_the_invoice_but_sees_its_figures_in_the_inbox(self):
         auth(self.client, self.tenant)
-        detail = self.client.get(f"{INVOICES}/{self.invoice.pk}/").data
-        self.assertEqual(detail["credit_applications"][0]["credit_number"], self.credit.credit_number)
-        self.assertEqual(detail["amount_due_chf"], "58.10")
-        self.assertIsNone(detail["payments"])
+        self.assertEqual(self.client.get(f"{INVOICES}/{self.invoice.pk}/").status_code, 404)
+        from inbox.producers import deliver_invoice_document
+
+        deliver_invoice_document(self.invoice, b"%PDF-1.7\n")
+        rows = self.client.get("/api/v1/inbox/documents/").data["results"]
+        figures = next(row for row in rows if str(row["invoice"]) == str(self.invoice.pk))["invoice_figures"]
+        self.assertEqual(
+            (figures["total_chf"], figures["credit_applied_chf"], figures["amount_due_chf"]),
+            ("108.10", "50.00", "58.10"),
+        )
 
     def test_an_application_names_the_invoice_its_credit_came_from(self):
         source = _invoice(self.zev, self.participant, InvoiceStatus.CANCELLED, period=(date(2025, 1, 1), date(2025, 1, 31)))

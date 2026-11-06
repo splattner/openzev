@@ -96,7 +96,7 @@ No new roles. Platform roles are `admin|user`; what an account may do in a ZEV c
 | `admin` | Everything below in every ZEV, including disabled ones |
 | manager (grant `manager`, or an account of the party holding `issuer` or `representative`) | Write LEG settings, assignments, tariffs, batches (upload, reconcile, approve, delete), tax confirmation; generate and run the invoice workflow. Writes on a disabled ZEV are rejected (as `InvoiceViewSet.generate` does today) |
 | viewer (grant `viewer`) | Read everything a manager reads, including batch preview and findings; no writes |
-| participant link | Own documents once sent (`sent_to_participant()`); own settlement quantities inside own assignment windows, from approved non-superseded batches only. No batch, finding or config read |
+| participant link | Own documents once delivered (the document inbox, #862; invoices are delivered when sent); own settlement quantities inside own assignment windows, from approved non-superseded batches only. No batch, finding or config read |
 | no relation | Nothing; objects of other ZEVs are `404` through `ZevScopedQuerySetMixin`, without disclosing existence |
 
 Per-action permissions are spelled out in §5. Every LEG `400` carries a stable `code` (§5).

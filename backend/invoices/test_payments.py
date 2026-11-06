@@ -208,14 +208,12 @@ class PaymentApiTests(TestCase):
         self.assertIn(response.status_code, (403, 404))
         self.assertFalse(invoice.payments.exists())
 
-    def test_participant_sees_totals_but_not_payment_rows(self):
+    def test_participant_reaches_neither_the_invoice_nor_its_payments(self):
+        # A participant sees what they owe through the inbox row (``invoice_figures``).
         invoice = _sent(self.zev, self.participant)
         record_payment(invoice, amount_chf=Decimal("10.00"), paid_on=date(2026, 2, 1))
         auth(self.client, self.tenant)
-        detail = self.client.get(f"{INVOICES}/{invoice.pk}/")
-        self.assertEqual(detail.status_code, 200)
-        self.assertEqual(detail.data["paid_chf"], "10.00")
-        self.assertIsNone(detail.data["payments"])
+        self.assertEqual(self.client.get(f"{INVOICES}/{invoice.pk}/").status_code, 404)
         self.assertEqual(self.client.get(f"{INVOICES}/{invoice.pk}/payments/").status_code, 403)
 
     def test_disabled_zev_refuses_payment_for_non_admin(self):

@@ -22,9 +22,22 @@ vi.mock('../src/lib/managedZev', () => ({
     useOptionalManagedZev: () => mockManagedZev(),
 }))
 
+// The owner's yearly download still goes through the live endpoint; the participant's documents are
+// what was issued to their inbox (#862). The inbox mock below forwards to these two so every document
+// request, and its abort signal, stays observable here.
 vi.mock('../src/lib/api/invoices', () => ({
     downloadAnnualStatement: vi.fn(() => Promise.resolve(new Blob())),
     downloadFinancialSummary: vi.fn(() => Promise.resolve(new Blob())),
+}))
+
+vi.mock('../src/lib/api/inbox', () => ({
+    listInboxDocuments: vi.fn(),
+    downloadInboxDocument: vi.fn(),
+}))
+
+vi.mock('../src/lib/appSettings', () => ({
+    useAppSettings: () => ({ settings: {} }),
+    formatShortDate: (date: string) => date,
 }))
 
 vi.mock('../src/lib/downloadBlob', () => ({
@@ -32,16 +45,49 @@ vi.mock('../src/lib/downloadBlob', () => ({
 }))
 
 import { ReportsPage } from '../src/pages/ReportsPage'
+import { queryKeys } from '../src/lib/api/queryKeys'
 import * as invoicesApi from '../src/lib/api/invoices'
+import * as inboxApi from '../src/lib/api/inbox'
 import { downloadBlob } from '../src/lib/downloadBlob'
 import { deferred, flush, pdfBlob } from './pdf-test-utils'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
+/** The issued statement and summary of each of the last years, addressed to the account's participation. */
+function issuedDocuments() {
+    const thisYear = new Date().getFullYear()
+    return Array.from({ length: 5 }, (_, index) => thisYear - index).flatMap((year) => [
+        ['annual_statement', 'statement', 'annual-statement'],
+        ['financial_summary', 'summary', 'financial-summary'],
+    ].map(([kind, idPrefix, filePrefix]) => ({
+        id: `${idPrefix}-${year}`, kind, participant: 'p1', zev: 'zev-1', zev_name: 'Demo',
+        period_start: `${year}-01-01`, period_end: `${year}-12-31`, delivered_at: `${year + 1}-01-15T10:00:00Z`,
+        superseded_at: null, withdrawn_at: null, file_name: `${filePrefix}-${year}.pdf`, title: `${kind} ${year}`,
+    })))
+}
+
+function useIssuedDocuments() {
+    vi.mocked(inboxApi.listInboxDocuments).mockResolvedValue(issuedDocuments() as never)
+    vi.mocked(inboxApi.downloadInboxDocument).mockImplementation(((id: string, signal?: AbortSignal) => {
+        const [kind, year] = id.split('-')
+        return kind === 'statement'
+            ? invoicesApi.downloadAnnualStatement({ year: Number(year) }, signal)
+            : invoicesApi.downloadFinancialSummary({ year: Number(year) }, signal)
+    }) as never)
+}
+
+const OWN_PARTICIPATION = { memberships: [{ zev: 'zev-1', zev_name: 'Demo', participants: [{ id: 'p1' }] }] }
+
 function renderReportsPage(component = ReportsPage) {
     const container = document.createElement('div')
     document.body.appendChild(container)
     const client = new QueryClient()
+    // The issued documents are already loaded, as when the participant opens the page again: these
+    // tests are about the preview lifecycle, not about the list request.
+    client.setQueryData(
+        queryKeys.inbox.list('mine', { kinds: ['annual_statement', 'financial_summary'] }),
+        issuedDocuments(),
+    )
     const root = createRoot(container)
     const render = (target = component) => createElement(
         MemoryRouter,
@@ -66,7 +112,7 @@ function renderReportsPage(component = ReportsPage) {
 }
 
 function mockParticipant(id = 7) {
-    mockAuth.mockReturnValue({ user: { id, role: 'user' } })
+    mockAuth.mockReturnValue({ user: { id, role: 'user', ...OWN_PARTICIPATION } })
     mockManagedZev.mockReturnValue({
         selectedZevId: 'zev-1',
         selectedZev: null,
@@ -102,10 +148,11 @@ describe('ReportsPage participant entry', () => {
     beforeEach(() => {
         document.body.innerHTML = ''
         vi.clearAllMocks()
+        useIssuedDocuments()
     })
 
     it('year selector defaults to last completed year for participants', async () => {
-        mockAuth.mockReturnValue({ user: { id: 7, role: 'user' } })
+        mockAuth.mockReturnValue({ user: { id: 7, role: 'user', ...OWN_PARTICIPATION } })
         mockManagedZev.mockReturnValue({
             selectedZevId: 'zev-1',
             selectedZev: null,
@@ -123,7 +170,7 @@ describe('ReportsPage participant entry', () => {
     })
 
     it('shared year selector drives the participant statement request', async () => {
-        mockAuth.mockReturnValue({ user: { id: 7, role: 'user' } })
+        mockAuth.mockReturnValue({ user: { id: 7, role: 'user', ...OWN_PARTICIPATION } })
         mockManagedZev.mockReturnValue({
             selectedZevId: 'zev-1',
             selectedZev: null,
@@ -149,7 +196,7 @@ describe('ReportsPage participant entry', () => {
     })
 
     it('participant renders document tabs with the statement selected, never the owner ZIP flow', async () => {
-        mockAuth.mockReturnValue({ user: { id: 7, role: 'user' } })
+        mockAuth.mockReturnValue({ user: { id: 7, role: 'user', ...OWN_PARTICIPATION } })
         mockManagedZev.mockReturnValue({
             selectedZevId: 'zev-1',
             selectedZev: null,
@@ -186,6 +233,7 @@ describe('ReportsPage participant annual documents', () => {
         document.body.innerHTML = ''
         vi.clearAllMocks()
         objectUrlCount = 0
+        useIssuedDocuments()
         mockParticipant()
         vi.mocked(invoicesApi.downloadAnnualStatement).mockReset()
         vi.mocked(invoicesApi.downloadFinancialSummary).mockReset()
@@ -484,7 +532,7 @@ describe('ReportsPage participant annual documents', () => {
         await flush()
         expect(URL.createObjectURL).toHaveBeenCalledTimes(2)
 
-        mockAuth.mockReturnValue({ user: { id: 8, role: 'user' } })
+        mockAuth.mockReturnValue({ user: { id: 8, role: 'user', ...OWN_PARTICIPATION } })
         rerender()
         await flush()
 
@@ -513,6 +561,7 @@ describe('ReportsPage participant annual documents', () => {
 
         vi.clearAllMocks()
         objectUrlCount = 0
+        useIssuedDocuments()
         mockParticipant()
         vi.mocked(invoicesApi.downloadAnnualStatement).mockResolvedValue(statementBlob())
         vi.mocked(invoicesApi.downloadFinancialSummary).mockResolvedValue(taxBlob())
@@ -522,7 +571,7 @@ describe('ReportsPage participant annual documents', () => {
         await flush()
         expect(URL.createObjectURL).toHaveBeenCalledTimes(2)
 
-        mockAuth.mockReturnValue({ user: { id: 7, role: 'user' } })
+        mockAuth.mockReturnValue({ user: { id: 7, role: 'user', ...OWN_PARTICIPATION } })
         mockManagedZev.mockReturnValue({
             selectedZevId: 'zev-1',
             selectedZev: { id: 'zev-1', name: 'Demo' },
@@ -550,7 +599,7 @@ describe('ReportsPage participant annual documents', () => {
         await selectTab(container, 'pages.reports.financialSummary.title')
         await flush()
 
-        mockAuth.mockReturnValue({ user: { id: 8, role: 'user' } })
+        mockAuth.mockReturnValue({ user: { id: 8, role: 'user', ...OWN_PARTICIPATION } })
         rerender()
         await flush()
 
@@ -675,6 +724,10 @@ describe('ReportsPage participant annual documents', () => {
             document.body.appendChild(holder)
             const root = createRoot(holder)
             const client = new QueryClient()
+            client.setQueryData(
+                queryKeys.inbox.list('mine', { kinds: ['annual_statement', 'financial_summary'] }),
+                issuedDocuments(),
+            )
             act(() => {
                 root.render(createElement(
                     MemoryRouter,

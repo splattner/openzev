@@ -101,8 +101,9 @@ participant paid moves onto their next invoice:
 The action endpoints use `IsAuthenticated, HasZevAccess` and resolve the invoice through the
 existing write-scoped `InvoiceViewSet` queryset, like `mark-paid`. A disabled ZEV refuses the write
 actions for non-admins through `_deny_if_zev_disabled`. `CreditViewSet` scopes its queryset the way
-`InvoiceViewSet.get_queryset` does, and a participant sees only their own credits. Credits are
-visible to the participant from creation, because a credit note is issued the moment it exists.
+`InvoiceViewSet.get_queryset` does: managers and viewers see their ZEVs' credits. A participant has no
+live access (#862); the participant reads their credit notes from the document inbox (kind `credit_note`,
+delivered when the PDF first exists, with the balance read live: `credit_figures`).
 
 ## 4. Data model and rules
 
@@ -116,8 +117,9 @@ visible to the participant from creation, because a credit note is issued the mo
 
 Serializer additions: `approved_at`, `paid_chf` (sum of payments), `outstanding_chf` (amount due
 minus `paid_chf`. Before phase 3 the amount due is `total_chf`), and, on the detail serializer, a
-nested `payments` list for callers with `zev.access.can_view` on the invoice's ZEV (`null` for a
-participant, who sees the two totals only). Phase 2 adds `credits` (credit notes whose source is this invoice). Phase 3
+nested `payments` list for callers with `zev.access.can_view` on the invoice's ZEV (`null` for any other
+caller; a participant has no live access to the invoice since #862 and reads `paid_chf`, `outstanding_chf` and
+the amount due from the inbox row's `invoice_figures`). Phase 2 adds `credits` (credit notes whose source is this invoice). Phase 3
 adds `credit_applied_chf`, `amount_due_chf` and `credit_applications`. In the list serializer,
 `paid_chf` comes from a `paid_sum` `Subquery` annotation so the list query count doesn't grow; detail
 reads and the period overview prefetch `payments`. `outstanding_chf` is `"0.00"` for a cancelled

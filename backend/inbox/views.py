@@ -2,7 +2,8 @@
 
 import uuid
 
-from django.db.models import Q
+from django.db.models import Count, OuterRef, Q, Subquery
+from django.db.models.functions import Coalesce
 from django.http import FileResponse
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from django.db import transaction
@@ -15,7 +16,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from config.http import sanitize_filename
-from invoices.models import ContractIssue
+from invoices.models import ContractIssue, InvoiceReadingImpact
 from notifications import producers as notification_producers
 from zev.access import can_manage
 from zev.models import Participant, Zev
@@ -107,6 +108,15 @@ class DocumentViewSet(
         queryset = DeliveredDocument.objects.select_related(
             "zev", "participant__party", "invoice", "delivered_by"
         )
+        if getattr(self, "action", None) in ("list", "retrieve"):
+            # The figures an invoice row shows (``invoice_figures``) are read live.
+            open_impacts = (
+                InvoiceReadingImpact.objects.filter(invoice_id=OuterRef("invoice_id"), resolved_at__isnull=True)
+                .order_by().values("invoice_id").annotate(total=Count("pk")).values("total")
+            )
+            queryset = queryset.prefetch_related("invoice__payments").annotate(
+                open_data_impacts=Coalesce(Subquery(open_impacts), 0)
+            )
         return self.filter_documents(self.scope_queryset(queryset))
 
     def filter_documents(self, queryset):

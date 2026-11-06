@@ -495,10 +495,10 @@ live on Reports; participant invoice PDF actions remain on the dashboard.
   4. `HourlyProfileCard` when the profile has data.
   5. `ParticipantInvoicesCard`: the invoice list, fetched alongside the summary
      and not tied to the period. It renders outside the analytics block, so it
-     also shows when the summary request fails. Its rows use
-     `personalInvoiceFilter` (`lib/membership.ts`, shared with My invoices): the
-     account's own invoices once sent (`sent_at`, or status `sent`/`paid`). A
-     missing PDF never hides a row. It spans all the account's communities and
+     also shows when the summary request fails. Its rows are the invoice rows of
+     the account's document inbox (`listInboxDocuments`, kept to the account's own
+     participations with `ownParticipantIds`, SPEC-2026-11-participant-document-inbox
+     §7.1), shown by `InvoiceDocumentsTable` with their live figures and a download. It spans all the account's communities and
      says so in its title and community column when the account has more than
      one membership, including former or disabled communities.
 

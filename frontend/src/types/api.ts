@@ -3090,7 +3090,31 @@ export interface DeliveredDocument {
     invoice: string | null
     /** The source invoice's raw status, so a cancelled invoice reads as cancelled. */
     invoice_status: string | null
+    /** Read live from the invoice (the file is a copy): what it comes to and where it stands. */
+    invoice_figures: InvoiceFigures | null
+    /** Read live from the credit note, found by its number; `null` for any other kind. */
+    credit_figures: CreditFigures | null
     contract_issue: string | null
+}
+
+export interface InvoiceFigures {
+    status: string
+    due_date: string | null
+    total_chf: string
+    credit_applied_chf: string
+    amount_due_chf: string
+    paid_chf: string
+    outstanding_chf: string
+    /** Open reading corrections that may have outdated the invoice; their evidence is for managers. */
+    open_data_impact_count: number
+}
+
+export interface CreditFigures {
+    amount_chf: string
+    remaining_chf: string
+    status: CreditStatus
+    source_invoice_number: string | null
+    applied_to: { invoice_number: string; amount_chf: string }[]
 }
 
 export interface DeliveryResult {

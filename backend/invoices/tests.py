@@ -62,15 +62,15 @@ class InvoiceRBACTests(TestCase):
         self.assertIn(str(self.inv1.pk), ids)
         self.assertNotIn(str(self.inv2.pk), ids)
 
-    def test_participant_sees_only_own_invoices(self):
+    def test_participant_sees_no_live_invoices(self):
+        # Their invoices are in the document inbox (#862), not on this endpoint.
         self.inv1.status = InvoiceStatus.SENT
         self.inv1.sent_at = datetime.now(timezone.utc)
         self.inv1.save(update_fields=["status", "sent_at"])
         auth(self.client, self.puser)
         status_code, ids = self._list()
         self.assertEqual(status_code, 200)
-        self.assertIn(str(self.inv1.pk), ids)
-        self.assertNotIn(str(self.inv2.pk), ids)
+        self.assertEqual(ids, set())
 
     def test_participant_cannot_approve(self):
         auth(self.client, self.puser)
@@ -120,7 +120,8 @@ class InvoiceRBACTests(TestCase):
 
         self.assertEqual(resp.status_code, 400)
 
-    def test_participant_can_download_own_financial_summary_pdf(self):
+    def test_participant_cannot_download_their_financial_summary_here(self):
+        # It is issued to their document inbox (#862) instead.
         make_invoice(self.zev1, self.p1, InvoiceStatus.PAID)
         auth(self.client, self.puser)
 
@@ -129,9 +130,7 @@ class InvoiceRBACTests(TestCase):
             {"year": 2026},
         )
 
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp["Content-Type"], "application/pdf")
-        self.assertIn("financial-summary-2026", resp["Content-Disposition"])
+        self.assertEqual(resp.status_code, 404)
 
     def test_owner_can_download_financial_summary_for_participant(self):
         make_invoice(self.zev1, self.p1, InvoiceStatus.PAID)

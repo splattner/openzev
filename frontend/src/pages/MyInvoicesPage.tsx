@@ -1,41 +1,33 @@
 import { useQuery } from '@tanstack/react-query'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { fetchInvoices, listCredits, openCreditPdf } from '../lib/api/invoices'
+import { listInboxDocuments } from '../lib/api/inbox'
 import { queryKeys } from '../lib/api/queryKeys'
-import { formatChf, formatChfAmount } from '../lib/numbers'
-import { formatShortDate, useAppSettings } from '../lib/appSettings'
-import { InvoiceLink, InvoicePdfCell, InvoiceRowActions, InvoicePaymentState, InvoiceTotal } from '../components/InvoicePresentation'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useAuth } from '../lib/auth'
-import { soleCommunityName, personalInvoiceFilter } from '../lib/membership'
+import { ownParticipantIds, soleCommunityName } from '../lib/membership'
 import { PageHeader } from '../components/PageHeader'
 import { Notice } from '../components/Notice'
-import { CREDIT_STATUS_BADGE } from '../features/invoices/invoiceCredits'
-import { IssueText } from '../components/IssueText'
+import { CreditNoteDocumentsTable, InvoiceDocumentsTable } from '../features/inbox/InvoiceDocuments'
 
 /**
- * Participant's own invoices (`/me/invoices`, nav-regroup phase 2): a
- * read-only list over the existing role-scoped backend list (no new grant).
- * PDFs never decide list membership — rows always show, the PDF action is
- * conditional on a stored document.
+ * Participant's own invoices and credit notes (`/me/invoices`): the invoice and credit note rows of
+ * the document inbox (SPEC-2026-11-participant-document-inbox §7.1), with the figures each row
+ * carries. The same list, unfiltered, is *My documents*. A former participant still reads what it
+ * was sent.
  */
 export function MyInvoicesPage() {
     const { t } = useTranslation()
-    const { settings } = useAppSettings()
     const { user } = useAuth()
 
-    const isPersonalInvoice = personalInvoiceFilter(user)
-    const invoicesQuery = useQuery({
-        // No zev_id: personal invoices span all participant memberships.
-        queryKey: queryKeys.invoices.mine(),
-        queryFn: () => fetchInvoices(undefined),
-        refetchInterval: (query) =>
-            query.state.data?.some((invoice) => isPersonalInvoice(invoice) && invoice.pdf_status === 'pending') ? 15000 : false,
-    })
-    const invoices = (invoicesQuery.data ?? []).filter(isPersonalInvoice)
-    // The participant's credit notes (#388): the backend scopes them to the account's own.
-    const creditsQuery = useQuery({ queryKey: queryKeys.invoices.credits(), queryFn: () => listCredits() })
-    const credits = creditsQuery.data ?? []
+    const query = useQuery({ queryKey: queryKeys.inbox.list('mine'), queryFn: () => listInboxDocuments() })
+    const own = useMemo(() => ownParticipantIds(user), [user])
+    const mine = useMemo(
+        () => (query.data ?? []).filter((document) => document.participant != null && own.has(document.participant)),
+        [query.data, own],
+    )
+    const invoices = mine.filter((document) => document.kind === 'invoice')
+    const credits = mine.filter((document) => document.kind === 'credit_note')
     // Several memberships: a community column, and the header names all of them.
     const showCommunity = (user?.memberships?.length ?? 0) > 1
 
@@ -47,13 +39,13 @@ export function MyInvoicesPage() {
                 description={t('pages.myInvoices.description')}
             />
 
-            {invoicesQuery.isError && invoicesQuery.data && (
-                <Notice tone="warning" onRetry={() => void invoicesQuery.refetch()} isRetrying={invoicesQuery.isFetching}>{t('pages.myInvoices.failed')}</Notice>
+            {query.isError && query.data && (
+                <Notice tone="warning" onRetry={() => void query.refetch()} isRetrying={query.isFetching}>{t('pages.myInvoices.failed')}</Notice>
             )}
-            {invoicesQuery.isLoading ? (
+            {query.isLoading ? (
                 <PageSkeleton variant="tableRows" />
-            ) : invoicesQuery.isError && !invoicesQuery.data ? (
-                <Notice tone="error" onRetry={() => void invoicesQuery.refetch()} isRetrying={invoicesQuery.isFetching}>{t('pages.myInvoices.failed')}</Notice>
+            ) : query.isError && !query.data ? (
+                <Notice tone="error" onRetry={() => void query.refetch()} isRetrying={query.isFetching}>{t('pages.myInvoices.failed')}</Notice>
             ) : invoices.length === 0 ? (
                 <div className="card">
                     <h3 className="mt-0">{t('pages.myInvoices.empty.title')}</h3>
@@ -61,60 +53,7 @@ export function MyInvoicesPage() {
                 </div>
             ) : (
                 <section className="table-card">
-                    <div className="table-scroll">
-                        <table className="billing-workflow-table">
-                            <thead>
-                                <tr>
-                                    <th scope="col">{t('pages.myInvoices.col.invoice')}</th>
-                                    {showCommunity && <th scope="col">{t('pages.myInvoices.col.community')}</th>}
-                                    <th scope="col">{t('pages.myInvoices.col.period')}</th>
-                                    <th scope="col">{t('pages.myInvoices.col.total')}</th>
-                                    <th scope="col">{t('pages.myInvoices.col.status')}</th>
-                                    <th scope="col">{t('pages.myInvoices.col.actions')}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {invoices.map((invoice) => (
-                                    <tr key={invoice.id}>
-                                        <td className="invoice-number-cell"><InvoiceLink invoice={invoice} from="/me/invoices" /></td>
-                                        {showCommunity && <td>{invoice.zev_name}</td>}
-                                        <td className="billing-period-cell">
-                                            {formatShortDate(invoice.period_start, settings)} →{' '}
-                                            {formatShortDate(invoice.period_end, settings)}
-                                        </td>
-                                        <td className="numeric"><InvoiceTotal invoice={invoice} /></td>
-                                        <td>
-                                            <InvoicePaymentState invoice={invoice} />
-                                            {invoice.needs_data_review && (
-                                                <div style={{ marginTop: '0.25rem' }}>
-                                                    <IssueText tone="warning" title={t('pages.invoices.dataReview.issuedNotice', { count: invoice.open_data_impact_count ?? 0 })}>
-                                                        {t('pages.invoices.dataReview.badge')}
-                                                    </IssueText>
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td>
-                                            <InvoiceRowActions>
-                                                <InvoiceLink
-                                                    className="button button-secondary"
-                                                    invoice={invoice}
-                                                    from="/me/invoices"
-                                                >
-                                                    {t('pages.myInvoices.viewDetails')}
-                                                </InvoiceLink>
-                                                <InvoicePdfCell
-                                                    invoice={invoice}
-                                                    keepExistingDuringPending
-                                                    buttonClassName="button button-secondary"
-                                                    ariaLabel={t('pages.myInvoices.openPdf', { number: invoice.invoice_number })}
-                                                />
-                                            </InvoiceRowActions>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <InvoiceDocumentsTable documents={invoices} showCommunity={showCommunity} />
                 </section>
             )}
 
@@ -122,57 +61,7 @@ export function MyInvoicesPage() {
                 <section className="table-card" aria-labelledby="my-credits-title">
                     <h3 id="my-credits-title">{t('pages.myInvoices.credits.title')}</h3>
                     <p className="muted">{t('pages.myInvoices.credits.description')}</p>
-                    <div className="table-scroll">
-                        <table className="billing-workflow-table">
-                            <thead>
-                                <tr>
-                                    <th scope="col">{t('pages.myInvoices.credits.number')}</th>
-                                    <th scope="col">{t('pages.myInvoices.credits.invoice')}</th>
-                                    <th scope="col">{t('pages.myInvoices.credits.date')}</th>
-                                    <th scope="col">{t('pages.myInvoices.credits.amount')}</th>
-                                    <th scope="col">{t('pages.myInvoices.credits.remaining')}</th>
-                                    <th scope="col">{t('pages.myInvoices.credits.status')}</th>
-                                    <th scope="col">{t('pages.myInvoices.col.actions')}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {credits.map((credit) => (
-                                    <tr key={credit.id}>
-                                        <td>{credit.credit_number}</td>
-                                        <td>{credit.source_invoice_number ?? '-'}</td>
-                                        <td>{formatShortDate(credit.created_at.slice(0, 10), settings)}</td>
-                                        <td className="numeric">{formatChfAmount(Number(credit.amount_chf))}</td>
-                                        <td className="numeric">{formatChfAmount(Number(credit.remaining_chf))}</td>
-                                        <td>
-                                            <span className={CREDIT_STATUS_BADGE[credit.status]}>
-                                                {t(`pages.invoiceDetail.credits.status.${credit.status}`)}
-                                            </span>
-                                            {(credit.applications ?? []).filter((a) => a.released_at === null).map((application) => (
-                                                <small key={application.id} className="muted" style={{ display: 'block' }}>
-                                                    {t('pages.invoiceDetail.credits.appliedTo', {
-                                                        invoice: application.invoice_number,
-                                                        amount: formatChf(Number(application.amount_chf)),
-                                                    })}
-                                                </small>
-                                            ))}
-                                        </td>
-                                        <td>
-                                            {credit.pdf_url ? (
-                                                <button
-                                                    type="button"
-                                                    className="button button-secondary"
-                                                    aria-label={t('pages.invoiceDetail.credits.openPdf', { number: credit.credit_number })}
-                                                    onClick={() => void openCreditPdf(credit.id)}
-                                                >
-                                                    {t('common.openPdf')}
-                                                </button>
-                                            ) : null}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <CreditNoteDocumentsTable documents={credits} />
                 </section>
             )}
         </div>

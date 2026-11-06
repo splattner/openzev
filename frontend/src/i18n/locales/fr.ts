@@ -930,7 +930,7 @@ export const fr = {
         myInvoices: {
             title: 'Mes factures',
             allCommunities: 'Toutes vos communautés',
-            description: 'Factures qui vous ont été émises. Cliquez sur une facture pour voir les détails ou ouvrir le PDF.',
+            description: 'Factures et avoirs émis à votre intention. Téléchargez un PDF ; les montants et l\'état du paiement sont à jour.',
             failed: 'Impossible de charger les factures.',
             empty: {
                 title: 'Aucune facture pour l\'instant',
@@ -944,8 +944,6 @@ export const fr = {
                 community: 'Communauté',
                 actions: 'Actions',
             },
-            viewDetails: 'Voir les détails',
-            openPdf: 'Ouvrir la facture {{number}} en PDF',
             credits: {
                 title: 'Avoirs',
                 description: 'Avoirs qui vous ont été émis. Le solde est déduit de votre prochaine facture.',
@@ -3593,7 +3591,6 @@ export const fr = {
             description: 'Consultez la production, la consommation, l’autoconsommation et les échanges réseau pour la période sélectionnée.',
         },
         dashboard: {
-            openInvoicePdf: 'Ouvrir le PDF de la facture {{number}}',
             participant: 'Participant',
             allParticipants: 'Tous les participants',
             resolution: 'Résolution',
@@ -3732,15 +3729,6 @@ export const fr = {
                 },
             },
             noInvoices: 'Aucune facture disponible.',
-            invoiceCol: {
-                invoice: 'Facture',
-                period: 'Période',
-                total: 'Total',
-                status: 'Paiement',
-                community: 'Communauté',
-                actions: 'Actions',
-            },
-            viewDetails: 'Voir les détails',
             energyFlow: {
                 title: 'Flux d\'énergie',
                 gridImport: 'Import réseau',
@@ -3754,12 +3742,14 @@ export const fr = {
         reports: {
             title: 'Rapports',
             description: 'Consultez les analyses énergétiques et les documents annuels disponibles.',
-            participantDescription: 'Lisez et téléchargez vos documents annuels.',
+            participantDescription: 'Lisez et téléchargez les documents annuels que votre communauté a émis à votre intention.',
             year: 'Année',
             downloading: 'Génération…',
             download: 'Télécharger',
             preparingDocument: 'Préparation de {{document}} pour {{year}}…',
             documentTitle: '{{document}} — {{year}}',
+            issuedOn: 'Émis le {{date}}',
+            notIssued: 'Votre communauté n\'a pas encore émis votre {{document}} pour {{year}}. Il apparaîtra ici, et dans Mes documents, dès qu\'il sera disponible.',
             documentTabs: 'Documents annuels',
             annualStatement: {
                 title: 'Décompte annuel',

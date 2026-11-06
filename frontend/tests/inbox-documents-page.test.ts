@@ -93,14 +93,15 @@ describe('DocumentsPage', () => {
         page.unmount()
     })
 
-    it('links an invoice to its detail page and downloads a document through the API', async () => {
+    it('shows a cancelled invoice as plain text with its badge and downloads a document through the API', async () => {
         vi.mocked(inboxApi.listInboxDocuments).mockResolvedValue([
             doc({ id: 'inv', title: 'RE-1', kind: 'invoice', invoice: 'invoice-1', invoice_status: 'cancelled' }),
         ])
         const page = render()
         await settled(page, 'RE-1')
 
-        expect(page.container.querySelector('a[href="/billing/invoices/invoice-1"]')).not.toBeNull()
+        // A participant has no live invoice to open (#862): the row is not a link.
+        expect(page.container.querySelector('a[href^="/billing/invoices/"]')).toBeNull()
         expect(page.container.textContent).toContain('inbox.standing.cancelled')
         const button = page.container.querySelector('button.inbox-row-action') as HTMLButtonElement
         await act(async () => { button.click() })

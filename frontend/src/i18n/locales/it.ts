@@ -930,7 +930,7 @@ export const it = {
         myInvoices: {
             title: 'Le mie fatture',
             allCommunities: 'Tutte le tue comunità',
-            description: 'Fatture emesse a tuo indirizzo. Fai clic su una fattura per vedere i dettagli o aprire il PDF.',
+            description: 'Fatture e note di credito emesse per te. Scarica un PDF; gli importi e lo stato del pagamento sono aggiornati.',
             failed: 'Impossibile caricare le fatture.',
             empty: {
                 title: 'Ancora nessuna fattura',
@@ -944,8 +944,6 @@ export const it = {
                 community: 'Comunità',
                 actions: 'Azioni',
             },
-            viewDetails: 'Vedi dettagli',
-            openPdf: 'Apri la fattura {{number}} come PDF',
             credits: {
                 title: 'Note di credito',
                 description: 'Note di credito emesse a suo favore. Il residuo viene dedotto dalla prossima fattura.',
@@ -3593,7 +3591,6 @@ export const it = {
             description: 'Consulta produzione, consumo, autoconsumo e scambio con la rete per il periodo selezionato.',
         },
         dashboard: {
-            openInvoicePdf: 'Apri PDF per fattura {{number}}',
             participant: 'Partecipante',
             allParticipants: 'Tutti i partecipanti',
             resolution: 'Risoluzione',
@@ -3732,15 +3729,6 @@ export const it = {
                 },
             },
             noInvoices: 'Nessuna fattura disponibile.',
-            invoiceCol: {
-                invoice: 'Fattura',
-                period: 'Periodo',
-                total: 'Totale',
-                status: 'Pagamento',
-                community: 'Comunità',
-                actions: 'Azioni',
-            },
-            viewDetails: 'Vedi dettagli',
             energyFlow: {
                 title: 'Flusso energetico',
                 gridImport: 'Importazione dalla rete',
@@ -3754,12 +3742,14 @@ export const it = {
         reports: {
             title: 'Rapporti',
             description: 'Consulta le analisi energetiche e i documenti annuali disponibili.',
-            participantDescription: 'Leggi e scarica i tuoi documenti annuali.',
+            participantDescription: 'Leggi e scarica i documenti annuali che la tua comunità ha emesso per te.',
             year: 'Anno',
             downloading: 'Generazione…',
             download: 'Scarica',
             preparingDocument: 'Preparazione di {{document}} per {{year}}…',
             documentTitle: '{{document}} — {{year}}',
+            issuedOn: 'Emesso il {{date}}',
+            notIssued: 'La tua comunità non ha ancora emesso il tuo {{document}} per {{year}}. Comparirà qui, e in I miei documenti, appena disponibile.',
             documentTabs: 'Documenti annuali',
             annualStatement: {
                 title: 'Rendiconto annuale',

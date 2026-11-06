@@ -627,13 +627,13 @@ or cannot load. Use **Retry** if the consumption profile fails.
 
 Login as a participant (Anna or Ben):
 - **Dashboard** shows your selected community's energy overview and your invoices from all communities
-- **My invoices** lists your invoices with details and any available PDFs
+- **My invoices** lists your invoices and credit notes with their amounts, payment state and PDFs
 - **My documents** lists everything delivered to you: invoices, credit notes, statements, the contract and notices
-- **Annual statement** shows your yearly statement and financial summary
+- **Annual statement** shows the yearly statement and financial summary your community issued to you
 
-Anna's demo account includes invoice PDFs; Ben's invoices show without PDFs.
-Invoice details and available PDFs remain accessible while the energy overview
-loads or fails. The consumption profile loads separately; use **Retry** if it
+Anna's demo account includes invoice PDFs and so lists her invoices; Ben's
+invoices were never given a PDF, so nothing was delivered to him and his list is
+empty. The invoices remain available while the energy overview loads or fails. The consumption profile loads separately; use **Retry** if it
 fails.
 
 ![Participant Dashboard](screenshots/02b-participant-dashboard.png)

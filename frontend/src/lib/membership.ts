@@ -1,4 +1,4 @@
-import type { Invoice, Membership, User } from '../types/api'
+import type { Membership, User } from '../types/api'
 
 /**
  * How the signed-in account relates to one community (#761): an admin to
@@ -20,13 +20,6 @@ export function ownParticipantIds(user: Pick<User, 'memberships'> | null | undef
         for (const row of membership.participants ?? []) ids.add(row.id)
     }
     return ids
-}
-
-/** Own sent invoices; excludes rows visible only through management/viewer access. */
-export function personalInvoiceFilter(user: Pick<User, 'memberships'> | null | undefined) {
-    const ownIds = ownParticipantIds(user)
-    return (invoice: Pick<Invoice, 'participant' | 'sent_at' | 'status'>) => ownIds.has(invoice.participant)
-        && (!!invoice.sent_at || invoice.status === 'sent' || invoice.status === 'paid')
 }
 
 /**

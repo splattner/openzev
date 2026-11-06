@@ -780,27 +780,25 @@ class VisibilityTests(ImpactBase):
         self.assertEqual(len(detail.data["data_impacts"]), 25)
         self.assertEqual(detail.data["open_data_impact_count"], 25)
 
-    def test_participant_sees_flag_and_count_without_import_evidence(self):
+    def test_participant_sees_the_count_in_the_inbox_without_import_evidence(self):
+        from inbox.producers import deliver_invoice_document
+
         tenant = make_user("impact_tenant", UserRole.USER)
         self.alice.user = tenant
         self.alice.save(update_fields=["user"])
         auth(self.client, tenant)
+        self.invoice.status = InvoiceStatus.SENT
+        self.invoice.save(update_fields=["status"])
+        deliver_invoice_document(self.invoice, b"%PDF-1.7\n")
 
-        for status in (InvoiceStatus.SENT, InvoiceStatus.PAID):
-            with self.subTest(status=status):
-                self.invoice.status = status
-                self.invoice.save(update_fields=["status"])
-                response = self.client.get(f"{INVOICES}{self.invoice.id}/")
-                self.assertEqual(response.status_code, 200, response.content)
-                self.assertTrue(response.data["needs_data_review"])
-                self.assertEqual(response.data["open_data_impact_count"], 1)
-                self.assertEqual(response.data["data_impacts"], [])
-
-        listed = self.client.get(INVOICES)
-        row = next(item for item in listed.data["results"] if item["id"] == str(self.invoice.id))
-        self.assertTrue(row["needs_data_review"])
-        self.assertEqual(row["open_data_impact_count"], 1)
+        # The live invoice is not reachable for a participant any more (#862) ...
+        self.assertEqual(self.client.get(f"{INVOICES}{self.invoice.id}/").status_code, 404)
+        # ... the count a participant may see is on their inbox row, and nothing of the import.
+        rows = self.client.get("/api/v1/inbox/documents/").data["results"]
+        row = next(item for item in rows if str(item["invoice"]) == str(self.invoice.id))
+        self.assertEqual(row["invoice_figures"]["open_data_impact_count"], 1)
         self.assertNotIn("data_impacts", row)
+        self.assertNotIn("data_impacts", row["invoice_figures"])
 
     def test_viewer_and_admin_keep_import_evidence(self):
         viewer = make_user("impact_viewer", UserRole.USER)
