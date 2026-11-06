@@ -383,6 +383,7 @@ Class attributes each viewset declares:
 | `participant_distinct` | `True` when the participant path crosses a to-many relation |
 | `participant_visible` | optional `Q` a row must also match to be visible through a participant link |
 | `participant_access_survives_end` | `True` when ended participant rows still count (invoices) |
+| `participant_survives_disabled_zev` | `True` when a participant keeps seeing the rows although their ZEV is disabled; default `False`, set only by the document inbox (`inbox.views.DocumentViewSet`, ADR 0045) |
 | `viewer_allowed_actions` | unsafe-method actions that only read (`InvoiceViewSet`: `{"download_pdfs"}`) |
 | `scope_parent_path` | write-scoping path, §4.5 |
 

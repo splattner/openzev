@@ -158,6 +158,9 @@ ZEV_SECTIONS: tuple[tuple[str, tuple[ZevPart, ...]], ...] = (
         ),
     ),
     ("contract_issues", (ZevPart("invoices.ContractIssue", "zev"),)),
+    # After invoices, contracts and participants: a row points at each. Its files
+    # travel as media; a contract row has none, its bytes are in the issue.
+    ("delivered_documents", (ZevPart("inbox.DeliveredDocument", "zev"),)),
     ("audit_events", (ZevPart("audit.AuditEvent", "zev"),)),
 )
 
@@ -169,6 +172,7 @@ ZEV_SECTIONS: tuple[tuple[str, tuple[ZevPart, ...]], ...] = (
 MEDIA_FIELDS: tuple[tuple[str, str, str], ...] = (
     ("invoices.Invoice", "pdf_file", "zev"),
     ("invoices.Credit", "pdf_file", "zev"),
+    ("inbox.DeliveredDocument", "file", "zev"),
 )
 
 # ── deliberately not backed up ───────────────────────────────────────────────

@@ -3850,6 +3850,7 @@ export const fr = {
                     sent_invoice_deleted: 'Une facture envoyée ou payée absente de la sauvegarde serait supprimée.',
                     sent_invoice_reverted: 'Une facture envoyée ou payée serait rétablie à un statut antérieur.',
                     contract_issue_deleted: 'Un contrat émis absent de la sauvegarde serait supprimé.',
+                    delivered_document_deleted: 'Un document remis à un participant et absent de la sauvegarde serait supprimé.',
                     meter_id_owned_by_other_zev: 'Un identifiant de compteur de la sauvegarde appartient désormais à une autre communauté.',
                     referenced_row_missing: 'La sauvegarde fait référence à quelque chose qui n\'existe plus ici.',
                     export_in_progress: 'Un export de décompte annuel est en cours pour cette communauté.',

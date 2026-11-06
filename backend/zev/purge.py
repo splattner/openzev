@@ -16,7 +16,9 @@ or from a row that is itself ``CASCADE`` from ``Zev`` — ``Participant``
 (-> ``MeteringPointAssignment``, ``ParticipantOnboardingToken``),
 ``MeteringPoint`` (-> ``MeterReading``, ``MeteringPointAssignment``),
 ``Tariff`` (-> ``TariffPeriod``), ``metering.ImportLog``. Django's delete
-collector walks all of that automatically. ``AuditEvent.zev``,
+collector walks all of that automatically. ``DeliveredDocument.zev``
+is ``CASCADE`` too (nobody is left who could reach a delivered document) and its
+stored files are deleted below with the other media. ``AuditEvent.zev``,
 ``ContractIssue.zev`` and ``backups.BackupJob.zev`` are ``SET_NULL`` and
 deliberately survive: ``ContractIssue`` is documented as an immutable
 archive, and the audit trail (including this purge's own event, and
@@ -48,6 +50,7 @@ from django.core.files.storage import default_storage
 from django.db import transaction
 
 from exports.models import ExportJob
+from inbox.models import DeliveredDocument
 from invoices.models import Credit, CreditApplication, Invoice
 
 from .models import Zev
@@ -91,6 +94,13 @@ def purge_zev(zev: Zev) -> PurgeResult:
         Credit.objects.filter(zev=zev).exclude(pdf_file="").values_list("pdf_file", flat=True)
         if name
     ]
+    # One stored file can back several rows (a broadcast upload), hence the set.
+    inbox_files = {
+        name for name in
+        DeliveredDocument.objects.filter(zev=zev).exclude(file="").exclude(file__isnull=True)
+        .values_list("file", flat=True)
+        if name
+    }
     export_files = [
         name for name in
         ExportJob.objects.filter(zev=zev).exclude(result_file="").values_list("result_file", flat=True)
@@ -99,6 +109,7 @@ def purge_zev(zev: Zev) -> PurgeResult:
 
     counts = {
         "export_jobs": ExportJob.objects.filter(zev=zev).count(),
+        "delivered_documents": DeliveredDocument.objects.filter(zev=zev).count(),
         "invoices": Invoice.objects.filter(zev=zev).count(),
         "credit_applications": CreditApplication.objects.filter(credit__zev=zev).count(),
         "credits": Credit.objects.filter(zev=zev).count(),
@@ -119,7 +130,7 @@ def purge_zev(zev: Zev) -> PurgeResult:
         zev.delete()
 
     media_files_deleted = 0
-    for name in (*invoice_pdfs, *credit_pdfs, *export_files):
+    for name in (*invoice_pdfs, *credit_pdfs, *sorted(inbox_files), *export_files):
         default_storage.delete(name)
         media_files_deleted += 1
 

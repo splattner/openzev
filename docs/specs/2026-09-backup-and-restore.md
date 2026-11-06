@@ -554,7 +554,7 @@ zip member (`force_zip64=True`, since the size is unknown when the header is
 written); a `_HashingWriter` digests and counts bytes as they pass. Nothing holds a
 whole section in memory.
 
-**Media.** For each `MEDIA_FIELDS` entry — today `invoices.Invoice.pdf_file` — the
+**Media.** For each `MEDIA_FIELDS` entry — today `invoices.Invoice.pdf_file`, `invoices.Credit.pdf_file` and `inbox.DeliveredDocument.file` — the
 file is copied from `default_storage` into the ZEV's `media/` directory under its
 storage name. A name that is absolute or contains `..` is refused (it is read from
 the database, and an archive member must not be able to name a place outside its
@@ -849,7 +849,8 @@ rolls the restore back. A dry run does not promote accounts. Rules, in the order
 3. **Refuse on conflicts.** *Overridable* (need `force`): `sent_invoice_deleted`,
    `sent_invoice_reverted` (a sent/paid invoice whose backed-up status differs),
    `contract_issue_deleted` (an issued contract the backup lacks — documented as *"an
-   immutable archive"*). *Hard* (never forceable): `meter_id_owned_by_other_zev`,
+   immutable archive"*), `delivered_document_deleted` (a document already delivered to a
+   participant that the backup lacks, SPEC-2026-11-participant-document-inbox §6.4). *Hard* (never forceable): `meter_id_owned_by_other_zev`,
    `referenced_row_missing` (a price source the backup points at that is gone),
    `export_in_progress`, `restore_in_progress`, `login_setup_required` (an account the
    backup links to an issuer/representative party has no password, enabled social login

@@ -2878,6 +2878,7 @@ export type RestoreConflictKind =
     | 'sent_invoice_deleted'
     | 'sent_invoice_reverted'
     | 'contract_issue_deleted'
+    | 'delivered_document_deleted'
     | 'meter_id_owned_by_other_zev'
     | 'referenced_row_missing'
     | 'export_in_progress'

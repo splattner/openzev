@@ -3850,6 +3850,7 @@ export const de = {
                     sent_invoice_deleted: 'Eine versendete oder bezahlte Rechnung, die nicht in der Sicherung ist, würde gelöscht.',
                     sent_invoice_reverted: 'Eine versendete oder bezahlte Rechnung würde auf einen früheren Status zurückgesetzt.',
                     contract_issue_deleted: 'Ein ausgestellter Vertrag, der nicht in der Sicherung ist, würde gelöscht.',
+                    delivered_document_deleted: 'Ein an einen Teilnehmer zugestelltes Dokument, das nicht in der Sicherung ist, würde gelöscht.',
                     meter_id_owned_by_other_zev: 'Eine Messpunkt-ID aus der Sicherung gehört jetzt zu einer anderen Gemeinschaft.',
                     referenced_row_missing: 'Die Sicherung verweist auf etwas, das hier nicht mehr existiert.',
                     export_in_progress: 'Für diese Gemeinschaft läuft ein Jahresabrechnungs-Export.',

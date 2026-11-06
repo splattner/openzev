@@ -87,6 +87,7 @@ class ArchiveFacts:
     users: list[dict]
     invoices: dict[str, str]  # invoice id → status
     contract_issue_ids: set[str]
+    delivered_document_ids: set[str]
     meter_ids: set[str]
     external: dict[str, set[str]] = field(default_factory=dict)  # model label → referenced ids
     managing_user_ids: set[int] = field(default_factory=set)  # backed-up users linked to an issuer/representative party
@@ -146,6 +147,7 @@ def read_facts(zf, manifest: dict, entry: dict) -> ArchiveFacts:
         users=refs.get("users", []),
         invoices={},
         contract_issue_ids=set(),
+        delivered_document_ids=set(),
         meter_ids=set(),
         counts=dict(entry["counts"]),
         media_files=entry.get("media", {}).get("files", 0),
@@ -153,7 +155,7 @@ def read_facts(zf, manifest: dict, entry: dict) -> ArchiveFacts:
     )
 
     external = _foreign_keys_outside_scope()
-    wanted = {"participants", "metering_points", "tariffs", "invoices", "contract_issues"}
+    wanted = {"participants", "metering_points", "tariffs", "invoices", "contract_issues", "delivered_documents"}
     links: list[tuple[str, int]] = []  # (party pk, user id)
     managing_parties: set[str] = set()
     for name, parts in ZEV_SECTIONS:
@@ -170,6 +172,8 @@ def read_facts(zf, manifest: dict, entry: dict) -> ArchiveFacts:
                 facts.invoices[record["pk"]] = fields.get("status", "")
             elif canonical == "invoices.ContractIssue":
                 facts.contract_issue_ids.add(record["pk"])
+            elif canonical == "inbox.DeliveredDocument":
+                facts.delivered_document_ids.add(record["pk"])
             elif canonical == "zev.MeteringPoint":
                 facts.meter_ids.update(value for value in (fields.get("meter_id"), fields.get("secondary_meter_id")) if value)
             elif canonical in ("zev.Party", "zev.Participant") and fields.get("user") is not None:
@@ -255,6 +259,15 @@ def evaluate(facts: ArchiveFacts, *, force: bool, exclude_job=None) -> dict:
         if str(row["pk"]) not in facts.contract_issue_ids
     ]
     conflicts += [_conflict("contract_issue_deleted", d, overridable=True) for d in _listed(lost_contracts)]
+
+    # Delivered to a participant, so the restore would take back something they already hold.
+    document_model = apps.get_model("inbox.DeliveredDocument")
+    lost_documents = [
+        f"{row['title']} ({row['kind']})"
+        for row in document_model._base_manager.filter(zev_id=facts.zev_id).values("pk", "title", "kind")
+        if str(row["pk"]) not in facts.delivered_document_ids
+    ]
+    conflicts += [_conflict("delivered_document_deleted", d, overridable=True) for d in _listed(lost_documents)]
 
     # Hard: forcing these would corrupt something else.
     point_model = apps.get_model("zev.MeteringPoint")

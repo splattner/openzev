@@ -3861,6 +3861,7 @@ export const en = {
                     sent_invoice_deleted: 'A sent or paid invoice that is not in the backup would be deleted.',
                     sent_invoice_reverted: 'A sent or paid invoice would be rolled back to an earlier status.',
                     contract_issue_deleted: 'An issued contract that is not in the backup would be deleted.',
+                    delivered_document_deleted: 'A document delivered to a participant that is not in the backup would be deleted.',
                     meter_id_owned_by_other_zev: 'A meter id in the backup now belongs to another community.',
                     referenced_row_missing: 'The backup refers to something that no longer exists here.',
                     export_in_progress: 'An annual-statement export for this community is running.',
