@@ -1886,7 +1886,7 @@ added later, but today an import is a copy.</p>
 <li>Scroll to <strong>Export ZEV</strong> and click <strong>Export ZEV</strong>.</li>
 <li>Pick the sections you want. The <strong>structure sections are pre-ticked</strong> — ZEV
    settings, participants, metering points and tariffs — and readings,
-   invoices and invoice PDFs start unticked, because they are the bulk of the
+   invoices, invoice PDFs and participant documents start unticked, because they are the bulk of the
    file and can take a while to stream.</li>
 <li>Click <strong>Download archive</strong>.</li>
 </ol>
@@ -1945,6 +1945,10 @@ the audit log with the sections that left the instance.</p>
 <tr>
 <td><strong>Invoice PDFs</strong></td>
 <td>The original rendered document for every invoice that has one — needs Invoices</td>
+</tr>
+<tr>
+<td><strong>Participant documents</strong></td>
+<td>Everything in the participants' document inboxes — invoices, contracts, statements and operator documents, with the exact files delivered — needs Participants</td>
 </tr>
 </tbody>
 </table>
@@ -2077,6 +2081,8 @@ move.</p>
   supplementary_sources.json            energy data sources, if ticked
   supplementary_readings/&lt;meter&gt;.csv    their quarter-hour values, one file per source
   invoices/pdf/&lt;invoice&gt;.pdf   one file per invoice that has a rendered PDF, if ticked
+  delivered_documents.json     the participant documents, if ticked
+  delivered_documents/&lt;id&gt;.pdf the delivered files, one per document
 </code></pre></div>
 <p>Readings use the same column layout the
 <a href="../05-metering-import/">metering import</a> reads — <code>meter_id</code>, <code>timestamp</code>,

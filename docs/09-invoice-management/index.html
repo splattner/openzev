@@ -1014,6 +1014,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#participant-view-my-documents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant View: My Documents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#invoice-lifecycle" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1025,10 +1036,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#billing-hub-invoices--emails" class="md-nav__link">
+  <a href="#billing-hub-invoices--emails--delivered-documents" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Billing Hub (Invoices · Emails)
+        Billing Hub (Invoices · Emails · Delivered documents)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#delivered-documents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Delivered documents
       
     </span>
   </a>
@@ -1896,6 +1918,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#participant-view-my-documents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant View: My Documents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#invoice-lifecycle" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1907,10 +1940,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#billing-hub-invoices--emails" class="md-nav__link">
+  <a href="#billing-hub-invoices--emails--delivered-documents" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Billing Hub (Invoices · Emails)
+        Billing Hub (Invoices · Emails · Delivered documents)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#delivered-documents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Delivered documents
       
     </span>
   </a>
@@ -2369,6 +2413,27 @@ The list is read-only; the deep link <code>/billing/invoices/{id}</code> shows a
 participant only their own invoice (enforced by the backend), and its return
 link leads back to <strong>My invoices</strong>.</p>
 <p><img alt="Participant My Invoices" src="../screenshots/08c-my-invoices.png" /></p>
+<h2 id="participant-view-my-documents">Participant View: My Documents<a class="headerlink" href="#participant-view-my-documents" title="Permanent link">&para;</a></h2>
+<p><strong>My documents</strong> (<code>/me/documents</code>) is the participant's mailbox: everything the
+community has delivered to them, grouped by year and newest first — sent
+invoices, annual statements, financial summaries, tariff overviews, the
+participation contract, and notices from the operator. Each row shows the type,
+the delivery date and a <strong>Download</strong> button; use the type filter to narrow the
+list, and the community filter when you take part in more than one.</p>
+<p><img alt="Participant My documents" src="../screenshots/08l-my-documents.png" /></p>
+<ul>
+<li>A document is a <strong>copy of what was delivered</strong>. Opening an invoice here shows
+  the document you were sent, even if the invoice PDF was regenerated later.</li>
+<li>Documents do not expire and are not removed when you leave a community: a
+  former participant can still open what was delivered to them.</li>
+<li>A <strong>document delivered before your account was linked</strong> appears as soon as it
+  is linked.</li>
+<li>A document that was replaced by a newer one (an annual statement issued again)
+  stays listed, marked <strong>Superseded</strong>. A sent invoice that was cancelled stays
+  listed, marked <strong>Cancelled</strong>. A notice the operator <strong>withdrew</strong> disappears from
+  your list.</li>
+<li>Invoices are still also listed under <strong>My invoices</strong>, with their payment state.</li>
+</ul>
 <h2 id="invoice-lifecycle">Invoice Lifecycle<a class="headerlink" href="#invoice-lifecycle" title="Permanent link">&para;</a></h2>
 <p>Invoices progress through a controlled workflow:</p>
 <div class="highlight"><pre><span></span><code>Draft → Approved → Sent → Paid
@@ -2399,7 +2464,7 @@ Use <strong>Generate PDF</strong> to view the approved document. Emailing genera
 missing PDF automatically. <strong>Mark sent</strong> records manual delivery without
 generating a PDF; you can generate it afterwards. Later address or bank-detail
 changes do not change the approved document.</p>
-<h2 id="billing-hub-invoices--emails">Billing Hub (Invoices · Emails)<a class="headerlink" href="#billing-hub-invoices--emails" title="Permanent link">&para;</a></h2>
+<h2 id="billing-hub-invoices--emails--delivered-documents">Billing Hub (Invoices · Emails · Delivered documents)<a class="headerlink" href="#billing-hub-invoices--emails--delivered-documents" title="Permanent link">&para;</a></h2>
 <p>The sidebar entry <strong>Billing</strong> (<code>/billing/invoices</code>) opens the invoice-first
 billing hub. Its tabs are routes — each is directly linkable:</p>
 <ul>
@@ -2408,6 +2473,9 @@ billing hub. Its tabs are routes — each is directly linkable:</p>
   invoices: the latest email status per invoice, a filter by status, a
   failed-email banner, <strong>View history</strong> for the actual attempt log, and an
   inline <strong>Retry</strong> per failed latest attempt.</li>
+<li><strong>Delivered documents</strong> (<code>/billing/documents</code>) — what the community has
+  delivered to its participants, and when (see
+  <a href="#delivered-documents">Delivered documents</a>).</li>
 </ul>
 <p>The yearly whole-ZEV annual-statement ZIP is on <strong>Reports</strong> (see
 <a href="#reports-annual-report-statements-and-tax-overviews">Reports: Annual Report, Statements and Tax Overviews</a>).
@@ -2430,6 +2498,39 @@ starts. It updates automatically when the next delivery attempt is recorded.
 Invoice rows themselves show only the latest delivery state (the <strong>Sent</strong> step
 of their progress); detailed attempts and errors are kept in the Emails tab's
 history panel.</p>
+<h2 id="delivered-documents">Delivered documents<a class="headerlink" href="#delivered-documents" title="Permanent link">&para;</a></h2>
+<p>The <strong>Delivered documents</strong> tab answers "did Anna get her statement?". It lists
+every document delivered to the selected community's participants — with the
+participant, the type, the delivery date, who delivered it, and a <strong>No account
+yet</strong> badge for a participant who has no linked account (they will see the
+document once an account is linked). Filter by participant, type and year;
+<strong>Download</strong> opens the exact delivered file.</p>
+<p><img alt="Delivered documents" src="../screenshots/08k-delivered-documents.png" /></p>
+<p>Invoices arrive here by themselves when they are sent, by email or by
+<strong>Mark as sent</strong>. Everything else you deliver on purpose:</p>
+<ul>
+<li><strong>Upload document</strong> — a PDF (up to 10 MB) with a title, for everyone in the
+  community or for chosen participants. Only people who are participants <strong>now</strong>
+  receive it; someone who joins later gets nothing. The result says how many
+  received it and how many of them have no account yet.</li>
+<li><strong>Issue documents</strong> — the <strong>annual statement</strong> for a year (one per participant
+  who was sent an invoice that year), the <strong>financial summary</strong> (one per producer),
+  or the <strong>tariff overview</strong> (the tariffs valid today, for every current
+  participant). Issuing again replaces the earlier document in the participant's
+  list; the earlier one stays visible to them as superseded. Statements and
+  summaries are rendered when you issue them, so issue them once the year's
+  invoices are final.</li>
+<li><strong>Withdraw</strong> — takes an uploaded notice back from participants (for example sent
+  to the wrong person). The record and the file are kept and the row stays here,
+  marked as withdrawn. Invoices, statements and the other issued documents are
+  corrected by issuing again, never withdrawn.</li>
+<li><strong>Deliver contract to inbox</strong> — in the action menu of a participant on the
+  <strong>Participants</strong> page. It delivers the participant's latest issued contract; it
+  is never automatic, because the contract is also issued whenever you download
+  it to preview or print it. If no contract has been issued yet, download it
+  first.</li>
+</ul>
+<p>Viewers can read this tab but not upload, issue, withdraw or deliver.</p>
 <h2 id="period-based-invoice-view">Period-Based Invoice View<a class="headerlink" href="#period-based-invoice-view" title="Permanent link">&para;</a></h2>
 <p>The <strong>Invoices</strong> tab shows one billing period at a time. You move between
 periods, and within a period you can narrow the list to one workflow stage or
