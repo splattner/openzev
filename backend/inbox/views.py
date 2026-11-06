@@ -21,6 +21,7 @@ from zev.access import can_manage
 from zev.models import Participant, Zev
 from zev.scoping import ZevScopedQuerySetMixin, assert_zev_not_disabled
 
+from .emails import queue_document_emails
 from .models import DeliveredDocument, DocumentKind
 from . import issuing
 from .serializers import (
@@ -47,17 +48,23 @@ def manageable_zev(request, zev_id) -> Zev:
     return zev
 
 
-def delivery_response(delivery: issuing.Delivery, context, *, created_status=status.HTTP_201_CREATED):
+def delivery_response(
+    delivery: issuing.Delivery, context, *, notify=False, created_status=status.HTTP_201_CREATED
+):
     """The response of every write that delivers documents (spec §5.2).
 
     The participants are told here, once the documents are written: the one
-    place every route that delivers passes through.
+    place every route that delivers passes through. The bell always rings; the
+    email only when the operator asked for it (``notify``).
     """
     notification_producers.notify_documents_delivered(delivery.fresh)
+    emailed, without_email = queue_document_emails(delivery.fresh) if notify else (0, 0)
     payload = {
         "batch_id": delivery.batch_id,
         "delivered": delivery.created,
         "without_account": delivery.without_account,
+        "emailed": emailed,
+        "without_email": without_email,
         "documents": delivery.documents,
     }
     return Response(
@@ -178,7 +185,7 @@ class DocumentViewSet(
             discard_file(stored.name)
             raise
         delivery = issuing.delivery_of(batch_id, results)
-        return delivery_response(delivery, self.get_serializer_context())
+        return delivery_response(delivery, self.get_serializer_context(), notify=data["notify"])
 
     @extend_schema(request=None, responses=DeliveredDocumentSerializer)
     @action(detail=True, methods=["post"], url_path="withdraw")
@@ -254,7 +261,7 @@ class DocumentViewSet(
             batch_id=batch_id,
         )
         delivery = issuing.delivery_of(document.batch_id or batch_id, [(document, created)])
-        return delivery_response(delivery, self.get_serializer_context())
+        return delivery_response(delivery, self.get_serializer_context(), notify=serializer.validated_data["notify"])
 
 
 class IssueView(APIView):
@@ -269,7 +276,7 @@ class IssueView(APIView):
         data = serializer.validated_data
         zev = manageable_zev(request, data["zev"])
         delivery = self.issue(zev, data, request.user)
-        return delivery_response(delivery, {"request": request})
+        return delivery_response(delivery, {"request": request}, notify=data["notify"])
 
     def audience(self, zev, data, eligible: set):
         """The named participants, or every eligible one; always limited to the eligible."""

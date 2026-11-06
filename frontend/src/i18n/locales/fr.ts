@@ -488,6 +488,7 @@ export const fr = {
             magicLinkEmail: 'E-mail de lien de connexion',
             zevAccessInvitationEmail: 'E-mail d\'invitation d\'accès',
             zevAccessGrantedEmail: 'E-mail d\'avis d\'accès',
+            documentDeliveredEmail: 'E-mail document remis',
             magicLinkLanguageNote: 'Tel quel, cet e-mail est envoy\u00e9 dans la langue de facturation de chaque ZEV. Un texte personnalis\u00e9 enregistr\u00e9 ici le remplace pour les quatre langues.',
             subject: 'Objet',
             body: 'Message',
@@ -501,6 +502,7 @@ export const fr = {
                 totalChf: 'Montant total de la facture en CHF',
                 amountDueChf: 'Montant dû en CHF, après imputation des avoirs',
                 inboxUrl: 'Lien vers la page «Mes documents» du participant; vide si le participant n\'a pas de compte',
+                documentTitle: 'Titre du document remis',
                 inviterName: 'Nom de la personne qui a ajouté le participant',
                 verifyUrl: 'URL du lien de vérification de l\'e-mail',
                 linkUrl: 'URL du lien de connexion à usage unique',
@@ -806,6 +808,10 @@ export const fr = {
             selected: 'Participants choisis',
             participants: 'Participants',
         },
+        notify: {
+            label: 'Prévenir aussi les participants par e-mail',
+            hint: 'Envoie un court e-mail avec un lien vers « Mes documents », sans le fichier. Les participants sans adresse e-mail sont ignorés.',
+        },
         upload: {
             title: 'Téléverser un document',
             titleField: 'Titre',
@@ -841,6 +847,10 @@ export const fr = {
             delivered_other: 'Remis à {{count}} participants.',
             withoutAccount_one: '{{count}} participant n\'a pas encore de compte et le verra dès qu\'un compte sera lié.',
             withoutAccount_other: '{{count}} participants n\'ont pas encore de compte et le verront dès qu\'un compte sera lié.',
+            emailed_one: '{{count}} e-mail en file d\'attente.',
+            emailed_other: '{{count}} e-mails en file d\'attente.',
+            withoutEmail_one: '{{count}} participant n\'a pas d\'adresse e-mail et n\'a pas été prévenu.',
+            withoutEmail_other: '{{count}} participants n\'ont pas d\'adresse e-mail et n\'ont pas été prévenus.',
         },
         outbox: {
             issue: 'Établir des documents',

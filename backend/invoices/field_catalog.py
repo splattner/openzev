@@ -2,6 +2,7 @@
 
 from .email_context import (
     build_invoice_email_context,
+    build_sample_document_email_context,
     build_magic_link_email_context,
     build_zev_access_email_context,
     build_onboarding_email_context,
@@ -92,6 +93,7 @@ def build_sample_zev_access_granted_email_context() -> dict:
 
 
 EMAIL_SAMPLE_CONTEXTS = {
+    "document_delivered": build_sample_document_email_context,
     "invoice_email": build_sample_invoice_email_context,
     "participant_onboarding": build_sample_onboarding_email_context,
     "email_verification": build_sample_verification_email_context,

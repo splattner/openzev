@@ -488,6 +488,7 @@ export const de = {
             magicLinkEmail: 'Anmeldelink-E-Mail',
             zevAccessInvitationEmail: 'E-Mail Zugangseinladung',
             zevAccessGrantedEmail: 'E-Mail Zugangsmitteilung',
+            documentDeliveredEmail: 'E-Mail Dokument zugestellt',
             magicLinkLanguageNote: 'Unver\u00e4ndert wird diese E-Mail in der Rechnungssprache der jeweiligen ZEV versendet. Ein hier gespeicherter eigener Text ersetzt sie f\u00fcr alle vier Sprachen.',
             subject: 'Betreff:',
             body: 'Nachricht',
@@ -501,6 +502,7 @@ export const de = {
                 totalChf: 'Gesamtbetrag der Rechnung in CHF',
                 amountDueChf: 'Zu zahlender Betrag in CHF, nach Verrechnung von Gutschriften',
                 inboxUrl: 'Link auf die Seite «Meine Dokumente» der Teilnehmenden; leer, wenn kein Login besteht',
+                documentTitle: 'Titel des zugestellten Dokuments',
                 inviterName: 'Name der Person, die den Teilnehmer hinzugefügt hat',
                 verifyUrl: 'URL des E-Mail-Verifizierungslinks',
                 linkUrl: 'URL des einmaligen Anmeldelinks',
@@ -806,6 +808,10 @@ export const de = {
             selected: 'Ausgewählte Teilnehmende',
             participants: 'Teilnehmende',
         },
+        notify: {
+            label: 'Teilnehmende zusätzlich per E-Mail benachrichtigen',
+            hint: 'Sendet eine kurze E-Mail mit einem Link zu «Meine Dokumente», ohne die Datei. Teilnehmende ohne E-Mail-Adresse werden übersprungen.',
+        },
         upload: {
             title: 'Dokument hochladen',
             titleField: 'Titel',
@@ -841,6 +847,10 @@ export const de = {
             delivered_other: 'An {{count}} Teilnehmende zugestellt.',
             withoutAccount_one: '{{count}} Teilnehmende hat noch kein Konto und sieht es, sobald ein Konto verknüpft ist.',
             withoutAccount_other: '{{count}} Teilnehmende haben noch kein Konto und sehen es, sobald ein Konto verknüpft ist.',
+            emailed_one: '{{count}} E-Mail in Warteschlange.',
+            emailed_other: '{{count}} E-Mails in Warteschlange.',
+            withoutEmail_one: '{{count}} Teilnehmende hat keine E-Mail-Adresse und wurde nicht benachrichtigt.',
+            withoutEmail_other: '{{count}} Teilnehmende haben keine E-Mail-Adresse und wurden nicht benachrichtigt.',
         },
         outbox: {
             issue: 'Dokumente ausstellen',

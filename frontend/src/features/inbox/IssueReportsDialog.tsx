@@ -12,6 +12,7 @@ import { queryKeys } from '../../lib/api/queryKeys'
 import { todayBusinessIso } from '../../lib/dates'
 import type { DeliveryResult, Participant } from '../../types/api'
 import { AudienceFields, type Audience } from './AudienceFields'
+import { NotifyField } from './NotifyField'
 import { DeliveryResultNotice } from './DeliveryResultNotice'
 import './inbox.css'
 
@@ -50,11 +51,12 @@ function IssueForm({ onClose, zevId, participants }: Omit<IssueReportsDialogProp
   const [year, setYear] = useState(years[1])
   const [audience, setAudience] = useState<Audience>('all')
   const [selected, setSelected] = useState<string[]>([])
+  const [notify, setNotify] = useState(false)
   const [result, setResult] = useState<DeliveryResult | null>(null)
 
   const mutation = useMutation({
     mutationFn: () => {
-      const input = { zev: zevId, participantIds: audience === 'selected' ? selected : undefined }
+      const input = { zev: zevId, participantIds: audience === 'selected' ? selected : undefined, notify }
       if (kind === 'tariff_overview') return issueTariffOverview(input)
       return (kind === 'annual_statement' ? issueAnnualStatements : issueFinancialSummaries)({ ...input, year })
     },
@@ -104,6 +106,7 @@ function IssueForm({ onClose, zevId, participants }: Omit<IssueReportsDialogProp
         allLabel={t(`inbox.issue.audienceAll.${kind}`)}
         disabled={mutation.isPending}
       />
+      <NotifyField checked={notify} onChange={setNotify} disabled={mutation.isPending} />
       <p className="muted grid-span-full m-0">{t('inbox.issue.reissueNote')}</p>
       {mutation.isError && (
         <p role="alert" className="text-error grid-span-full m-0">{formatApiError(mutation.error, t('common.error'))}</p>

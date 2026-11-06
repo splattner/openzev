@@ -51,6 +51,8 @@ export interface UploadInboxDocumentInput {
   file: File
   audience: 'all' | 'selected'
   participantIds?: string[]
+  /** Also email the participants a link (the bell notification is always sent). */
+  notify?: boolean
 }
 
 export async function uploadInboxDocument(input: UploadInboxDocumentInput): Promise<DeliveryResult> {
@@ -59,6 +61,7 @@ export async function uploadInboxDocument(input: UploadInboxDocumentInput): Prom
   body.append('title', input.title)
   body.append('file', input.file)
   body.append('audience', input.audience)
+  if (input.notify) body.append('notify', 'true')
   if (input.audience === 'selected') {
     for (const id of input.participantIds ?? []) body.append('participant_ids', id)
   }
@@ -75,6 +78,7 @@ export interface IssueReportInput {
   zev: string
   year?: number
   participantIds?: string[]
+  notify?: boolean
 }
 
 type IssueEndpoint = 'annual-statement' | 'financial-summary' | 'tariff-overview'
@@ -84,6 +88,7 @@ async function issue(endpoint: IssueEndpoint, input: IssueReportInput): Promise<
     zev: input.zev,
     year: input.year,
     participant_ids: input.participantIds?.length ? input.participantIds : undefined,
+    notify: input.notify || undefined,
   })
   return data
 }

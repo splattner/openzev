@@ -16,7 +16,7 @@ from django.core.files.storage import default_storage
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from audit.models import AuditActionCategory, AuditEventSource
+from audit.models import AuditActionCategory, AuditEventSource, AuditEventStatus
 from audit.services import record_audit_event
 from config.http import sanitize_filename
 
@@ -71,7 +71,7 @@ def remove_file_if_unreferenced(name: str) -> bool:
     return True
 
 
-def _audit(action, document, *, user=None, summary, source=None, metadata=None):
+def _audit(action, document, *, user=None, summary, source=None, metadata=None, status=AuditEventStatus.SUCCESS):
     record_audit_event(
         action_category=AuditActionCategory.PARTICIPANT,
         action_type=f"inbox.document.{action}",
@@ -79,6 +79,7 @@ def _audit(action, document, *, user=None, summary, source=None, metadata=None):
         target_id=str(document.pk),
         target_display=document.title,
         summary=summary,
+        status=status,
         user=user,
         zev=document.zev,
         source=source or (AuditEventSource.API if user is not None else AuditEventSource.SYSTEM),

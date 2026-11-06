@@ -497,6 +497,7 @@ export const en = {
             magicLinkEmail: 'Sign-in Link Email',
             zevAccessInvitationEmail: 'ZEV Access Invitation Email',
             zevAccessGrantedEmail: 'ZEV Access Notice Email',
+            documentDeliveredEmail: 'Document Delivered Email',
             magicLinkLanguageNote: 'Left as shipped, this email is sent in each ZEV\u2019s invoice language. Saving a custom text here replaces it for all four languages.',
             subject: 'Subject:',
             body: 'Body',
@@ -510,6 +511,7 @@ export const en = {
                 totalChf: 'Total invoice amount in CHF',
                 amountDueChf: 'Amount due in CHF, after credit notes applied',
                 inboxUrl: 'Link to the participant\'s My documents page; empty when the participant has no login',
+                documentTitle: 'Title of the delivered document',
                 inviterName: 'Name of the person who added the participant',
                 verifyUrl: 'Email verification link URL',
                 linkUrl: 'One-time sign-in link URL',
@@ -815,6 +817,10 @@ export const en = {
             selected: 'Selected participants',
             participants: 'Participants',
         },
+        notify: {
+            label: 'Also notify participants by email',
+            hint: 'Sends a short email with a link to My documents, without the file. Participants without an email address are skipped.',
+        },
         upload: {
             title: 'Upload document',
             titleField: 'Title',
@@ -850,6 +856,10 @@ export const en = {
             delivered_other: 'Delivered to {{count}} participants.',
             withoutAccount_one: '{{count}} participant has no account yet and will see it once an account is linked.',
             withoutAccount_other: '{{count}} participants have no account yet and will see it once an account is linked.',
+            emailed_one: '{{count}} email queued.',
+            emailed_other: '{{count}} emails queued.',
+            withoutEmail_one: '{{count}} participant has no email address and was not emailed.',
+            withoutEmail_other: '{{count}} participants have no email address and were not emailed.',
         },
         outbox: {
             issue: 'Issue documents',

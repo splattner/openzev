@@ -6,6 +6,7 @@ export const EMAIL_TEMPLATE_KEYS = [
     'participant_magic_link',
     'zev_access_invitation',
     'zev_access_granted',
+    'document_delivered',
 ] as const
 
 export type EmailTemplateKey = (typeof EMAIL_TEMPLATE_KEYS)[number]

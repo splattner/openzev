@@ -93,3 +93,28 @@ def build_zev_access_email_context(
     if valid_days is not None:
         context["valid_days"] = valid_days
     return context
+
+
+def build_document_email_context(
+    *,
+    participant_name: object,
+    zev_name: object,
+    title: object,
+    inbox_url: object,
+) -> dict[str, object]:
+    """Return the variables available to the document-delivered email."""
+    return {
+        "participant_name": participant_name,
+        "zev_name": zev_name,
+        "title": title,
+        "inbox_url": inbox_url,
+    }
+
+
+def build_sample_document_email_context() -> dict[str, object]:
+    return build_document_email_context(
+        participant_name="Hans Beispiel",
+        zev_name="Solar Community Example",
+        title="Annual statement 2025",
+        inbox_url="https://app.example.com/me/documents",
+    )
