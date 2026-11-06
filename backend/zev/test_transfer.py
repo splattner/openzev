@@ -216,6 +216,10 @@ def as_format_version(raw, version, *, replace=None):
     if version < 6:
         manifest["counts"].pop("buildings", None)
         drop = (*drop, "buildings.json")
+    if version < 11:
+        manifest["sections"] = [name for name in manifest["sections"] if name != "delivered_documents"]
+        manifest["counts"].pop("delivered_documents", None)
+        drop = (*drop, "delivered_documents.json")
     members.update(replace or {})
     return rewrite_archive(raw, replace=members, drop=drop)
 
@@ -303,7 +307,7 @@ class ArchiveShapeTests(TestCase):
         )
         with zipfile.ZipFile(io.BytesIO(export_to_bytes(self.zev))) as archive:
             names = archive.namelist()
-        self.assertTrue(all(name.startswith(("readings/", "manifest", "zev.", "participants", "parties", "party_roles", "buildings", "metering", "tariffs", "charges", "invoices")) for name in names))
+        self.assertTrue(all(name.startswith(("readings/", "manifest", "zev.", "participants", "parties", "party_roles", "buildings", "metering", "tariffs", "charges", "invoices", "delivered_documents")) for name in names))
         self.assertNotIn("../../etc/passwd.csv", names)
         self.assertTrue(any(name.startswith("readings/.._.._etc_passwd-") for name in names))
 

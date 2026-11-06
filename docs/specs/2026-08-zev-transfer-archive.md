@@ -109,7 +109,10 @@ commit — a failed audit must not cause a duplicate import on client retry).
 
 ## 6. Archive format (`backend/zev/transfer/schema.py`)
 
-`FORMAT_VERSION = 10`, `SUPPORTED_FORMAT_VERSIONS = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}`.
+`FORMAT_VERSION = 11`, `SUPPORTED_FORMAT_VERSIONS = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}`.
+Version 11 adds the `delivered_documents` section (the participant document
+inbox, ADR 0045): see "Delivered documents" below. A version 10 archive lists no
+such section and imports with an empty inbox.
 Version 10 requires a `reading_impacts` array on each invoice (empty when none).
 Entries preserve `evidence`, `created_at`, `resolved_at` and `resolution`, with
 validated timestamps and consistent resolution state. Import/user links do not
@@ -206,7 +209,7 @@ refused outright (`ArchiveError`, a `ValueError` subclass).
 Sections (order = write and import order, a correctness constraint):
 
 ```python
-SECTIONS = ("zev", "participants", "metering_points", "tariffs", "charges", "readings", "invoices", "invoice_pdfs")  # plus opt-in supplementary_data
+SECTIONS = ("zev", "participants", "metering_points", "tariffs", "charges", "readings", "invoices", "invoice_pdfs", "delivered_documents")  # plus opt-in supplementary_data
 SECTION_DEPENDENCIES = {
     "zev": (),
     "participants": (),
@@ -216,6 +219,7 @@ SECTION_DEPENDENCIES = {
     "readings": ("metering_points",),
     "invoices": ("participants",),          # deliberately NOT tariffs
     "invoice_pdfs": ("invoices",),          # a PDF means nothing without its invoice
+    "delivered_documents": ("participants",),  # addressed to a participant; NOT invoices
 }
 ```
 
@@ -244,6 +248,8 @@ openzev-export-<community>-<date>.zip
   quarantine/<meter>.csv   one file per meter with held observations (format 9+)
   invoices/pdf/<invoice_number>.pdf   one file per invoice that has a rendered PDF
   invoices/pdf/credit-<credit_number>-<hash>.pdf   one per credit note that has one
+  delivered_documents.json     [{"id", "participant_id", "invoice_number", "superseded_by_id", <DELIVERED_DOCUMENT_FIELDS>}]  (format 11)
+  delivered_documents/<id>.pdf one file per delivered document, named by its archive id
 ```
 
 Field lists (`ZEV_FIELDS`, `PARTY_FIELDS`, `PARTY_ROLE_FIELDS`, `PARTICIPANT_FIELDS`, `METERING_POINT_FIELDS`,
@@ -316,6 +322,33 @@ full `invoice.save()`. Importing an archive without this section leaves an
 imported invoice reporting "not generated", same as version ≤2 always did — a
 regenerated PDF uses today's template, which is why retaining the original
 bytes needed its own section rather than letting the next render stand in.
+
+**Delivered documents (`delivered_documents`, format version 11+).** The
+participant inbox travels with its ZEV, depending on `participants` only.
+`DELIVERED_DOCUMENT_FIELDS` are `kind`, `title`, `document_number`,
+`period_start`, `period_end`, `file_name`, `content_type`, `sha256`,
+`delivered_at`, `superseded_at` and `withdrawn_at`; a record also carries its
+`id`, its `participant_id` (`null` when the participant was removed),
+`invoice_number` and `superseded_by_id`. Every document travels, superseded and
+withdrawn ones included, and arrives as it was: delivery time, supersession
+and withdrawal are kept, nothing is audited, and `delivered_by`, `withdrawn_by`
+and `batch_id` never travel (no account reference leaves the instance). The
+bytes are `delivered_documents/<id>.pdf`, named by the document's own UUID, so
+there is nothing to sanitise (`delivered_document_member_name()` in
+`export.py`; the importer recomputes it from the record's `id`). A contract
+held by reference to its `ContractIssue` is exported with the issued bytes and
+arrives holding its own file, because `ContractIssue` is not in the archive
+(`inbox_document_has_one_body` allows a document with no issue to carry a
+file). Import (`_import_delivered_documents`, after the invoices and their
+PDFs) rejects a record whose bytes are missing, are not `%PDF-`, or do not match
+`sha256`; whose kind is unknown; or whose participant was not imported. It
+links `invoice_number` to the imported invoice when the invoices section also
+travels and leaves the link empty otherwise (the document holds its own
+bytes). It always stores `application/pdf`, never the archive's content type,
+and restores `superseded_by` in a second pass. The files are written outside
+the transaction, so `import_archive` removes every file it wrote when the
+import rolls back. The frontend export dialog treats it as a data section,
+unticked in the structure-only default.
 
 **PDF member names**: `invoices/pdf/<sanitised>-<digest>.pdf`, built by
 `pdf_member_name()` with the exact same construction as reading member names
@@ -673,10 +706,10 @@ garbled, missing-column and unknown-meter reading; a dropped readings file caugh
 bad row rolls everything back). `SchemaParityTests` gains `SUPPLEMENTARY_SOURCE_FIELDS` against
 `SupplementarySource` with its excluded set.
 
-### Backend — `backend/zev/test_transfer_invoice_pdfs.py` (format version 10)
+### Backend — `backend/zev/test_transfer_invoice_pdfs.py` (format version 11)
 
-`FormatVersionTests`: `FORMAT_VERSION == 10`; `SUPPORTED_FORMAT_VERSIONS ==
-{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}`; `invoice_pdfs` is a known section depending on `invoices`.
+`FormatVersionTests`: `FORMAT_VERSION == 11`; `SUPPORTED_FORMAT_VERSIONS ==
+{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}`; `invoice_pdfs` is a known section depending on `invoices`.
 `MemberNamingTests`: `pdf_member_name` is deterministic and collision-safe
 (same construction as reading member names), stays under `invoices/pdf/`.
 `RoundTripTests`: a PDF travels when `invoice_pdfs` is selected and does not
@@ -690,6 +723,22 @@ a PDF member dropped from an otherwise-correct archive is caught by
 imported as zero. `TransferEndpointInvoicePdfTests`: `transfer-sections` lists
 `invoice_pdfs`; a real export request with it selected contains the PDF
 member, exercised through the view, not just the library functions.
+
+### Backend — `backend/zev/test_transfer_delivered_documents.py` (format version 11)
+
+`SectionContractTests`: the section depends on `participants` only; the member
+name is per document. `RoundTripTests`: an operator document arrives with its
+bytes, checksum, delivery time and file name; no account, batch or `delivered_by`
+travels and a withdrawn document stays withdrawn; a superseded chain keeps its
+`superseded_by` link; a contract arrives holding its own file; an invoice
+document links to its imported invoice, and without the invoices section keeps
+its bytes and no link; a document whose participant was removed still travels;
+the section can be left out of an import; the default export carries it.
+`OlderArchiveTests`: a version 10 archive imports with an empty inbox.
+`RejectedArchiveTests`: a checksum mismatch, a missing member, a non-PDF, an
+unknown kind, an unknown participant and a manifest count mismatch are
+rejected; a rejected import and a row that fails validation leave no stored
+files behind. `as_format_version(raw, 10)` drops the section from the manifest.
 
 ### Frontend
 

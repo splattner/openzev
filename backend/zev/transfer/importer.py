@@ -18,6 +18,7 @@ archive with several problems takes one round trip to diagnose.
 """
 
 import csv
+import hashlib
 import io
 import json
 import logging
@@ -30,7 +31,10 @@ from django.core.files.base import ContentFile
 from django.conf import settings
 from django.db import DataError, IntegrityError, transaction
 from django.utils import timezone
+from django.utils.dateparse import parse_date, parse_datetime
 
+from inbox.models import DeliveredDocument, DocumentKind
+from inbox.services import discard_file, store_file
 from invoices.models import (
     InvoiceReadingImpact,
     Charge, Credit, CreditApplication, Invoice, InvoiceDynamicSourceEvidence, InvoiceItem, InvoicePdfStatus, InvoiceStatus, Payment,
@@ -69,7 +73,7 @@ logger = logging.getLogger(__name__)
 from ..access import grant_manager
 from ..tasks import trigger_building_geocode_if_address_present
 from ..buildings import assign_buildings_from_participants, default_building, ensure_initial_building
-from .export import credit_pdf_member_name, pdf_member_name
+from .export import credit_pdf_member_name, delivered_document_member_name, pdf_member_name
 from .schema import (
     ASSIGNMENT_FIELDS,
     BUILDING_FIELDS,
@@ -81,6 +85,7 @@ from .schema import (
     PAYMENT_FIELDS,
     CREDIT_APPLICATION_FIELDS,
     CREDIT_FIELDS,
+    DELIVERED_DOCUMENT_FIELDS,
     MANIFEST_NAME,
     METERING_POINT_FIELDS,
     LEGACY_PARTICIPANT_FIELDS,
@@ -94,6 +99,7 @@ from .schema import (
     READINGS_DIR,
     READING_CSV_COLUMNS,
     SECTION_CHARGES,
+    SECTION_DELIVERED_DOCUMENTS,
     SECTION_FILES,
     SECTION_INVOICE_PDFS,
     SECTION_INVOICES,
@@ -968,6 +974,140 @@ def _import_invoice_pdfs(archive, zev):
     return written
 
 
+# ── Delivered documents (format 11) ────────────────────────────────────────
+
+_VALID_DOCUMENT_KINDS = {value for value, _ in DocumentKind.choices}
+_DELIVERED_DATE_FIELDS = ("period_start", "period_end")
+_DELIVERED_DATETIME_FIELDS = ("delivered_at", "superseded_at", "withdrawn_at")
+
+
+def _import_delivered_documents(archive, zev, participants_by_archive_id, collector, *, written_files):
+    """Create the ZEV's inbox: every delivered document with its own copy of the bytes.
+
+    Rows are created as they were, not re-derived: ``delivered_at``,
+    supersession and withdrawal travel, nothing is audited, and no account is
+    attached (``delivered_by`` and ``withdrawn_by`` never travel). The bytes are
+    checked against the recorded ``sha256`` and must be a PDF; the content type
+    is not taken from the archive.
+
+    A second pass restores ``superseded_by``, which can point at a record later
+    in the file. ``written_files`` collects every file written so
+    ``import_archive`` can remove them when the transaction rolls back.
+    """
+    names = set(archive.namelist())
+    created = {}  # archive id -> document
+    successors = {}  # document id -> archive id of the document that superseded it
+    invoices_by_number = {
+        invoice.invoice_number: invoice for invoice in Invoice.objects.filter(zev=zev).only("id", "invoice_number")
+    }
+    seen_ids = set()
+    for position, raw in enumerate(_load_json(archive, SECTION_FILES[SECTION_DELIVERED_DOCUMENTS]), start=1):
+        fields = _pick(raw, DELIVERED_DOCUMENT_FIELDS, position, SECTION_DELIVERED_DOCUMENTS)
+        label = str(fields.get("title") or f"#{position}")
+        source_id = str(raw.get("id") or "")
+        if not source_id or source_id in seen_ids:
+            collector.add(
+                SECTION_DELIVERED_DOCUMENTS, position, label,
+                {"id": ["Missing or duplicate document id."]},
+            )
+            continue
+        seen_ids.add(source_id)
+
+        participant = None
+        if raw.get("participant_id"):
+            participant = participants_by_archive_id.get(str(raw["participant_id"]))
+            if participant is None:
+                collector.add(
+                    SECTION_DELIVERED_DOCUMENTS, position, label,
+                    {"participant_id": ["No imported participant matches this document."]},
+                )
+                continue
+
+        member = delivered_document_member_name(source_id)
+        if member not in names:
+            collector.add(
+                SECTION_DELIVERED_DOCUMENTS, position, label,
+                {"__all__": [f"The archive is missing {member}, which holds this document."]},
+            )
+            continue
+        with archive.open(member) as source:
+            body = source.read()
+        if not body.startswith(b"%PDF-"):
+            collector.add(SECTION_DELIVERED_DOCUMENTS, position, label, {"__all__": ["The document is not a PDF."]})
+            continue
+        digest = hashlib.sha256(body).hexdigest()
+        if fields.get("sha256") and fields["sha256"] != digest:
+            collector.add(
+                SECTION_DELIVERED_DOCUMENTS, position, label,
+                {"sha256": ["The document does not match its recorded checksum. The archive is corrupt or was modified."]},
+            )
+            continue
+
+        unreadable = []
+        for name, parse in (
+            *((name, parse_date) for name in _DELIVERED_DATE_FIELDS),
+            *((name, parse_datetime) for name in _DELIVERED_DATETIME_FIELDS),
+        ):
+            if name not in fields:
+                continue
+            try:
+                fields[name] = parse(str(fields[name]))
+            except ValueError:
+                fields[name] = None
+            if fields[name] is None:
+                unreadable.append(name)
+        if unreadable:
+            collector.add(
+                SECTION_DELIVERED_DOCUMENTS, position, label,
+                {name: ["Enter a valid date."] for name in unreadable},
+            )
+            continue
+        if fields.get("kind") not in _VALID_DOCUMENT_KINDS:
+            collector.add(SECTION_DELIVERED_DOCUMENTS, position, label, {"kind": ["Unknown document kind."]})
+            continue
+
+        stored = store_file(zev, body, str(fields.get("file_name") or ""))
+        written_files.append(stored.name)
+        document = DeliveredDocument(
+            zev=zev,
+            participant=participant,
+            invoice=invoices_by_number.get(raw.get("invoice_number") or ""),
+            file=stored.name,
+            size_bytes=stored.size,
+            sha256=digest,
+            **{
+                name: value
+                for name, value in fields.items()
+                if name not in ("file_name", "content_type", "sha256")
+            },
+            file_name=stored.file_name,
+            content_type="application/pdf",
+        )
+        try:
+            with transaction.atomic():
+                document.full_clean(
+                    exclude=["zev", "participant", "invoice", "contract_issue", "superseded_by", "delivered_by",
+                             "withdrawn_by"],
+                )
+                document.save()
+        except (DjangoValidationError, ValueError, TypeError, IntegrityError) as exc:
+            collector.add(SECTION_DELIVERED_DOCUMENTS, position, label, exc)
+            discard_file(stored.name)
+            written_files.remove(stored.name)
+            continue
+        created[source_id] = document
+        if raw.get("superseded_by_id"):
+            successors[source_id] = str(raw["superseded_by_id"])
+
+    for source_id, successor_id in successors.items():
+        successor = created.get(successor_id)
+        if successor is None:
+            collector.warn("A superseded document named a successor that was not imported; the link was left out.")
+            continue
+        DeliveredDocument.objects.filter(pk=created[source_id].pk).update(superseded_by=successor)
+    return len(created)
+
+
 # ── Readings ───────────────────────────────────────────────────────────────
 
 _VALID_DIRECTIONS = {value for value, _ in ReadingDirection.choices}
@@ -1346,26 +1486,34 @@ def import_archive(fileobj, *, owner, sections=None, name_override=""):
 
         batch_id = uuid.uuid4()
         collector = _Collector()
+        # Files written outside the database; removed again if the import rolls back.
+        written_files = []
 
-        with transaction.atomic():
-            summary = _run_import(
-                archive,
-                manifest,
-                sections,
-                owner=owner,
-                name_override=name_override,
-                collector=collector,
-                batch_id=batch_id,
-            )
-            # Raised inside the atomic block on purpose: it is what rolls the
-            # whole import back, so a rejected archive leaves no ZEV behind.
-            if collector:
-                raise ImportFailed(collector.errors, total_errors=collector.total)
+        try:
+            with transaction.atomic():
+                summary = _run_import(
+                    archive,
+                    manifest,
+                    sections,
+                    owner=owner,
+                    name_override=name_override,
+                    collector=collector,
+                    batch_id=batch_id,
+                    written_files=written_files,
+                )
+                # Raised inside the atomic block on purpose: it is what rolls the
+                # whole import back, so a rejected archive leaves no ZEV behind.
+                if collector:
+                    raise ImportFailed(collector.errors, total_errors=collector.total)
+        except BaseException:
+            for name in written_files:
+                discard_file(name)
+            raise
 
         return summary
 
 
-def _run_import(archive, manifest, sections, *, owner, name_override, collector, batch_id):
+def _run_import(archive, manifest, sections, *, owner, name_override, collector, batch_id, written_files):
     zev_fields = {}
     if SECTION_ZEV in sections:
         zev_fields = {
@@ -1503,6 +1651,12 @@ def _run_import(archive, manifest, sections, *, owner, name_override, collector,
 
         if SECTION_INVOICE_PDFS in sections:
             summary["counts"][SECTION_INVOICE_PDFS] = _import_invoice_pdfs(archive, zev)
+
+    # After the invoices, so a document can be linked to its invoice.
+    if SECTION_DELIVERED_DOCUMENTS in sections:
+        summary["counts"][SECTION_DELIVERED_DOCUMENTS] = _import_delivered_documents(
+            archive, zev, participants_by_archive_id, collector, written_files=written_files,
+        )
 
     # Best-effort map lookups for every building the import ended up with.
     for building in zev.buildings.all():

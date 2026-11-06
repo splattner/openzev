@@ -17,7 +17,7 @@
 |---|---|---|
 | 0 | This spec and ADR 0045 | — |
 | 1 | `inbox` app: model, `deliver()` service, scoping, read and outbox API, backups (incl. per-ZEV restore), ZEV purge, audit | — |
-| 1b | Transfer archive format 11 (`delivered_documents`) | — |
+| 1b | Transfer archive format 11 (`delivered_documents`) | stacked on #1206 |
 | 2 | Producers: invoice sent / superseded, explicit contract delivery, backfill command | — |
 | 3 | Operator documents (upload, withdraw), issued annual statement / financial summary / tariff overview | — |
 | 4 | Frontend: participant *Documents* page, manager outbox, upload and issue dialogs | — |
@@ -117,7 +117,7 @@ New Django app `inbox` (`backend/inbox/`, registered in `INSTALLED_APPS`). One m
 | `title` | `CharField(200)` | — | Shown in the list. Invoice: invoice number; contract: document number; statement: localised title with the year; operator: the manager's title |
 | `document_number` | `CharField(64)` | `""` | Invoice or contract number; blank otherwise |
 | `period_start` / `period_end` | `DateField` | — | `null=True`. Invoice period, statement year (1 Jan – 31 Dec); blank for contract and operator documents |
-| `file` | `FileField(upload_to=inbox_upload_to, max_length=255)` | `""` | `blank=True`, not null (Django stores an empty `FileField` as `""`). Stored copy; empty only for `kind=contract`, whose bytes stay in `ContractIssue.pdf` |
+| `file` | `FileField(upload_to=inbox_upload_to, max_length=255)` | `""` | `blank=True`, not null (Django stores an empty `FileField` as `""`). Stored copy; empty only for a contract held by reference, whose bytes stay in `ContractIssue.pdf` |
 | `file_name` | `CharField(255)` | `""` | Download name, sanitised with `config.http.sanitize_filename` |
 | `content_type` | `CharField(100)` | `"application/pdf"` | |
 | `size_bytes` | `PositiveBigIntegerField` | — | |
@@ -136,7 +136,7 @@ New Django app `inbox` (`backend/inbox/`, registered in `INSTALLED_APPS`). One m
 
 **Constraints:**
 
-- `inbox_document_has_one_body`: `CheckConstraint` — `kind="contract"` ⇔ `contract_issue` not null and `file=""`; every other kind has a non-empty `file`.
+- `inbox_document_has_one_body`: `CheckConstraint` — either `kind="contract"` with `contract_issue` not null and `file=""`, or `contract_issue` null and a non-empty `file`. The second branch also holds a contract that arrived through a transfer archive (migration `0002`).
 - `inbox_one_per_invoice`: `UniqueConstraint(fields=["invoice"], condition=Q(invoice__isnull=False))`. Delivery is idempotent: a resent email does not add a row.
 - `inbox_one_per_contract_issue`: `UniqueConstraint(fields=["contract_issue", "participant"], condition=Q(contract_issue__isnull=False))`.
 - `inbox_one_current_report`: `UniqueConstraint(fields=["participant", "kind", "period_start", "period_end"], condition=Q(kind__in=[annual_statement, financial_summary], superseded_at__isnull=True))`. Re-issuing a year supersedes the earlier one instead of duplicating it.
@@ -246,7 +246,7 @@ Decision for this spec, to be honoured by #793:
 ### 6.4 Backups, transfer, MCP
 
 - **Backups.** `inbox.DeliveredDocument` is a ZEV-scoped part (`ZevPart("inbox.DeliveredDocument", "zev")`) in `backups/registry.py`, and `("inbox.DeliveredDocument", "file", "zev")` joins the file-field list beside `invoices.Invoice`. The coverage test (`backups/test_archive.py`) fails until both are in place, as intended. The section `delivered_documents` comes after `invoices` and `contract_issues`, which its rows point at. A per-ZEV restore gains the overridable conflict `delivered_document_deleted` (a delivered document the backup lacks would be deleted, as for `contract_issue_deleted`), with the new key in `RestoreConflictKind` and in the four locale files.
-- **Transfer archive (increment 1b).** `FORMAT_VERSION` 10 → 11 adds `delivered_documents` (rows and files). Not part of increment 1: the transfer archive carries neither contracts nor accounts, so remapping participants and invoices needs its own design pass. Version 10 archives import unchanged and create no rows; a re-imported ZEV re-derives nothing, because delivery is a fact, not a derivation.
+- **Transfer archive (increment 1b).** `FORMAT_VERSION` 10 → 11 adds the `delivered_documents` section (`delivered_documents.json` and one `delivered_documents/<id>.pdf` per document; it depends on `participants` only), specified in `2026-08-zev-transfer-archive.md`. Documents arrive as they were (delivery time, supersession, withdrawal), with no account reference and no audit event, and the importer checks each file against its `sha256`. Participants and invoices are remapped by archive id and invoice number. The transfer archive carries no `ContractIssue`, so a contract arrives holding its own file: `inbox_document_has_one_body` allows a document with no issue to carry a file (migration `inbox/0002`). Version 10 archives import unchanged and create no rows; a re-imported ZEV re-derives nothing, because delivery is a fact, not a derivation.
 - **MCP.** The read-only participant tools (`find_invoices`, `explain_invoice`) keep working through the live endpoints in phases 1–5. Phase 6 either leaves them on `participant_visible` or moves them to the inbox; decided in the phase 6 PR.
 
 ### 6.5 Notifications and email
@@ -417,7 +417,7 @@ All counts are planned; the final numbers replace them when each phase lands.
 
 - `inbox/test_backfill.py` (≈5): creates rows for sent invoices, skips missing files and reports them, `--dry-run` writes nothing, idempotent, `delivered_at` equals `sent_at`.
 - `backups/test_archive.py`: the existing coverage tests pass with the model and file field registered (increment 1).
-- `zev/transfer` (increment 1b): export / import round trip at format 11; a v10 archive imports without rows (≈3).
+- `zev/test_transfer_delivered_documents.py` (increment 1b, 20 tests): export / import round trip at format 11 (bytes, history, supersession chain, contract held as a file, invoice link), a v10 archive imports without rows, and rejected archives (checksum, missing member, non-PDF, kind, participant, count) leave no files behind.
 - `notifications/test_producers.py`: `invoice.sent` payload carries `document_id`; `document.delivered` dedupes (≈3).
 - `invoices/test_public_invoice_access.py`: public PDF serves the delivered snapshot, falls back when none (≈2).
 - Phase 6: `invoices/test_participant_invoice_visibility.py` is rewritten so a participant gets 404 on every live endpoint and managers are unchanged (≈6 changed).
