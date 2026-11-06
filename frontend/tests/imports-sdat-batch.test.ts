@@ -3,7 +3,7 @@ import { queryKeys } from '../src/lib/api/queryKeys'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MantineProvider } from '@mantine/core'
-import { MemoryRouter } from 'react-router-dom'
+import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { ImportLog } from '../src/types/api'
@@ -26,12 +26,13 @@ let cacheClient: QueryClient
 vi.mock('@tanstack/react-query', async importOriginal => ({
     ...await importOriginal(),
     useQueryClient: () => cacheClient,
-    useQuery: () => ({ data: importLogsData, isLoading: false, isError: false, error: null, refetch: vi.fn() }),
+    useQuery: () => ({ data: cacheClient.getQueryData<ImportLog[]>(queryKeys.metering.importLogs()) ?? importLogsData, isLoading: false, isError: false, error: null, refetch: vi.fn() }),
     useMutation: (options: MutationOptions) => {
         mutationOptions.push(options)
         return {
             isPending: false,
             mutate: (vars: MutationVariables, opts?: unknown) => {
+                cacheClient.setQueryData(queryKeys.metering.importLogs(), importLogsData)
                 mutateCalls.push({ vars, opts })
             },
         }
@@ -63,10 +64,11 @@ import { ImportsPage } from '../src/pages/ImportsPage'
 let container: HTMLDivElement
 let root: ReturnType<typeof createRoot>
 let importLogsData: ImportLog[] = []
+let router: ReturnType<typeof createMemoryRouter>
 
 function buttons(label: string): HTMLButtonElement[] {
     return Array.from(container.querySelectorAll('button')).filter(
-        (button) => button.textContent === label,
+        (button) => button.textContent === label || button.getAttribute('aria-label') === label,
     ) as HTMLButtonElement[]
 }
 
@@ -97,10 +99,14 @@ function sdatLog(overrides: Partial<ImportLog> = {}): ImportLog {
 }
 
 function renderPage() {
+    router = createMemoryRouter([
+        { path: '/metering/imports', element: createElement(ImportsPage) },
+        { path: '/elsewhere', element: createElement('p', null, 'Elsewhere') },
+    ], { initialEntries: ['/metering/imports'] })
     act(() => {
         root.render(
             createElement(MantineProvider, null,
-                createElement(MemoryRouter, null, createElement(ImportsPage))),
+                createElement(RouterProvider, { router })),
         )
     })
 }
@@ -131,6 +137,8 @@ function pick(...names: string[]) {
 
 function goToStep2WithFiles(...names: string[]) {
     openWizard()
+    // Real pointer input arms FormModal's unsaved-control snapshot.
+    container.querySelector('select')!.dispatchEvent(new Event('pointerdown', { bubbles: true }))
     selectSdatch()
     pick(...names)
     act(() => {
@@ -221,7 +229,9 @@ describe('ImportsPage SDAT-CH batch outcomes', () => {
         expect(translate).toHaveBeenCalledWith('pages.imports.messages.importBatchPartial', {
             done: 1, total: 2, failed: 1, names: 'bad.xml', imported: 96, overwritten: 0, held: 0,
         })
-        // …its protocol opens, and the retry covers only that file.
+        // …its protocol opens without treating that URL update as discarding the draft.
+        expect(router.state.location.search).toBe('?import=log-bad')
+        expect(container.textContent).not.toContain('common.unsavedChanges.title')
         expect(container.textContent).toContain('pages.imports.protocol.title')
         expect(container.textContent).toContain('pages.imports.protocol.outcome.rejected')
         startImport()
@@ -243,6 +253,8 @@ describe('ImportsPage SDAT-CH batch outcomes', () => {
                 error: null,
             },
         ])
+        expect(router.state.location.search).toBe('?import=log-1')
+        expect(container.textContent).not.toContain('common.unsavedChanges.title')
         expect(pushToast).toHaveBeenCalledWith('pages.imports.messages.importSdatRejected', 'error')
         expect(container.textContent).toContain('pages.imports.protocol.title')
         // A rejected file wrote nothing: the wizard stays open for a retry.
@@ -267,10 +279,30 @@ describe('ImportsPage SDAT-CH batch outcomes', () => {
                 error: null,
             },
         ])
+        expect(router.state.location.search).toBe('?import=log-1')
+        expect(container.textContent).not.toContain('common.unsavedChanges.title')
         expect(pushToast).toHaveBeenCalledWith('pages.imports.messages.importSdat_held', 'success')
         expect(container.textContent).not.toContain('pages.imports.wizard.title')
         expect(container.textContent).toContain('pages.imports.protocol.outcome.held')
     })
+})
+
+it.each([false, true])('still protects a rejected-file draft with protocol closed=%s', async (closeProtocol) => {
+    goToStep2WithFiles('bad.xml')
+    startImport()
+    resolveUpload([{ file: uploadFiles()[0], value: sdatLog({ result_status: 'rejected' }), error: null }])
+    await act(async () => undefined)
+    expect(router.state.location.search).toBe('?import=log-1')
+    if (closeProtocol) {
+        const protocol = Array.from(container.querySelectorAll('[role=dialog]')).find(dialog =>
+            dialog.querySelector('h2')?.textContent === 'pages.imports.protocol.title',
+        )!
+        await act(async () => (protocol.querySelector('.form-modal-close') as HTMLButtonElement).click())
+        expect(router.state.location.search).toBe('')
+    }
+    await act(async () => { void router.navigate('/elsewhere') })
+    expect(router.state.location.pathname).toBe('/metering/imports')
+    expect(container.textContent).toContain('common.unsavedChanges.title')
 })
 
 describe('ImportsPage SDAT-CH deletion gating', () => {
@@ -320,15 +352,15 @@ describe('ImportsPage SDAT-CH deletion gating', () => {
             historyLog({ id: 'log-clean', filename: 'clean.xml' }),
         ]
         renderPage()
-        // Single delete is disabled for the protected log…
+        // The protected log has no deletion control; its protocol explains why.
         const rows = Array.from(container.querySelectorAll('tbody tr'))
         const heldRow = rows.find((row) => row.textContent?.includes('held.xml'))!
         const actions = Array.from(heldRow.querySelectorAll('button')).find(
-            (button) => button.textContent === 'pages.imports.actions.rowActions',
+            (button) => button.getAttribute('aria-label') === 'pages.imports.actions.rowActions',
         )!
-        expect(actions.disabled).toBe(true)
+        expect(actions).toBeUndefined()
         const protocol = Array.from(heldRow.querySelectorAll('button')).find(
-            (button) => button.textContent === 'pages.imports.actions.openProtocol',
+            (button) => button.getAttribute('aria-label') === 'pages.imports.actions.openProtocol',
         )!
         act(() => protocol.click())
         expect(container.textContent).toContain('pages.imports.delete.quarantineProtected')

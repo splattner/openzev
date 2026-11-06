@@ -319,6 +319,9 @@ The system calculates energy allocation and applies tariffs, creating a **Draft*
 Concurrent generation requests for the same participant run in sequence.
 The regeneration rules below apply to overlapping billing periods.
 
+Tariff-generation errors stay visible with **Check tariffs**, which opens the
+tariff configuration. Processing timeouts offer a status refresh.
+
 ### Regenerating an Existing Invoice
 
 While an invoice is a **Draft**, **More → Regenerate invoice** replaces it with a
@@ -335,17 +338,45 @@ they are stored separately and added to the new draft again.
 
 A committed metering correction (or an import deletion) never rewrites an
 invoice — amounts, PDFs and delivery records stay as issued. Instead the
-affected invoices stay in the **Issues** filter and carry a **Data review**
-flag. The period rows and invoice detail page identify them; managers and viewers
-also see source evidence (delivery ID or CSV filename, changed intervals) on the
-detail page. The **Overview** readiness
+affected invoices stay in the **Issues** filter. Their metering step under
+**Progress** shows a red exclamation mark. **Review corrections** under **Actions** opens the invoice's evidence and
+available resolution action. Managers and viewers see source evidence (delivery
+ID or CSV filename, changed intervals) on the detail page. The **Overview** readiness
 check gains a **Data corrections** step linking to the period's billing page.
+
+The arrow-marked **Open import protocol** link opens the source import's
+[recorded reading changes](05-metering-import.md#recorded-reading-changes),
+with the affected dates as context. It still shows the whole import's retained
+history. Reviewing it does not clear the invoice's flag.
 
 | Invoice status | What to do |
 | --- | --- |
-| **Draft** | **More → Regenerate invoice** bills the corrected values. |
-| **Approved / Sent** | With no payments, cancel through the API and generate a new invoice. A sent invoice with payments needs **Correct invoice → Reverse the invoice** first. |
-| **Paid** | Use **Correct invoice → Reverse the invoice**, then generate a new invoice. Payments and partial credits leave the review flag open. |
+| **Draft** | **Regenerate invoice** creates a new draft using the corrected values, after confirmation. |
+| **Approved / Sent** | With no payments, **Create replacement invoice** cancels the original and creates a new draft in one confirmed operation. A sent invoice with payments needs **Correct invoice → Reverse the invoice** first. |
+| **Paid** | Use **Correct invoice → Reverse the invoice**, then **Create replacement invoice**. Payments and partial credits leave the review flag open. |
+
+Before **Regenerate invoice** or **Create replacement invoice**, the detail page
+shows the expected total and energy changes using current readings and tariffs,
+beside the button on wide screens and above it on phones. The current amount,
+expected amount and signed difference are plain text; an unchanged amount is
+shown only once. A shift between local and grid energy
+is shown in one line; other energy changes show old and new quantities. The source
+import link remains below the action. Loading or failed calculation prevents
+submission; a failed preview offers **Retry**, with **Check tariffs** for tariff
+errors. This preview changes no invoice or invoice number. Confirmation calculates
+again, so changes made in the meantime can affect the final result.
+
+A flagged draft's stored PDF is labelled **Stored PDF – changes not yet included**.
+An issued invoice's PDF is labelled **Issued invoice – original**: it remains
+the document that was issued. Cancelling or failing a recalculation keeps that
+context visible; the successfully recalculated draft no longer has the pending-changes label.
+
+The issued original stays in the records with its original amount and PDF. For an
+unpaid replacement, a calculation failure leaves it valid. The replacement opens
+for review before approval or sending. Its result message compares the old and
+new amounts as plain text, explicitly notes an unchanged amount, and lists changed energy
+totals. Viewers
+and managers of disabled communities can inspect the evidence without write actions.
 
 Full reversal is available for a positive invoice with uncredited payments
 or applied credit. If neither remains, the flag stays open for review.
@@ -356,14 +387,26 @@ without internal import evidence or management actions.
 
 ## Reviewing Invoices
 
-Click the invoice number in the **Participant** column to view the invoice detail page.
+Click the underlined invoice number in the **Participant** column to view the invoice detail page.
 
 ### Invoice Detail Page
+
+The detail page also offers the next invoice action: **Approve** for a draft,
+then **Send email** for an approved invoice. Only one workflow step is offered
+at a time, aligned to the right like the correction action; sent invoices keep **Mark Paid** in the payments card. While email
+is queued the send button stays busy; a failed delivery leaves it available
+again with a visible error. Open corrections take priority over these ordinary
+actions. Read-only users and managers of disabled communities receive no write
+actions; opening the PDF remains available.
+
+If a stored PDF cannot be loaded, **Retry** loads it again without regenerating
+the invoice. Read-only users receive no instruction to generate a document.
 
 ![Invoice detail page](screenshots/08b-invoice-detail.png)
 
 The page header names the invoice and, next to the recipient and the billing
-period, its current **status** as a quiet label (a participant sees whether
+period, its current **status** as plain text, with **Cancelled** in red error text and
+**Partly paid** kept as a blue pill (a participant sees whether
 payment is due, overdue or paid instead). The invoice PDF itself no longer prints
 a status line; only a draft or cancelled document carries a plain **Draft** or
 **Cancelled** marking. Below it, two rows of figure tiles summarise the invoice the way its

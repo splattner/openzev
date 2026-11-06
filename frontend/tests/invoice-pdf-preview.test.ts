@@ -137,15 +137,20 @@ describe('InvoiceDetailPage PDF preview lifecycle', () => {
         expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:invoice-1')
     })
 
-    it('shows only the error when the stored PDF cannot be fetched', async () => {
-        vi.mocked(fetchInvoicePdfBlob).mockRejectedValue(new Error('fetch failed'))
+    it('retries a stored PDF fetch locally after an error', async () => {
+        vi.mocked(fetchInvoicePdfBlob).mockRejectedValueOnce(new Error('fetch failed')).mockResolvedValueOnce(pdfBlob())
         const { container, unmount } = await renderInvoiceDetail()
 
-        await waitFor(() => container.textContent?.includes('common.error') ?? false)
+        await waitFor(() => container.textContent?.includes('pdf.loadFailed') ?? false)
 
         expect(container.querySelector('iframe')).toBeNull()
         expect(container.querySelector('.pdf-frame')).toBeNull()
         expect(container.textContent).not.toContain('pdf.noDocument')
+        const retry = [...container.querySelectorAll('button')].find(button => button.textContent?.includes('common.retry'))!
+        expect(retry).toBeDefined()
+        await act(async () => retry.click())
+        await waitFor(() => container.querySelector('iframe') !== null)
+        expect(fetchInvoicePdfBlob).toHaveBeenCalledTimes(2)
         unmount()
     })
 

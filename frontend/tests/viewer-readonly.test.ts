@@ -6,6 +6,7 @@ import { MantineProvider } from '@mantine/core'
 import { ParticipantToolbar } from '../src/features/participants/ParticipantToolbar'
 import { TariffActions } from '../src/features/tariffs/TariffActions'
 import { TariffEmptyState } from '../src/features/tariffs/TariffEmptyState'
+import { InvoicesEmptyState } from '../src/features/invoices/InvoicesEmptyState'
 import { ImportHistoryTable } from '../src/features/imports/ImportHistoryTable'
 
 // A viewer sees a ZEV's management pages but no write controls (#761,
@@ -49,6 +50,15 @@ describe('viewer read-only controls', () => {
 
     it('tariffs empty state: no create action', async () => {
         expect(has(await render(createElement(TariffEmptyState, { onOpenCreateTariff: vi.fn(), readOnly: true })), 'pages.tariffs.newTariff')).toBe(false)
+    })
+
+    it('invoices: setup actions are offered only to writers', async () => {
+        const viewer = await render(createElement(InvoicesEmptyState, { canManage: false }))
+        expect(viewer.querySelector('a, button')).toBeNull()
+        const manager = await render(createElement(InvoicesEmptyState, { canManage: true }))
+        expect([...manager.querySelectorAll('a')].map(link => link.getAttribute('href'))).toEqual([
+            '/participants', '/metering/points', '/tariffs',
+        ])
     })
 
     it('imports: an empty history offers no new import', async () => {

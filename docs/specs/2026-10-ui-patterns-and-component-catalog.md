@@ -209,6 +209,11 @@ Rules that cut across the table:
   `dirty` signal from the form) and reused by the pane, not written per form.
   Explicit discard resets the draft; reopening starts from saved data. A reload
   warning does not imply recovery after reload.
+  A page-owned navigation that saves or preserves the draft can share a
+  `navigationBypassRef` with `FormModal` and use `allowNavigation` for that
+  update; other departures retain the guard.
+  Read-only dialogs pass `dirty={false}` and register no router blocker, so a
+  stacked read-only dialog cannot mask its parent's unsaved draft.
 - Focus, stacking, inertness and restoration: SPEC-2026-04 §4.1
   ([dialog behavior](2026-04-frontend-management-page-design.md#dialog-behavior)),
   owned by `useDialogBehavior.ts` / `dialogInertness.ts`. Escape closes the

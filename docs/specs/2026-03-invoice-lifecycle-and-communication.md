@@ -363,6 +363,25 @@ after a metadata-only prefix; evidence totals/kinds and affected day bounds
 cover the entire source import, not the subset priced by one invoice. Counts describe changes rather than unique slots when a file writes a slot repeatedly. Deletions query distinct scoped meter/day/direction
 slots before removing the rows, independently of the audit sample limit.
 
+**Navigation to the evidence:** `InvoiceDataReviewNotice` links source imports
+to `/metering/imports?import=…#correction-history` for callers with admin,
+manager or viewer access to `invoice.zev` while the selected community is in
+management scope, matching the destination route guard. Participants receive no impact
+evidence at the API boundary; impacts without an import render no link.
+Optional `change_from` / `change_to` carry the evidence's affected dates;
+calendar-invalid, incomplete or reversed ranges are ignored. The note makes
+clear that the history covers the whole import's retained changes, with no
+inferred meter filter. See the metering import spec §8.4 for history behavior.
+
+The URL owns protocol selection for links, rows and upload results. Upload
+results seed lightweight list rows until refresh. Resolution uses all
+accessible logs, independent of the header community. Explicit close, a real
+scope change or successful deletion of the open import clears its selection
+and change-period parameters and its correction-history hash, preserving
+unrelated URL state. Initial scope
+loading preserves incoming links. Missing-source feedback waits for list
+refresh and appears above history; list failures retain their separate retry.
+
 PostgreSQL serializes the writes that move billing inputs with a per-ZEV
 advisory lock (`pg_advisory_xact_lock`, class 1641412 keyed by ZEV —
 ADR 0041): SDAT/CSV imports, import-log and metering-point deletions, and
@@ -399,9 +418,44 @@ through the existing registry.
 | Invoice status | Resolution |
 |---|---|
 | `draft` | Explicit regeneration only (`POST /invoices/generate/`). Success deletes the incorporated open rows with their draft and records an audit event (`invoice.reading_impact_resolved`, resolution `regenerated`); the billing lock prevents tracked corrections committing mid-run; a failed run resolves nothing. |
-| `approved`, `sent` | Without payments, cancel via `POST /invoices/{id}/cancel/`, which resolves the flags as `cancelled`, then regenerate. A sent invoice with payments uses an explicit full credit-note reversal instead. No automatic credit or reissue. |
+| `approved`, `sent` | Without payments, `POST /invoices/{id}/replace/` atomically cancels the source and generates a replacement for the same participant and dates. Cancellation, impact resolution, credit releases, numbering and generation roll back together on failure. A sent invoice with payments uses an explicit full credit-note reversal instead. |
 | `paid` | Payment and partial credit adjustments leave the flag open. An explicit full credit-note reversal cancels the invoice and resolves its flags as `cancelled`; the period can then be regenerated. |
 | `cancelled` | Terminal and never flagged; regeneration after cancel starts clean. |
+
+Before a manager regenerates or replaces a flagged invoice, the detail page
+loads `POST /invoices/{id}/calculation-preview/`. The endpoint derives the
+participant and dates from the scoped source; request-body overrides are ignored.
+It uses `generate_invoice(preview=True)`: the same allocation, tariffs, VAT and
+rounding, returning an unsaved invoice before numbering, items, evidence,
+impact settlement or credit application. Existing invoices, PDFs, impacts,
+credits and the counter remain unchanged; no audit event or PDF task is created.
+Preview bypasses overlap replacement guards because it does not replace anything;
+the real generation/replacement still checks eligibility and recalculates.
+
+The response has exactly four decimal strings: `total_chf` (2 decimal places),
+`total_local_kwh`, `total_grid_kwh`, `total_feed_in_kwh` (4 each). Manager/admin
+scoping matches write actions; viewers/participants receive no preview and a
+disabled-community manager is denied without creating a denial audit event.
+The UI shows the expected total and changed energy beside the action on wide
+screens, above it on narrow screens, with muted source evidence below. The
+current amount stays plain and muted, the expected amount is bold, and a signed
+CHF difference appears as inline text; an unchanged amount appears once without
+an arrow. No coloured container or badges are used. Equal/opposite local/grid changes with unchanged
+feed-in are condensed to one energy-transfer sentence; other changes show old/new
+quantities. Loading/failure disables the action; failure offers Retry and tariff
+errors also offer Check tariffs, selecting the invoice’s community before
+navigation. The open confirmation shares this preview and also blocks submission
+during refresh or failure. No window-focus refetch. The expectation is a
+current calculation, not a reserved quote; confirmation calculates again. Result
+feedback uses plain text without a coloured banner and shares the same energy comparison.
+For a flagged invoice with a stored PDF, the document is labelled as a stored
+draft whose changes are not yet included, or as the issued original. A failed or
+cancelled recalculation leaves that label intact; a successful new draft has no
+open review flag and therefore no pending-changes label.
+Staff detail status text is dark gold for draft/sent/paid and green for approved.
+Cancelled labels use red text for staff and participants; only partly
+paid keeps its blue pill in the detail header.
+German sent-status labels consistently read **Versandt**.
 
 Cancel and full-reversal responses clear cached open `reading_impacts` before
 serializing, so they immediately return `needs_data_review: false`,
@@ -489,6 +543,8 @@ Validation: `period_start` must be before `period_end`. On creation the engine a
 | `POST` | `/invoices/{id}/mark-sent/` | `HasZevAccess` | `status == approved` | → `sent`, `sent_at = now()` |
 | `POST` | `/invoices/{id}/mark-paid/` | `HasZevAccess` | `status == sent` | Optional body `{paid_on}` (default today); books the outstanding amount as one `mark_paid` payment (none for a zero outstanding amount) → `paid`. Audit metadata `{payment_id, amount_chf, paid_on}` |
 | `POST` | `/invoices/{id}/cancel/` | `HasZevAccess` | `status ∉ {paid, cancelled}`, no payments | → `cancelled` |
+| `POST` | `/invoices/{id}/calculation-preview/` | `HasZevAccess` (manager/admin scoped) | Existing visible source; disabled-community manager denied | `200` four decimal-string totals (`total_chf`, `total_local_kwh`, `total_grid_kwh`, `total_feed_in_kwh`); derives participant/dates from source, ignores body. No billing writes, numbering, audit event or PDF. `400` calculation/disabled error, `409` dynamic-tariff error. |
+| `POST` | `/invoices/{id}/replace/` | `HasZevAccess` (write-scoped: managers) | `status ∈ {approved, sent}`, no payments; disabled-ZEV manager writes denied | `201` replacement `Invoice`; derives participant/dates from source; `400` invalid state/pricing failure, `409` dynamic-price gaps. Source amount/PDF retained. |
 | `POST` | `/invoices/{id}/correct/` | `HasZevAccess` (write-scoped: managers) | `status == paid`, or `sent` with payments; total > 0; reason required; an adjustment needs `0 < amount_chf ≤ paid − credited` | Body `{kind: reversal \| adjustment, reason, amount_chf?}`; `201 {invoice, credit}`. A reversal credits the cash received (less earlier credits), cancels the invoice and releases the credit applied to it; an invoice settled by credit alone is reversed without a credit note (`credit: null`). An adjustment is capped by cash. The credit PDF is queued on commit. Audit `invoice.correct` (metadata adds `released_chf`) |
 | `GET` | `/invoices/credits/`, `/invoices/credits/{id}/` | scoped (`ZevScopedQuerySetMixin`) | — | Read-only `CreditSerializer`; filters `participant_id`, `source_invoice_id`; a participant sees their own credits |
 | `GET` / `POST` | `/invoices/credits/{id}/pdf/`, `…/generate-pdf/` | scoped / `HasZevAccess` | — | Stored PDF (`404` before the render) / queue a re-render (`202`) |
@@ -1538,10 +1594,13 @@ visibility, restored access, and strict selection with a second membership.
   targets are outstanding, including individual generation for those targets.
   Single generation and PDF-batch acceptance check the originating account,
   community, period and write-access lifetime before starting local feedback.
-  Scope changes stop watching; errors still toast. One hidden status region
+  Scope changes stop watching. Tariff generation errors remain inline with a
+  **Check tariffs** link; other failures toast. Tariff feedback is bound to its
+  account/community/period/write scope, clears on retry/success and ignores late
+  errors. The feedback scrolls into view after a row action unless a field is
+  being edited; it does not move keyboard focus. One hidden status region
   announces invoice/PDF preparation. If the deadline passes with work still
-  outstanding, a warning says processing has not finished and to reload before
-  retrying; completion and scope changes clear it.
+  outstanding, a warning offers a local status refresh; completion and scope changes clear it.
 - `useEmailDelivery` tracks queued email for row sends and Send all alike.
   Each target is an invoice and its prior latest-email-log ID (Send all counts
   and snapshots approved invoices with a recipient). The overview polls every
@@ -1566,24 +1625,50 @@ visibility, restored access, and strict selection with a second membership.
 - Viewers and managers of disabled communities retain filtering, conflict and
   related-invoice navigation, stored PDFs and batch download, with no writes.
 - Reading-correction review (§4.6) renders wherever the flags ride:
-  `InvoiceDataReviewNotice` (row/compact and detail/evidence variants) on the
-  period rows (`InvoicePeriodRowsTable`, imperative wording only when the
-  viewer can act), the invoice detail page (open impacts with source
-  evidence, including CSV filenames), a badge on the admin list and My invoices, and the
+  Period rows mark the metering step in **Progress** with the existing red issue
+  indicator; its tooltip/accessibility text identifies the review. **Review
+  corrections** remains in **Actions**, without a separate status label.
+  `useInvoiceActions` makes review the primary action and retains normal workflow
+  actions in the menu. Navigation preserves the invoice period.
+  On the invoice detail page it shows a plain red notice and evidence paragraphs,
+  including CSV filenames. Source links carry a visible arrow; invoice-number links are underlined; the authorised
+  resolution action is primary. The notice does not add decorative warning icons
+  or a bullet for one impact. Other surfaces show a badge on the admin list
+  and My invoices, and the
   `data_corrections` readiness warn step (`review_data_corrections`
   next-action mapping, `correctionsWarn` detail text) on Overview period
-  cards. Drafts resolve through the existing regenerate action, issued
-  invoices without payments through cancel (API-only) plus regeneration, and
+  cards. Invoice pages use plain feedback instead of coloured error/warning
+  banners. A forbidden/missing invoice shows an unavailable message and a
+  dashboard link, rather than retrying access failures or offering a retry that cannot recover access. Drafts resolve through the existing regenerate action, issued
+  invoices without payments through confirmed atomic replacement, and
   paid invoices or sent invoices with payments through full credit-note reversal
-  plus regeneration. Paid notices state the reversal eligibility (positive
-  invoice total and uncredited payments or applied credit); payments and partial credits leave
+  plus regeneration. `InvoiceDataReviewActions` exposes confirmed draft regeneration
+  and calls `/invoices/{id}/replace/` for unpaid issued invoices. The cancelled detail offers a
+  separate **Create replacement invoice** action when no replacement exists. Generation
+  uses the original participant and dates and navigates to the returned draft, preserving
+  the return-link state. The new draft shows the previous/new total (or explicitly
+  says unchanged), plus changed local/grid/feed-in energy totals, from a small
+  navigation-state snapshot; it is shown only on that draft. Row-menu regeneration
+  reports the previous/new total in its success toast. Write controls use the invoice's own community permissions;
+  unpaid replacement requires known empty payments. `InvoiceCorrectionButton` shares the
+  credit-note dialog between the review notice and credit card; a flagged invoice offers
+  it in the notice only. Reversal requires a positive
+  invoice total and uncredited payments or applied credit; payments and partial credits leave
   review flags open;
   no lifecycle permission changes. Correction flags remain in the Issues filter,
   including on paid invoices. Overview text counts affected invoices rather than
   correction records. Evidence ranges use the configured short-date format;
   flag timestamps use Swiss civil dates. Detail wording uses write availability
-  in the invoice’s own community, including its disabled state. Covered by
-  `frontend/tests/invoice-data-review.test.ts`.
+  in the invoice’s own community, including its disabled state. Open impacts
+  with a source import link to that import’s correction history with the impact
+  period preserved; the link is not rendered for a participant relation or an
+  impact without a source import. Covered by
+  `frontend/tests/invoice-data-review.test.ts` (evidence rendering, import link,
+  participant and no-source-import cases),
+  `frontend/tests/invoice-data-review-actions.test.ts` (confirmation, replacement,
+  failure recovery and action eligibility), and
+  `frontend/tests/imports-wizard.test.ts` (deep link opens the linked import;
+  an out-of-scope id shows the missing-import notice).
 - Containers up to 46rem render card rows, keeping table headers accessible;
   up to 28rem, progress and actions stack. The amount column header names CHF;
   cards show the currency next to the amount.
@@ -1592,6 +1677,24 @@ visibility, restored access, and strict selection with a second membership.
 - Billing rows keep the five progress icons; in the card layout (≤46rem) the next open or running step is also shown as visible text beside them (`InvoiceRowProgress`, `.invoice-progress-next`), since a card has room for words and no legend to decode. Problems already read as red text under the name, so they are not repeated. The PDF cell shows only a failed PDF (issue text) or a missing one (muted text), never a green "ready" mark, and the email-delivery column marks only a failed send (issue text) or a running one (info badge).
 - Template field definitions come from the backend catalogs. `frontend/src/lib/emailTemplateFields.ts` owns only `EMAIL_TEMPLATE_KEYS`/`EmailTemplateKey`, the four-key frontend route contract. `frontend/src/components/FieldReference.tsx` is shared by `ZevEmailTemplateFields`, `AdminEmailTemplatesPage`, and `AdminPdfTemplatesPage`; it renders API-provided groups (without the backend-only `sample_path`), examples, search, usage badges, and click-to-insert behavior. Insertion calculates state changes and restores the caret after controlled React updates rather than writing `element.value` directly. `frontend/tests/templates-hub.test.ts` covers the seven-tab hub and cross-category routing; `field-reference.test.ts`, `email-template-parity.test.ts`, and `dead-i18n-keys.test.ts` pin token helpers, syntax-aware counting, key/tab parity, backend description-key translations, and catalog-key reachability.
 - Annual-statement export card (admin/owner): prepare → poll → download with partial, failed and expired states. Polling stops on ZEV/year switch, and a create response that resolves after the user switched ZEV/year is discarded (the old selection's job is never shown under the new one); a failed job shows the backend's safe `error_message` when there is one; a single transient poll error is tolerated (only consecutive errors or a long wall-clock backstop end the poll); a failed download surfaces an error instead of crashing; an in-flight or completed export is restored after a reload (`AnnualStatementsExportCard`)
+- `InvoiceWorkflowAction` shares `nextInvoiceWorkflowAction` with billing:
+  draft → Approve, approved → Send email, sent → Mark paid. Detail adds the
+  first two as one right-aligned next-action button, matching correction resolution; sent invoices retain the existing
+  payment-card action. Paid/cancelled have no ordinary next action; flagged
+  invoices retain their correction resolver instead. PDF generation is secondary.
+  Effective write access belongs to the invoice's community, including its
+  disabled state, for workflow/payment/credit/PDF actions; access-link revocation
+  retains its existing role-only exception. Email delivery reuses `useEmailDelivery`
+  to refresh detail every 2.5 seconds for up to 90 seconds, with queued/disabled,
+  failed/retry and observed already-pending states. At the 90-second deadline,
+  automatic polling stops; detail offers an explicit status refresh and bounded
+  polling resume without sending another email or duplicating the inline timeout
+  message in a toast. Late feedback after permission
+  or invoice scope changes is ignored. Backend workflow guards remain authoritative.
+- Empty billing states offer setup actions only with write access and a selected
+  community. Empty-state and PDF-failure descriptions remain factual for viewers
+  and participants. A stored invoice PDF fetch failure offers a local retry,
+  including for participants; it does not require regenerating the document.
 - PDF tests: `use-pdf-object-url.test.ts` covers replacement, abort, failure, and cleanup; `participant-documents.test.ts` covers tabs, year and user changes, retries, and blob reuse. `pdf-preview.test.ts`, `api-reports.test.ts`, and `invoice-pdf-preview.test.ts` cover the shared viewer and API calls. Manager and export flows remain in `reports-page.test.ts` and `annual-statements-export.test.ts`.
 - Build and type checks (`npm run build`)
 

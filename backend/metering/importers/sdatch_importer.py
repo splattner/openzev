@@ -248,6 +248,24 @@ def _issue(code, message, *, severity="error", **params):
     return entry
 
 
+def _xml_error_params(exc):
+    """Expose parser locations and machine codes without parsing diagnostic prose."""
+    error_log = getattr(exc, "error_log", None)
+    error = error_log.last_error if error_log is not None else None
+    if error is None:
+        return {}
+    return {
+        key: value
+        for key, value in (
+            ("xml_line", error.line),
+            ("xml_column", error.column),
+            ("xml_path", error.path),
+            ("xml_error_type", error.type_name),
+        )
+        if value is not None and value != ""
+    }
+
+
 def _zero_counts():
     return {key: 0 for key in COUNT_KEYS}
 
@@ -368,12 +386,13 @@ def _validate_header(run, root):
     header = root.find(_qname("ValidatedMeteredData_HeaderInformation"))
     if header is None:
         raise _FileRejected(
-            [_issue(ISSUE_INVALID_HEADER, "Missing ValidatedMeteredData_HeaderInformation.")]
+            [_issue(ISSUE_INVALID_HEADER, "Missing ValidatedMeteredData_HeaderInformation.",
+                    element="ValidatedMeteredData_HeaderInformation")]
         )
     instance = header.find(_qname("InstanceDocument"))
     if instance is None:
         raise _FileRejected(
-            [_issue(ISSUE_INVALID_HEADER, "Missing InstanceDocument header.")]
+            [_issue(ISSUE_INVALID_HEADER, "Missing InstanceDocument header.", element="InstanceDocument")]
         )
     delivery_id = _text(instance, "DocumentID")
     doc_type = _code(instance, "DocumentType")
@@ -383,6 +402,7 @@ def _validate_header(run, root):
                 _issue(
                     ISSUE_UNSUPPORTED_DOCUMENT_TYPE,
                     f"DocumentType is not E66 (ValidatedMeteredData): '{doc_type or '?'}'.",
+                    document_type=doc_type,
                 )
             ]
         )
@@ -393,6 +413,7 @@ def _validate_header(run, root):
                 _issue(
                     ISSUE_UNSUPPORTED_STATUS,
                     f"Document Status '{status or '?'}' is not supported for import (expected 9 original or 5 replacement).",
+                    status=status,
                 )
             ]
         )
@@ -405,7 +426,7 @@ def _validate_header(run, root):
         creation = _parse_ts_strict(creation_raw)
     except ValueError:
         raise _FileRejected(
-            [_issue(ISSUE_INVALID_CREATION, f"Invalid Creation timestamp '{creation_raw}'.")]
+            [_issue(ISSUE_INVALID_CREATION, f"Invalid Creation timestamp '{creation_raw}'.", creation=creation_raw)]
         )
     scope = header.find(_qname("BusinessScopeProcess"))
     reason = _code(scope, "BusinessReasonType")
@@ -425,14 +446,17 @@ def _validate_header(run, root):
             ]
         )
     report = scope.find(_qname("ReportPeriod"))
+    report_start_raw = _text(report, "StartDateTime")
+    report_end_raw = _text(report, "EndDateTime")
     try:
-        report_start = _parse_ts_strict(_text(report, "StartDateTime"))
-        report_end = _parse_ts_strict(_text(report, "EndDateTime"))
+        report_start = _parse_ts_strict(report_start_raw)
+        report_end = _parse_ts_strict(report_end_raw)
         if report_end <= report_start:
             raise ValueError("ReportPeriod end must follow its start")
     except ValueError:
         raise _FileRejected([_issue(
-            ISSUE_INVALID_REPORT_PERIOD, "ReportPeriod must be a valid, non-empty UTC interval."
+            ISSUE_INVALID_REPORT_PERIOD, "ReportPeriod must be a valid, non-empty UTC interval.",
+            interval_start=report_start_raw, interval_end=report_end_raw,
         )]) from None
     sender_id, sender_role, receiver_id, receiver_role = _sender_identity(header)
     run.delivery = {
@@ -519,32 +543,36 @@ def _parse_block(md, *, reason, report_period):
 
     interval = md.find(_qname("Interval"))
     if interval is None:
-        reject(ISSUE_MISSING_INTERVAL, f"Block '{doc_id}' has no Interval.")
+        reject(ISSUE_MISSING_INTERVAL, f"Block '{doc_id}' has no Interval.", block_id=doc_id)
     start_raw = _text(interval, "StartDateTime")
     end_raw = _text(interval, "EndDateTime")
+    interval_params = {"block_id": doc_id, "interval_start": start_raw, "interval_end": end_raw}
     for raw_ts in (start_raw, end_raw):
         if not _has_tz_designator(raw_ts):
             reject(
                 ISSUE_NAIVE_TIMESTAMP,
                 f"Block '{doc_id}' carries an offset-less Interval timestamp; strict SDAT-CH 1.6 uses UTC exclusively.",
-                block_id=doc_id,
+                **interval_params,
             )
     try:
         start_ts = _parse_ts_strict(start_raw)
         end_ts = _parse_ts_strict(end_raw)
     except ValueError as exc:
-        reject(ISSUE_INVALID_INTERVAL, f"Invalid Interval timestamps in block '{doc_id}': {exc}.", block_id=doc_id)
+        reject(ISSUE_INVALID_INTERVAL, f"Invalid Interval timestamps in block '{doc_id}': {exc}.",
+               detail_code="invalid_timestamp", **interval_params)
     if end_ts <= start_ts:
-        reject(ISSUE_INVALID_INTERVAL, f"Empty Interval in block '{doc_id}'.", block_id=doc_id)
+        reject(ISSUE_INVALID_INTERVAL, f"Empty Interval in block '{doc_id}'.",
+               detail_code="empty_interval", **interval_params)
     if start_ts < report_period[0] or end_ts > report_period[1]:
         reject(
             ISSUE_OUTSIDE_REPORT_PERIOD,
             f"Block '{doc_id}' extends outside the delivery's ReportPeriod.",
-            block_id=doc_id,
+            **interval_params,
         )
     span = end_ts - start_ts
     if span.microseconds or span.seconds % 60:
-        reject(ISSUE_INVALID_INTERVAL, f"Block '{doc_id}' Interval is not a whole-minute span.", block_id=doc_id)
+        reject(ISSUE_INVALID_INTERVAL, f"Block '{doc_id}' Interval is not a whole-minute span.",
+               detail_code="non_minute_interval", **interval_params)
     if (
         start_ts.second
         or start_ts.microsecond
@@ -556,14 +584,14 @@ def _parse_block(md, *, reason, report_period):
         reject(
             ISSUE_UNALIGNED_INTERVAL,
             f"Block '{doc_id}' Interval is not aligned to the 15-minute grid.",
-            block_id=doc_id,
+            **interval_params,
         )
     span_minutes = int(span.total_seconds() // 60)
     if span_minutes % RESOLUTION_MINUTES:
         reject(
             ISSUE_UNALIGNED_INTERVAL,
             f"Block '{doc_id}' Interval spans {span_minutes} minutes, not divisible into 15-minute positions.",
-            block_id=doc_id,
+            **interval_params,
         )
     expected = span_minutes // RESOLUTION_MINUTES
 
@@ -574,8 +602,9 @@ def _parse_block(md, *, reason, report_period):
             f"Block '{doc_id}' has no Resolution; the strict SDAT-CH 1.6 profile fixes Resolution 15/MIN.",
             block_id=doc_id,
         )
+    resolution_raw = (_text(res_elem, "Resolution") or "").strip()
     try:
-        res_value = int((_text(res_elem, "Resolution") or "").strip())
+        res_value = int(resolution_raw)
     except ValueError:
         res_value = None
     unit = (_text(res_elem, "Unit") or "").strip().upper()
@@ -584,6 +613,8 @@ def _parse_block(md, *, reason, report_period):
             ISSUE_UNSUPPORTED_RESOLUTION,
             f"Block '{doc_id}' Resolution is '{res_value or '?'}'/'{unit or '?'}'; only 15/MIN is supported for billing import.",
             block_id=doc_id,
+            resolution=resolution_raw,
+            resolution_unit=unit,
         )
 
     seqs = []
@@ -600,6 +631,7 @@ def _parse_block(md, *, reason, report_period):
                 block_id=doc_id,
                 meter_id=meter_id or None,
                 position=seq_raw or None,
+                expected_positions=expected,
             )
         seqs.append(seq)
     if len(set(seqs)) != len(seqs):
@@ -641,6 +673,8 @@ def _parse_block(md, *, reason, report_period):
             block_id=doc_id,
             meter_id=meter_id or None,
             missing=missing[:50],
+            missing_count=missing_count,
+            expected_positions=expected,
         )
 
     by_seq = {}
@@ -663,6 +697,8 @@ def _parse_block(md, *, reason, report_period):
             reject(
                 ISSUE_INVALID_VOLUME,
                 f"Invalid numeric value '{qty_raw or '?'}' at position {seq} in block '{doc_id}'.",
+                detail_code="invalid_number",
+                volume=qty_raw,
                 block_id=doc_id,
                 meter_id=meter_id or None,
                 position=seq,
@@ -671,6 +707,8 @@ def _parse_block(md, *, reason, report_period):
             reject(
                 ISSUE_INVALID_VOLUME,
                 f"Negative volume '{qty_raw}' at position {seq} in block '{doc_id}' is not valid interval energy.",
+                detail_code="negative_volume",
+                volume=qty_raw,
                 block_id=doc_id,
                 meter_id=meter_id or None,
                 position=seq,
@@ -679,6 +717,9 @@ def _parse_block(md, *, reason, report_period):
             reject(
                 ISSUE_INVALID_VOLUME,
                 f"Volume '{qty_raw}' at position {seq} in block '{doc_id}' exceeds the storable range.",
+                detail_code="volume_out_of_range",
+                volume=qty_raw,
+                volume_limit=str(MAX_ENERGY_KWH),
                 block_id=doc_id,
                 meter_id=meter_id or None,
                 position=seq,
@@ -689,6 +730,7 @@ def _parse_block(md, *, reason, report_period):
             reject(
                 ISSUE_UNKNOWN_CONDITION,
                 f"Unknown Condition '{condition}' at position {seq} in block '{doc_id}'.",
+                condition=condition,
                 block_id=doc_id,
                 meter_id=meter_id or None,
                 position=seq,
@@ -819,6 +861,7 @@ def _conflict_issue(obs, row, *, creation, delivery_id):
         incoming_delivery_id=delivery_id,
         stored_document_id=row.source_document_id or None,
         stored_delivery_id=row.source_delivery_id or None,
+        creation=creation.isoformat(),
     )
 
 
@@ -1002,6 +1045,7 @@ def _resolve_plan(blocks, zev, run):
                 ISSUE_METER_DIRECTION_MISMATCH,
                 f"Meter '{observed}' is configured as {point.meter_type} and cannot import {direction} readings.",
                 meter_id=observed, block_id=block.document_id, direction=direction,
+                meter_type=point.meter_type,
             )
             continue
         for obs in block.observations:
@@ -1026,6 +1070,8 @@ def _resolve_plan(blocks, zev, run):
                                 meter_id=obs.meter_id,
                                 position_timestamp=obs.timestamp.isoformat(),
                                 direction=obs.direction,
+                                block_id=obs.block_id,
+                                other_block_id=prev_block,
                             )
                         ]
                     )
@@ -1038,6 +1084,8 @@ def _resolve_plan(blocks, zev, run):
                             meter_id=obs.meter_id,
                             position_timestamp=obs.timestamp.isoformat(),
                             direction=obs.direction,
+                            block_id=obs.block_id,
+                            other_block_id=prev_block,
                         )
                     ]
                 )
@@ -1068,6 +1116,8 @@ def import_sdatch(file, zev, user):
             log,
             ISSUE_FILE_TOO_LARGE,
             f"File too large ({mb(size_hint)}). Maximum is {mb(MAX_SDAT_BYTES)}.",
+            size_bytes=size_hint,
+            limit_bytes=MAX_SDAT_BYTES,
         )
 
     try:
@@ -1081,6 +1131,7 @@ def import_sdatch(file, zev, user):
             log,
             ISSUE_FILE_TOO_LARGE,
             f"File too large ({mb(len(raw))}). Maximum is {mb(MAX_SDAT_BYTES)}.",
+            limit_bytes=MAX_SDAT_BYTES,
         )
 
     if filename.lower().endswith(".gz"):
@@ -1094,6 +1145,7 @@ def import_sdatch(file, zev, user):
                 log,
                 ISSUE_DECOMPRESSED_TOO_LARGE,
                 f"Decompressed file too large. Maximum is {mb(MAX_SDAT_DECOMPRESSED_BYTES)}.",
+                limit_bytes=MAX_SDAT_DECOMPRESSED_BYTES,
             )
 
     try:
@@ -1105,7 +1157,7 @@ def import_sdatch(file, zev, user):
         )
         root = etree.fromstring(raw, parser)
     except Exception as exc:
-        return _fail_early(log, ISSUE_MALFORMED_XML, f"Malformed SDAT-CH XML: {exc}")
+        return _fail_early(log, ISSUE_MALFORMED_XML, f"Malformed SDAT-CH XML: {exc}", **_xml_error_params(exc))
 
     root_name = _local(root.tag)
     root_ns = root.tag.rsplit("}", 1)[0][1:] if "}" in root.tag else ""
@@ -1118,12 +1170,14 @@ def import_sdatch(file, zev, user):
             log,
             ISSUE_UNSUPPORTED_ROOT,
             f"Wrong XML namespace '{root_ns or '?'}'; expected '{SDAT_NS}'.",
+            detail_code="wrong_namespace", root_element=root_name, namespace=root_ns,
         )
     elif root_name.startswith("ValidatedMeteredData_"):
         return _fail_early(
             log,
             ISSUE_UNSUPPORTED_SCHEMA_VERSION,
             f"Schema version {root_name} is not supported; only {STRICT_ROOT} (SDAT-CH 2025, 15-minute active energy) is imported.",
+            root_element=root_name,
         )
     elif root_name.startswith("AggregatedMeteredData_"):
         detail = "AggregatedMeteredData holds grid-area/balance-group sums, not per-meter data."
@@ -1131,6 +1185,7 @@ def import_sdatch(file, zev, user):
             log,
             ISSUE_UNSUPPORTED_ROOT,
             f"Not a ValidatedMeteredData (E66) file. {detail}",
+            detail_code="aggregated_data", root_element=root_name,
         )
     elif root_name.startswith("ImbalanceData_"):
         detail = "ImbalanceData holds balance-settlement series, not per-meter data."
@@ -1138,6 +1193,7 @@ def import_sdatch(file, zev, user):
             log,
             ISSUE_UNSUPPORTED_ROOT,
             f"Not a ValidatedMeteredData (E66) file. {detail}",
+            detail_code="imbalance_data", root_element=root_name,
         )
     else:
         detail = f"Unsupported root element '{root_name}'."
@@ -1145,6 +1201,7 @@ def import_sdatch(file, zev, user):
             log,
             ISSUE_UNSUPPORTED_ROOT,
             f"Not a ValidatedMeteredData (E66) file. {detail}",
+            root_element=root_name,
         )
 
     try:
@@ -1165,7 +1222,7 @@ def import_sdatch(file, zev, user):
     try:
         schema.assertValid(root)
     except etree.DocumentInvalid as exc:
-        return _fail_early(log, ISSUE_SCHEMA_INVALID, f"Schema validation failed: {exc}")
+        return _fail_early(log, ISSUE_SCHEMA_INVALID, f"Schema validation failed: {exc}", **_xml_error_params(exc))
 
     try:
         delivery, reason, creation, is_replace, report_period = _validate_header(run, root)

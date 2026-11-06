@@ -72,9 +72,32 @@ export const SDAT_COUNT_ORDER = [
  * Values come from stable backend fields — never parsed from prose. */
 export const SDAT_ISSUE_PARAM_ORDER = [
     'meter_id',
+    'meter_type',
     'block_id',
+    'other_block_id',
+    'element',
+    'document_type',
+    'status',
+    'creation',
+    'root_element',
+    'namespace',
+    'xml_error_type',
+    'xml_line',
+    'xml_column',
+    'xml_path',
     'position',
+    'expected_positions',
+    'missing_count',
     'missing',
+    'interval_start',
+    'interval_end',
+    'resolution',
+    'resolution_unit',
+    'volume',
+    'volume_limit',
+    'condition',
+    'size_bytes',
+    'limit_bytes',
     'position_timestamp',
     'direction',
     'incoming_document_id',
@@ -94,8 +117,7 @@ export const SDAT_ISSUE_PARAM_ORDER = [
 export type SdatIssueParamKey = typeof SDAT_ISSUE_PARAM_ORDER[number]
 
 /** Renderable (key, value) pairs of an issue's structured params. Arrays
- * (e.g. `missing` positions) are shortened; anything unlisted stays in the
- * backend message detail only. */
+ * (e.g. `missing` positions) are shortened; original prose stays in the API. */
 export function sdatIssueParams(issue: SdatIssue): Array<{ key: SdatIssueParamKey; value: string }> {
     const params: Array<{ key: SdatIssueParamKey; value: string }> = []
     for (const key of SDAT_ISSUE_PARAM_ORDER) {

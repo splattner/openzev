@@ -6,7 +6,7 @@ import {
     faUpload,
     faXmark,
 } from '@fortawesome/free-solid-svg-icons'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
@@ -75,6 +75,7 @@ export interface ImportWizardModalProps {
     csvConfigValid: boolean
     uploadPending: boolean
     onClose: () => void
+    navigationBypassRef?: RefObject<boolean>
     onSourceChange: (source: ImportSource) => void
     onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void
     onRemoveFile: (index: number) => void
@@ -172,13 +173,13 @@ function FilePreviewBlock({ entry, heading }: { entry: FilePreview; heading: boo
 
                     {preview.errors.length > 0 && (
                         <div className="error-banner">
-                            <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                            <div>
                                 {preview.errors.slice(0, 8).map((error, index) => (
-                                    <li key={`${error.row ?? 'general'}-${index}`}>
+                                    <p className="m-0" key={`${error.row ?? 'general'}-${index}`}>
                                         {error.row ? <>{t('pages.imports.preview.rowPrefix', { row: error.row })} </> : ''}{error.error}
-                                    </li>
+                                    </p>
                                 ))}
-                            </ul>
+                            </div>
                         </div>
                     )}
 
@@ -248,8 +249,8 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
     )
 
     return (
-        <FormModal isOpen={true} title={t('pages.imports.wizard.title')} onClose={props.onClose} size="xl">
-            <div className="page-stack" style={{ gap: '0.75rem' }}>
+        <FormModal isOpen={true} title={t('pages.imports.wizard.title')} onClose={props.onClose} size="xl" navigationBypassRef={props.navigationBypassRef}>
+            <div className="page-stack plain-feedback" style={{ gap: '0.75rem' }}>
                 <div className="muted" style={{ fontSize: '0.9rem' }}>
                     {t('pages.imports.wizard.step', { step })}
                 </div>

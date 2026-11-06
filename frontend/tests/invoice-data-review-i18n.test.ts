@@ -3,6 +3,7 @@ import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import i18n from 'i18next'
 import { I18nextProvider, initReactI18next } from 'react-i18next'
+import { MemoryRouter } from 'react-router-dom'
 import { en } from '../src/i18n/locales/en'
 import { de } from '../src/i18n/locales/de'
 import { fr } from '../src/i18n/locales/fr'
@@ -13,6 +14,7 @@ import type { Invoice } from '../src/types/api'
 // plural resolution (_one/_other) is genuinely exercised.
 import { InvoiceDataReviewNotice } from '../src/features/invoices/InvoiceDataReviewNotice'
 
+vi.mock('../src/lib/auth', () => ({ useAuth: () => ({ user: { role: 'manager', memberships: [] } }) }))
 vi.mock('../src/lib/appSettings', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../src/lib/appSettings')>()
     return {
@@ -104,7 +106,8 @@ describe('InvoiceDataReviewNotice evidence plural resolution', () => {
         })
         act(() => {
             root.render(createElement(I18nextProvider, { i18n: instance },
-                createElement(InvoiceDataReviewNotice, { invoice: inv, variant: 'detail', canAct: true })))
+                createElement(MemoryRouter, null,
+                    createElement(InvoiceDataReviewNotice, { invoice: inv, canAct: true }))))
         })
         const text = container.textContent ?? ''
         // A missing `count` would render the raw key instead of a sentence.

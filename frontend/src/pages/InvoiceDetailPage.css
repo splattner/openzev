@@ -1,4 +1,4 @@
-/* Invoice detail: the document's header line (status pill, recipient,
+/* Invoice detail: the document's header line (status, recipient,
    period) and its figures above the embedded PDF. */
 
 .invoice-detail-meta {
@@ -22,3 +22,48 @@
   gap: 0.75rem 1rem;
 }
 
+.invoice-status-draft,
+.invoice-status-sent,
+.invoice-status-paid {
+  color: var(--warning-800);
+}
+
+.invoice-status-approved {
+  color: var(--success-700);
+}
+
+.invoice-data-review {
+  overflow-wrap: anywhere;
+}
+
+.invoice-data-review .issue-text {
+  font: inherit;
+}
+
+.invoice-review-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+}
+
+.invoice-data-review-evidence {
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.invoice-review-amount {
+  white-space: nowrap;
+}
+
+@media (max-width: 46rem) {
+  .invoice-review-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .invoice-review-actions > .button {
+    justify-self: end;
+    max-width: 100%;
+  }
+}

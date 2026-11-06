@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MantineProvider } from '@mantine/core'
 import type { Invoice } from '../src/types/api'
 import { InvoiceDetailPage } from '../src/pages/InvoiceDetailPage'
+import { ToastProvider } from '../src/lib/toast'
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en', changeLanguage: vi.fn() } }),
@@ -46,9 +47,9 @@ async function renderDetail(invoice: Invoice) {
         root.render(createElement(MemoryRouter, { initialEntries: ['/billing/invoices/1'] },
             createElement(QueryClientProvider, { client: new QueryClient() },
                 createElement(MantineProvider, null,
-                    createElement(Routes, null, createElement(Route, {
+                    createElement(ToastProvider, null, createElement(Routes, null, createElement(Route, {
                         path: '/billing/invoices/:invoiceId', element: createElement(InvoiceDetailPage),
-                    }))))))
+                    })))))))
     })
     for (let i = 0; i < 100 && !container.querySelector('.invoice-detail-meta'); i += 1) {
         await act(async () => { await new Promise((r) => setTimeout(r, 50)) })

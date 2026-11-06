@@ -79,9 +79,10 @@ export function invoiceRowProgress(row: InvoicePeriodParticipantRow, work: Invoi
     }
 
     const steps: Record<InvoiceProgressStep, Omit<InvoiceRowStep, 'step'>> = {
-        metering: issues.includes('metering') ? { state: 'issue', reason: 'metering' }
-            : !row.metering_data_complete && settledWithoutMeters(row, invoice) ? { state: 'done', reason: 'noMeters' }
-                : { state: 'done' },
+        metering: issues.includes('correction') ? { state: 'issue', reason: 'correction' }
+            : issues.includes('metering') ? { state: 'issue', reason: 'metering' }
+                : !row.metering_data_complete && settledWithoutMeters(row, invoice) ? { state: 'done', reason: 'noMeters' }
+                    : { state: 'done' },
         invoice: invoiceStep(),
         approved: { state: reached('approved') ? 'done' : 'open' },
         sent: issues.includes('delivery') ? { state: 'issue', reason: 'delivery' }

@@ -7,7 +7,6 @@ import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { InvoiceProgressLegend, InvoiceRowProgress } from './InvoiceRowProgress'
 import { invoiceStepReasonText } from './invoiceRowText'
 import { invoiceRowIssues, liveInvoice, type InvoiceRowWork } from './invoiceRowState'
-import { InvoiceDataReviewNotice } from './InvoiceDataReviewNotice'
 import type { InvoicePeriodParticipantRow } from '../../types/api'
 
 type InvoicePeriodRowsTableProps = {
@@ -19,9 +18,6 @@ type InvoicePeriodRowsTableProps = {
   getRowWork: (row: InvoicePeriodParticipantRow) => InvoiceRowWork
   /** Repeated parties across the unfiltered period; their rows show meter locations. */
   repeatedPartyIds: ReadonlySet<string>
-  /** Whether the viewer may run the resolution (regenerate/cancel); without
-   * it the data-review notice states facts instead of actions. */
-  canAct?: boolean
 }
 
 /** Period invoice rows; narrow containers render cards. */
@@ -32,7 +28,6 @@ export function InvoicePeriodRowsTable({
   getRowMenuItems,
   getRowWork,
   repeatedPartyIds,
-  canAct = false,
 }: InvoicePeriodRowsTableProps) {
   const { t } = useTranslation()
   const { settings } = useAppSettings()
@@ -56,7 +51,7 @@ export function InvoicePeriodRowsTable({
               const invoice = row.invoice
               const live = liveInvoice(row)
               const work = getRowWork(row)
-              const issues = invoiceRowIssues(row, work)
+              const issues = invoiceRowIssues(row, work).filter((issue) => issue !== 'correction')
               const missingMeters = row.missing_meter_details?.length
                 ? row.missing_meter_details.map((item) => ({
                     id: item.meter_id,
@@ -126,12 +121,9 @@ export function InvoicePeriodRowsTable({
                       </span>
                     )}
                     {missingMeters.length > 0 && (
-                      <ul className="metering-missing-list muted">
-                        {missingMeters.map((meter) => <li key={meter.id}>{meter.text}</li>)}
-                      </ul>
-                    )}
-                    {invoice?.needs_data_review && (
-                      <InvoiceDataReviewNotice invoice={invoice} variant="row" canAct={canAct} />
+                      <div className="metering-missing-list muted">
+                        {missingMeters.map((meter) => <p className="m-0" key={meter.id}>{meter.text}</p>)}
+                      </div>
                     )}
                   </td>
                   <td role="cell" className="invoice-row-progress">

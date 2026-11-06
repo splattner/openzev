@@ -1574,13 +1574,18 @@ export interface Invoice {
 
 export type CreditKind = 'reversal' | 'adjustment'
 
-/** The part of a credit note set against an invoice, seen from the invoice (#388). */
+/** Recalculated totals without a stored invoice or reserved number. */
+export type InvoiceCalculation = Required<Pick<Invoice,
+    'total_chf' | 'total_local_kwh' | 'total_grid_kwh' | 'total_feed_in_kwh'
+>>
+
 /** Another invoice, by id and number only. */
 export interface InvoiceRef {
     id: string
     invoice_number: string
 }
 
+/** The part of a credit note set against an invoice, seen from the invoice (#388). */
 export interface InvoiceCreditApplication {
     id: string
     credit: string
@@ -2081,6 +2086,8 @@ export interface SdatResultCounts {
 }
 
 export interface SdatIssue {
+    /** Optional diagnostic subtype; older logs retain the general issue code. */
+    detail_code?: string
     code: string
     severity: 'error' | 'info'
     message: string

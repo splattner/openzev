@@ -7,15 +7,17 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MantineProvider } from '@mantine/core'
 import { fetchInvoice } from '../src/lib/api/invoices'
 import { InvoiceDetailPage } from '../src/pages/InvoiceDetailPage'
+import { ToastProvider } from '../src/lib/toast'
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
-        t: (k: string) => k,
+        t: (k: string, values?: Record<string, unknown>) => values ? `${k} ${JSON.stringify(values)}` : k,
         i18n: { language: 'en', changeLanguage: vi.fn() },
     }),
 }))
 
 const mockAuth = vi.fn()
+vi.mock('../src/lib/managedZev', () => ({ useManagedZev: () => ({ setSelectedZevId: vi.fn() }), useOptionalManagedZev: () => null }))
 
 vi.mock('../src/lib/auth', () => ({
     useAuth: () => mockAuth(),
@@ -41,8 +43,9 @@ vi.mock('../src/lib/api/invoices', () => ({
             pdf_url: null,
         }),
     ),
-    fetchInvoicePdfBlob: vi.fn(),
+    fetchInvoicePdfBlob: vi.fn(async () => { throw new Error('PDF unavailable') }),
     generateInvoicePdf: vi.fn(),
+    previewInvoiceCalculation: vi.fn(async () => ({ total_chf: '10.00', total_local_kwh: '0.0000', total_grid_kwh: '0.0000', total_feed_in_kwh: '0.0000' })),
 }))
 
 /** A non-admin account managing, or taking part in, the invoice's community (#761). */
@@ -58,7 +61,7 @@ function mockRole(relation: 'manager' | 'participant', disabled = false) {
 async function renderDetail(initialEntries: unknown[] = ['/billing/invoices/1']) {
     const container = document.createElement('div')
     document.body.appendChild(container)
-    const client = new QueryClient()
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const root = createRoot(container)
     await act(async () => {
         root.render(
@@ -73,14 +76,14 @@ async function renderDetail(initialEntries: unknown[] = ['/billing/invoices/1'])
                         null,
                         createElement(Routes, null, createElement(Route, {
                             path: '/billing/invoices/:invoiceId',
-                            element: createElement(InvoiceDetailPage),
+                            element: createElement(ToastProvider, null, createElement(InvoiceDetailPage)),
                         })),
                     ),
                 ),
             ),
         )
     })
-    for (let i = 0; i < 100 && !container.querySelector('header a.button'); i += 1) {
+    for (let i = 0; i < 100 && !container.querySelector('header a.button, [role="alert"]'); i += 1) {
         await act(async () => {
             await new Promise((r) => setTimeout(r, 50))
         })
@@ -97,6 +100,63 @@ describe('InvoiceDetailPage return link', () => {
         expect(container.textContent).toContain(disabled
             ? 'pages.invoices.dataReview.issuedNotice'
             : 'pages.invoices.dataReview.issuedAction')
+        container.remove()
+    })
+
+    it.each([
+        ['draft', 'pages.invoices.approve'], ['approved', 'pages.invoices.sendEmail'], ['sent', 'pages.invoices.markPaid'],
+    ])('offers one next action for %s and none in a disabled invoice community', async (status, label) => {
+        for (const disabled of [false, true]) {
+            mockRole('manager', disabled)
+            const inv = await fetchInvoice('1')
+            vi.mocked(fetchInvoice).mockResolvedValueOnce({ ...inv, status, payments: [], needs_data_review: false })
+            const container = await renderDetail()
+            const primary = container.querySelectorAll('button.button-primary')
+            expect(primary).toHaveLength(disabled ? 0 : 1)
+            if (!disabled) expect(primary[0].textContent).toContain(label)
+            expect(container.querySelector('.pdf-missing .button-primary')).toBeNull()
+            container.remove()
+        }
+    })
+
+    it('keeps correction resolution primary and payment secondary on a flagged sent invoice', async () => {
+        mockRole('manager')
+        const inv = await fetchInvoice('1')
+        vi.mocked(fetchInvoice).mockResolvedValueOnce({ ...inv, status: 'sent', payments: [], paid_chf: '0.00', needs_data_review: true })
+        const container = await renderDetail()
+        expect(container.querySelectorAll('button.button-primary')).toHaveLength(1)
+        expect(container.querySelector('button.button-primary')?.textContent).toContain('pages.invoices.dataReview.replace')
+        const payment = [...container.querySelectorAll('button')].find(button => button.textContent?.includes('pages.invoices.markPaid'))
+        expect(payment?.className).toBe('button button-secondary')
+        container.remove()
+    })
+
+    it.each([
+        ['draft', true, '/stored.pdf', 'pdfPendingChanges'],
+        ['approved', true, '/stored.pdf', 'pdfIssuedOriginal'],
+        ['sent', true, '/stored.pdf', 'pdfIssuedOriginal'],
+        ['draft', false, '/stored.pdf', null],
+        ['draft', true, null, null],
+    ] as const)('labels the stored PDF for %s (review=%s, PDF=%s)', async (status, needsReview, pdfUrl, label) => {
+        mockRole('manager')
+        const inv = await fetchInvoice('1')
+        vi.mocked(fetchInvoice).mockResolvedValueOnce({ ...inv, status, needs_data_review: needsReview, pdf_url: pdfUrl })
+        const container = await renderDetail()
+        const pdf = container.querySelector('section[aria-label="pdf.previewTitle"]')!
+        expect(pdf).toBeTruthy()
+        expect(pdf.textContent).not.toContain(label === 'pdfPendingChanges' ? 'pdfIssuedOriginal' : 'pdfPendingChanges')
+        if (label) expect(pdf.textContent).toContain(`pages.invoices.dataReview.${label}`)
+        else expect(pdf.textContent).not.toContain('pdfIssuedOriginal')
+        container.remove()
+    })
+
+    it('gives an unavailable invoice a working return link without a pointless retry', async () => {
+        mockRole('participant')
+        vi.mocked(fetchInvoice).mockRejectedValueOnce({ response: { status: 404 } })
+        const container = await renderDetail()
+        expect(container.textContent).toContain('pages.invoices.dataReview.unavailable')
+        expect(container.querySelector('button')).toBeNull()
+        expect(container.querySelector('a.button')?.getAttribute('href')).toBe('/')
         container.remove()
     })
 
@@ -162,6 +222,35 @@ describe('InvoiceDetailPage return link', () => {
         }])
         const link = container.querySelector('header a.button') as HTMLAnchorElement
         expect(link.getAttribute('href')).toBe('/billing/invoices?period_start=2026-02-01&period_end=2026-02-28')
+        container.remove()
+    })
+
+    it.each([['9.00', 'recalculatedChanged'], ['10.00', 'recalculatedUnchanged']])('shows the recalculation result for a previous total of %s', async (before, message) => {
+        mockRole('manager')
+        vi.mocked(fetchInvoice).mockResolvedValueOnce({
+            id: '1', invoice_number: 'NEW', zev: 'z1', zev_name: 'Muster ZEV', participant: 'p1', participant_name: 'Anna',
+            period_start: '2026-01-01', period_end: '2026-01-31', status: 'draft', total_chf: '10.00',
+            total_grid_kwh: '4.0001', total_local_kwh: '1.0000', pdf_url: null,
+        })
+        const container = await renderDetail([{ pathname: '/billing/invoices/1', state: {
+            recalculation: { invoiceId: '1', before: { invoice_number: 'OLD', total_chf: before, total_grid_kwh: '4.0000', total_local_kwh: '1.0000' } },
+        } }])
+        const result = container.querySelector('.page-stack > div[role="status"]')!
+        expect(container.querySelector('.success-banner')).toBeNull()
+        expect(result.textContent).toContain(`pages.invoices.dataReview.${message}`)
+        expect(result.textContent).toContain('CHF 10.00')
+        expect(result.textContent).toContain('OLD')
+        expect(result.textContent).toContain('4.0001')
+        expect(result.textContent).not.toContain('pages.invoiceDetail.local')
+        container.remove()
+    })
+
+    it('does not show an old recalculation result on another invoice', async () => {
+        mockRole('manager')
+        const container = await renderDetail([{ pathname: '/billing/invoices/1', state: {
+            recalculation: { invoiceId: 'another-invoice', before: { invoice_number: 'OLD', total_chf: '9.00' } },
+        } }])
+        expect(container.textContent).not.toContain('pages.invoices.dataReview.recalculated')
         container.remove()
     })
 

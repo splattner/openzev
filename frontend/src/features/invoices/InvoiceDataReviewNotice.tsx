@@ -1,6 +1,10 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
+import { IssueText } from '../../components/IssueText'
 import { formatShortDate, useAppSettings } from '../../lib/appSettings'
+import { useAuth } from '../../lib/auth'
+import { relationToZev, useCommunityAccess } from '../../lib/communityAccess'
 import type { Invoice, InvoiceReadingImpact } from '../../types/api'
 
 function impactSummary(impact: InvoiceReadingImpact): { key: string; params: Record<string, unknown> } {
@@ -43,17 +47,22 @@ function reviewMessageKey(status: Invoice['status'], canAct: boolean): string {
 /** Explain reading corrections without changing invoice workflow permissions. */
 export function InvoiceDataReviewNotice({
     invoice,
-    variant,
-    canAct,
+    canAct = false,
+    action,
 }: {
-    invoice: Pick<Invoice, 'status' | 'needs_data_review' | 'open_data_impact_count' | 'data_impacts'>
-    variant: 'row' | 'detail'
-    canAct: boolean
+    invoice: Pick<Invoice, 'zev' | 'status' | 'needs_data_review' | 'open_data_impact_count' | 'data_impacts'>
+    canAct?: boolean
+    action?: ReactNode
 }) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
+    const { user } = useAuth()
+    const { isZevScope } = useCommunityAccess()
     const [showAll, setShowAll] = useState(false)
     if (!invoice.needs_data_review) return null
+
+    const relation = relationToZev(user, invoice.zev)
+    const canOpenImports = isZevScope && (relation === 'admin' || relation === 'manager' || relation === 'viewer')
 
     const count = invoice.open_data_impact_count ?? invoice.data_impacts?.length ?? 0
     const impacts = invoice.data_impacts ?? []
@@ -61,16 +70,15 @@ export function InvoiceDataReviewNotice({
     const messageKey = `pages.invoices.dataReview.${reviewMessageKey(invoice.status, canAct)}`
 
     return (
-        <div className="warning-banner" style={{ margin: 0, overflowWrap: 'anywhere' }}>
-            <div className="actions-row actions-row-wrap">
-                <span>{t(messageKey, { count })}</span>
-            </div>
-            {variant === 'detail' && (invoice.data_impacts ?? []).length > 0 && (
-                <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.1rem' }}>
+        <div className="invoice-data-review">
+            <p className="m-0"><IssueText>{t(messageKey, { count })}</IssueText></p>
+            {action && <div className="mt-05">{action}</div>}
+            {impacts.length > 0 && (
+                <div className="invoice-data-review-evidence page-stack mt-05">
                     {visibleImpacts.map((impact) => {
                         const summary = impactSummary(impact)
                         return (
-                            <li key={impact.id}>
+                            <p className="m-0" key={impact.id}>
                                 {t(summary.key, {
                                     ...summary.params,
                                     from: formatShortDate(impact.evidence.day_from, settings),
@@ -78,12 +86,30 @@ export function InvoiceDataReviewNotice({
                                 })}
                                 {' · '}
                                 {t('pages.invoices.dataReview.flaggedAt', { date: formatShortDate(impact.created_at, settings) })}
-                            </li>
+                                {canOpenImports && impact.import_log && (
+                                    <>
+                                        {' · '}
+                                        <Link
+                                            className="table-inline-link"
+                                            to={`/metering/imports?${new URLSearchParams({
+                                                import: impact.import_log,
+                                                ...(impact.evidence.day_from && impact.evidence.day_to ? {
+                                                    change_from: impact.evidence.day_from,
+                                                    change_to: impact.evidence.day_to,
+                                                } : {}),
+                                            })}#correction-history`}
+                                        >
+                                            {t('pages.invoices.dataReview.openImport')}
+                                            <span aria-hidden="true">→</span>
+                                        </Link>
+                                    </>
+                                )}
+                            </p>
                         )
                     })}
-                </ul>
+                </div>
             )}
-            {variant === 'detail' && impacts.length > 20 && (
+            {impacts.length > 20 && (
                 <button type="button" className="button button-secondary button-compact" onClick={() => setShowAll(!showAll)}>
                     {t(showAll ? 'pages.invoices.dataReview.showLess' : 'pages.invoices.dataReview.showAll', { count: impacts.length })}
                 </button>
