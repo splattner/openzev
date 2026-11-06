@@ -1003,17 +1003,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#participant-view-my-invoices" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Participant View: My Invoices
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#participant-view-my-documents" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1036,10 +1025,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#billing-hub-invoices--emails--delivered-documents" class="md-nav__link">
+  <a href="#billing-hub-invoices--emails" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Billing Hub (Invoices · Emails · Delivered documents)
+        Billing Hub (Invoices · Emails)
       
     </span>
   </a>
@@ -1907,17 +1896,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#participant-view-my-invoices" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Participant View: My Invoices
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#participant-view-my-documents" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1940,10 +1918,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#billing-hub-invoices--emails--delivered-documents" class="md-nav__link">
+  <a href="#billing-hub-invoices--emails" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Billing Hub (Invoices · Emails · Delivered documents)
+        Billing Hub (Invoices · Emails)
       
     </span>
   </a>
@@ -2395,31 +2373,25 @@ in a period, the period card gains a <strong>Charges</strong> step between gener
 approving. It asks you to regenerate draft invoices that were created before a
 charge was added or changed, and warns about a charge nobody can be billed for
 (no member on its date). It stays out of the list for periods without charges.</p>
-<h2 id="participant-view-my-invoices">Participant View: My Invoices<a class="headerlink" href="#participant-view-my-invoices" title="Permanent link">&para;</a></h2>
-<p>Participants open <strong>My invoices</strong> (<code>/me/invoices</code>) in the sidebar to see the
-invoices issued to them — invoice number, period, total, whether payment is
-<strong>due</strong>, <strong>overdue</strong> or <strong>paid</strong>, and a link to the details. An invoice appears here once it has been sent: drafts and
-approved invoices that haven't gone out yet stay with the operator, and the
-participant's annual statement counts only sent invoices too. A sent invoice
-that is cancelled later stays listed, marked as cancelled. The PDF button
-appears only on rows that have a document. This sent-only list also applies
-when you manage another community where you are a participant.
-Click the invoice number or <strong>View details</strong> to open the invoice. <strong>Open PDF</strong>
-has a text label; invoices without a document show whether the PDF is being
-prepared, failed, or missing. A failed refresh keeps the last loaded invoices
-visible with a warning and <strong>Retry</strong>.
-Participants with several communities see which community issued each invoice.
-The list is read-only; the deep link <code>/billing/invoices/{id}</code> shows a
-participant only their own invoice (enforced by the backend), and its return
-link leads back to <strong>My invoices</strong>.</p>
-<p><img alt="Participant My Invoices" src="../screenshots/08c-my-invoices.png" /></p>
 <h2 id="participant-view-my-documents">Participant View: My Documents<a class="headerlink" href="#participant-view-my-documents" title="Permanent link">&para;</a></h2>
-<p><strong>My documents</strong> (<code>/me/documents</code>) is the participant's mailbox: everything the
-community has delivered to them, grouped by year and newest first — sent
-invoices, annual statements, financial summaries, tariff overviews, the
-participation contract, and notices from the operator. Each row shows the type,
-the delivery date and a <strong>Download</strong> button; use the type filter to narrow the
-list, and the community filter when you take part in more than one.</p>
+<p><strong>My documents</strong> (<code>/me/documents</code>) is where a participant finds everything the
+community has delivered to them, invoices included, newest first, in the same
+table as the other lists: sent invoices, credit notes, annual statements,
+financial summaries, tariff overviews, the participation contract, and notices
+from the operator. Each row shows the type, the year, the delivery date and a
+<strong>Download</strong> button; use the type filter to narrow the list (<strong>Invoice</strong> gives
+the invoices alone), the year filter when documents span several years, and the
+community filter when you take part in more than one. On a phone each document
+is a small card.</p>
+<p>An <strong>invoice</strong> row shows its total and, where a credit note was set against it,
+the amount due beneath it, and whether payment is <strong>due</strong>, <strong>overdue</strong> or
+<strong>paid</strong>. A <strong>credit note</strong> row shows its amount, what is left of it, and where it
+was set against an invoice. These figures are read from the invoice or credit
+note, so they stay current; the PDF is the copy that was sent and does not
+change. An invoice appears once it has been sent (drafts and approved invoices
+that haven't gone out yet stay with the operator), a credit note once its PDF
+exists. There is no separate page for one invoice: the PDF carries the details,
+and an old link to an invoice or to <strong>My invoices</strong> takes a participant here.</p>
 <p><img alt="Participant My documents" src="../screenshots/08l-my-documents.png" /></p>
 <ul>
 <li>A document is a <strong>copy of what was delivered</strong>. Opening an invoice here shows
@@ -2432,7 +2404,6 @@ list, and the community filter when you take part in more than one.</p>
   stays listed, marked <strong>Superseded</strong>. A sent invoice that was cancelled stays
   listed, marked <strong>Cancelled</strong>. A notice the operator <strong>withdrew</strong> disappears from
   your list.</li>
-<li>Invoices are still also listed under <strong>My invoices</strong>, with their payment state.</li>
 </ul>
 <h2 id="invoice-lifecycle">Invoice Lifecycle<a class="headerlink" href="#invoice-lifecycle" title="Permanent link">&para;</a></h2>
 <p>Invoices progress through a controlled workflow:</p>
@@ -2464,7 +2435,7 @@ Use <strong>Generate PDF</strong> to view the approved document. Emailing genera
 missing PDF automatically. <strong>Mark sent</strong> records manual delivery without
 generating a PDF; you can generate it afterwards. Later address or bank-detail
 changes do not change the approved document.</p>
-<h2 id="billing-hub-invoices--emails--delivered-documents">Billing Hub (Invoices · Emails · Delivered documents)<a class="headerlink" href="#billing-hub-invoices--emails--delivered-documents" title="Permanent link">&para;</a></h2>
+<h2 id="billing-hub-invoices--emails">Billing Hub (Invoices · Emails)<a class="headerlink" href="#billing-hub-invoices--emails" title="Permanent link">&para;</a></h2>
 <p>The sidebar entry <strong>Billing</strong> (<code>/billing/invoices</code>) opens the invoice-first
 billing hub. Its tabs are routes — each is directly linkable:</p>
 <ul>
@@ -2473,10 +2444,9 @@ billing hub. Its tabs are routes — each is directly linkable:</p>
   invoices: the latest email status per invoice, a filter by status, a
   failed-email banner, <strong>View history</strong> for the actual attempt log, and an
   inline <strong>Retry</strong> per failed latest attempt.</li>
-<li><strong>Delivered documents</strong> (<code>/billing/documents</code>) — what the community has
-  delivered to its participants, and when (see
-  <a href="#delivered-documents">Delivered documents</a>).</li>
 </ul>
+<p>What the community has delivered to its participants has its own sidebar entry,
+<strong>Documents</strong> (see <a href="#delivered-documents">Delivered documents</a>).</p>
 <p>The yearly whole-ZEV annual-statement ZIP is on <strong>Reports</strong> (see
 <a href="#reports-annual-report-statements-and-tax-overviews">Reports: Annual Report, Statements and Tax Overviews</a>).
 The former <code>/billing/statements</code> address redirects there.</p>
@@ -2499,7 +2469,7 @@ Invoice rows themselves show only the latest delivery state (the <strong>Sent</s
 of their progress); detailed attempts and errors are kept in the Emails tab's
 history panel.</p>
 <h2 id="delivered-documents">Delivered documents<a class="headerlink" href="#delivered-documents" title="Permanent link">&para;</a></h2>
-<p>The <strong>Delivered documents</strong> tab answers "did Anna get her statement?". It lists
+<p>The <strong>Documents</strong> page (<code>/documents</code>, in the sidebar right after <strong>Billing</strong>) answers "did Anna get her statement?". It lists
 every document delivered to the selected community's participants — with the
 participant, the type, the delivery date, who delivered it, and a <strong>No account
 yet</strong> badge for a participant who has no linked account (they will see the
@@ -2520,6 +2490,14 @@ document once an account is linked). Filter by participant, type and year;
   list; the earlier one stays visible to them as superseded. Statements and
   summaries are rendered when you issue them, so issue them once the year's
   invoices are final.</li>
+</ul>
+<p>Participants with an account always get a notification in the app. Both dialogs
+also offer <strong>Also notify participants by email</strong>, off by default: it sends a short
+email with a link to <strong>My documents</strong> and no attachment, and the result says how
+many emails were queued and how many participants were skipped because they have
+no email address. The text of that email is edited by admins under <strong>Platform →
+Templates → Email templates</strong>.</p>
+<ul>
 <li><strong>Withdraw</strong> — takes an uploaded notice back from participants (for example sent
   to the wrong person). The record and the file are kept and the row stays here,
   marked as withdrawn. Invoices, statements and the other issued documents are
@@ -2924,8 +2902,10 @@ and click <strong>Correct invoice</strong> in the <strong>Credit notes</strong> 
 <p>Enter a <strong>reason</strong>; it is printed on the credit note. Credit notes have their
 own numbers (prefix <strong>CN</strong> by default, changeable in the community settings
 under <em>Billing &amp; payment</em>) and a PDF you can open from the card, based on the
-<strong>Credit Note PDF Template</strong> that admins can edit under <em>Templates</em>. Participants see their
-credit notes on the invoice and under <strong>My invoices</strong>.</p>
+<strong>Credit Note PDF Template</strong> that admins can edit under <em>Templates</em>. Participants find their
+credit notes in <strong>My documents</strong> (type <em>Credit note</em>) as soon as the PDF exists,
+and are notified. That copy is fixed: rendering the credit note's PDF again later
+does not change what they were given.</p>
 <p><img alt="Credit note on a reversed invoice" src="../screenshots/08g-invoice-credit-note.png" /></p>
 <p>Once a credit note exists, the invoice's payments can no longer be removed and
 the invoice can no longer be deleted. Invoices with nothing to collect (a
@@ -3054,16 +3034,22 @@ same <strong>—</strong> and note appear on that participant's annual statement
   <code>omitted.txt</code> listing statements that could not be generated.</li>
 </ul>
 <p><img alt="Reports page" src="../screenshots/23-reports.png" /></p>
-<p><strong>Participants:</strong> Open <strong>Annual statement</strong> (<code>/me/statement</code>) to read your own
-statement or select the <strong>Tax Overview</strong> tab. Use <strong>Download PDF</strong> to save the
-document. <strong>Open in new tab</strong> shows the same PDF. Select <strong>Retry</strong> if generation
-fails, or reload the page for fresh documents. The tax overview shows producers'
-net local-energy revenue and feed-in compensation. The annual statement and the
-tax overview count the same invoices as the annual report: those that have
-been approved and not cancelled, whether or not they are paid yet.</p>
+<p><strong>Participants:</strong> Open <strong>Annual statement</strong> (<code>/me/statement</code>) to read the annual
+statement your community <strong>issued</strong> to you, or select the <strong>Tax Overview</strong> tab for
+the financial summary. The page shows the date it was issued; use <strong>Download PDF</strong>
+to save the document. <strong>Open in new tab</strong> shows the same PDF. The year list offers the years for which you have a document, and <strong>Tax Overview</strong>
+only appears if you have one (it is for producers). If your community has not
+issued anything yet, the page says so; it appears here and under <strong>My documents</strong>
+as soon as it does. Select <strong>Retry</strong> if loading fails.
+Issuing a statement again replaces the earlier one on this page (the earlier one
+stays under <strong>My documents</strong>, marked <strong>Superseded</strong>). The tax overview shows
+producers' net local-energy revenue and feed-in compensation. The statement and the
+tax overview count the same invoices as the annual report: those that have been
+approved and not cancelled, whether or not they are paid yet.</p>
 <p><img alt="Participant annual documents with embedded statement" src="../screenshots/23b-participant-annual-statement.png" /></p>
-<p>These documents use your consumption, invoices, and savings. They become
-available after billing. The selected community appears above the page title.</p>
+<p>These documents use your consumption, invoices, and savings. They are issued by
+your community's operator, usually after the year's billing. The selected community
+appears above the page title.</p>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <h3 id="no-participants-appear-in-the-period-overview">No participants appear in the period overview<a class="headerlink" href="#no-participants-appear-in-the-period-overview" title="Permanent link">&para;</a></h3>
 <p><strong>Causes:</strong></p>

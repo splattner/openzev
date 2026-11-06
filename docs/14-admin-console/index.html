@@ -1369,6 +1369,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#document-delivered-email-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Document Delivered Email Variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#verification-email-variables" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2241,6 +2252,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#document-delivered-email-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Document Delivered Email Variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#verification-email-variables" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2873,7 +2895,7 @@ reset the template to the default:</p>
 <p><strong>Note:</strong> Managers can also customize email templates for their own ZEV in <strong>ZEV Settings → Documents &amp; emails</strong>. See <a href="../02-zev-setup/#email-templates">ZEV Setup</a> for per-ZEV customization, and <a href="../10-email-configuration/">Email Configuration</a> for SMTP setup and delivery tracking.</p>
 </blockquote>
 <h3 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h3>
-<p>OpenZEV uses six email templates:</p>
+<p>OpenZEV uses seven email templates:</p>
 <table>
 <thead>
 <tr>
@@ -2906,9 +2928,13 @@ reset the template to the default:</p>
 <td><strong>ZEV Access Notice Email</strong></td>
 <td>Sent when an existing account is given access to a community</td>
 </tr>
+<tr>
+<td><strong>Document Delivered Email</strong></td>
+<td>Sent when a manager ticks <strong>Also notify participants by email</strong> while delivering a document (see <a href="../09-invoice-management/#delivered-documents">Delivered documents</a>); a link to <strong>My documents</strong>, without the file</td>
+</tr>
 </tbody>
 </table>
-<p>The sign-in link and the two access emails are sent in each community's invoice
+<p>The sign-in link, the two access emails and the document email are sent in each community's invoice
 language until you save your own text, which then replaces all four languages.</p>
 <p>The <strong>Sign-in Link Email</strong> is the one template whose recipient never sees a copy
 of anything else you send — it exists only to carry <code>{link_url}</code>. If your edit
@@ -2918,7 +2944,7 @@ instead, so the link always works even when the wording is not yours.</p>
 <h3 id="accessing-email-templates">Accessing Email Templates<a class="headerlink" href="#accessing-email-templates" title="Permanent link">&para;</a></h3>
 <ol>
 <li>Navigate to <strong>Platform → Templates → Email templates</strong></li>
-<li>The page displays six tabs — one per template type</li>
+<li>The page displays seven tabs — one per template type</li>
 </ol>
 <p><img alt="Admin Email Templates" src="../screenshots/14b-admin-email-templates.png" /></p>
 <h3 id="editing-a-template">Editing a Template<a class="headerlink" href="#editing-a-template" title="Permanent link">&para;</a></h3>
@@ -2961,6 +2987,33 @@ instead, so the link always works even when the wording is not yours.</p>
 <tr>
 <td><code>{expiry_date}</code></td>
 <td>Formatted onboarding-link expiry date</td>
+</tr>
+</tbody>
+</table>
+<h4 id="document-delivered-email-variables">Document Delivered Email Variables<a class="headerlink" href="#document-delivered-email-variables" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{participant_name}</code></td>
+<td>Full name of the participant</td>
+</tr>
+<tr>
+<td><code>{zev_name}</code></td>
+<td>Name of the ZEV</td>
+</tr>
+<tr>
+<td><code>{title}</code></td>
+<td>Title of the delivered document</td>
+</tr>
+<tr>
+<td><code>{inbox_url}</code></td>
+<td>Link to the participant's <strong>My documents</strong> page</td>
 </tr>
 </tbody>
 </table>
