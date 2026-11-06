@@ -21,6 +21,7 @@ class DocumentKind(models.TextChoices):
     ANNUAL_STATEMENT = "annual_statement", "Annual statement"
     FINANCIAL_SUMMARY = "financial_summary", "Financial summary"
     TARIFF_OVERVIEW = "tariff_overview", "Tariff overview"
+    CREDIT_NOTE = "credit_note", "Credit note"
     OPERATOR = "operator", "Operator document"
 
 
@@ -104,6 +105,13 @@ class DeliveredDocument(models.Model):
             ),
             models.UniqueConstraint(
                 fields=["invoice"], condition=Q(invoice__isnull=False), name="inbox_one_per_invoice"
+            ),
+            # A credit note is keyed by its number, which is unique per ZEV: there is
+            # no foreign key to the credit, so the row survives it like any other fact.
+            models.UniqueConstraint(
+                fields=["zev", "document_number"],
+                condition=Q(kind=DocumentKind.CREDIT_NOTE),
+                name="inbox_one_per_credit_note",
             ),
             models.UniqueConstraint(
                 fields=["contract_issue", "participant"],

@@ -93,8 +93,8 @@ link leads back to **My invoices**.
 
 **My documents** (`/me/documents`) is the participant's mailbox: everything the
 community has delivered to them, grouped by year and newest first — sent
-invoices, annual statements, financial summaries, tariff overviews, the
-participation contract, and notices from the operator. Each row shows the type,
+invoices, credit notes, annual statements, financial summaries, tariff
+overviews, the participation contract, and notices from the operator. Each row shows the type,
 the delivery date and a **Download** button; use the type filter to narrow the
 list, and the community filter when you take part in more than one.
 
@@ -610,7 +610,10 @@ Enter a **reason**; it is printed on the credit note. Credit notes have their
 own numbers (prefix **CN** by default, changeable in the community settings
 under *Billing & payment*) and a PDF you can open from the card, based on the
 **Credit Note PDF Template** that admins can edit under *Templates*. Participants see their
-credit notes on the invoice and under **My invoices**.
+credit notes on the invoice and under **My invoices**; each one also appears in
+**My documents** (type *Credit note*) as soon as its PDF exists, and the
+participant is notified. That copy is fixed: rendering the credit note's PDF again later
+does not change what they were given.
 
 ![Credit note on a reversed invoice](screenshots/08g-invoice-credit-note.png)
 

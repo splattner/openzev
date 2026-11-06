@@ -9,6 +9,7 @@ from audit.models import AuditActionCategory, AuditEventSource, AuditEventStatus
 from audit.services import record_audit_event
 from notifications import producers as notification_producers
 
+from inbox import producers as inbox_producers
 from inbox.links import inbox_url
 
 from .email_context import build_invoice_email_context
@@ -377,9 +378,10 @@ def generate_credit_pdf_task(self, credit_id: str):
         return
 
     try:
-        save_credit_pdf(credit)
+        body = save_credit_pdf(credit)
     except Credit.DoesNotExist:
         logger.info("Credit %s was deleted before its PDF finished", credit_id)
+        return
     except SoftTimeLimitExceeded:
         raise
     except Exception as exc:
@@ -396,6 +398,12 @@ def generate_credit_pdf_task(self, credit_id: str):
             status=AuditEventStatus.FAILED,
             source=AuditEventSource.CELERY,
         )
+    else:
+        # The participant's copy is made once, when the document first exists; a later
+        # re-render by a manager finds the row and leaves it alone. Never raises.
+        delivered = inbox_producers.deliver_credit_note(credit, body=body)
+        if delivered is not None and delivered[1]:
+            notification_producers.notify_documents_delivered([delivered[0]])
 
 
 @shared_task(bind=True, max_retries=1)

@@ -792,6 +792,7 @@ export const de = {
         },
         kind: {
             invoice: 'Rechnung',
+            credit_note: 'Gutschrift',
             contract: 'Teilnahmevertrag',
             annual_statement: 'Jahresabrechnung',
             financial_summary: 'Steuerübersicht',

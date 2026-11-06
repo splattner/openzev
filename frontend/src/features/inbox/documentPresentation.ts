@@ -3,6 +3,7 @@ import {
   faFileInvoice,
   faFileLines,
   faFileSignature,
+  faReceipt,
   faTags,
   faChartPie,
   type IconDefinition,
@@ -11,6 +12,7 @@ import type { DeliveredDocument, DocumentKind } from '../../types/api'
 
 export const DOCUMENT_KINDS: readonly DocumentKind[] = [
   'invoice',
+  'credit_note',
   'annual_statement',
   'financial_summary',
   'tariff_overview',
@@ -21,6 +23,7 @@ export const DOCUMENT_KINDS: readonly DocumentKind[] = [
 export const KIND_ICON: Record<DocumentKind, IconDefinition> = {
   invoice: faFileInvoice,
   contract: faFileContract,
+  credit_note: faReceipt,
   annual_statement: faFileSignature,
   financial_summary: faChartPie,
   tariff_overview: faTags,

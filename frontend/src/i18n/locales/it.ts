@@ -792,6 +792,7 @@ export const it = {
         },
         kind: {
             invoice: 'Fattura',
+            credit_note: 'Nota di credito',
             contract: 'Contratto di partecipazione',
             annual_statement: 'Conteggio annuale',
             financial_summary: 'Panoramica fiscale',

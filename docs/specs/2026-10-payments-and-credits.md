@@ -431,6 +431,9 @@ Denied attempts are recorded with `AuditEventStatus.DENIED`, the same way
   `PdfTemplate`s. The content: issuer, recipient, credit number and date, "Credit note for invoice
   INV-… dated …", the reason, the amount with the VAT breakdown for the source's VAT mode, and a
   note that the amount is set against the next invoice or refunded. There is no QR bill.
+  After a successful render `generate_credit_pdf_task` hands the bytes to the participant inbox once, under the
+  credit number (`inbox.producers.deliver_credit_note`, SPEC-2026-11-participant-document-inbox §6.2); a later
+  re-render does not change the delivered copy.
 - **Transfer archive:** payments, credits and `credit_applications` travel nested under their invoice
   (an application names its credit by `credit_number` and is imported once every credit exists), plus
   `Zev.credit_note_prefix` and `credit_note_counter`. The credit PDF bytes go into the same optional

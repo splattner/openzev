@@ -23,9 +23,10 @@
 | 4 | Frontend: participant *My documents* page, manager *Delivered documents* tab, upload and issue dialogs, deliver-contract action; `deliver-contract` also by participant; demo seed | stacked on #1209 |
 | 5 | Links and the bell: the public invoice PDF serves the delivered snapshot, `{inbox_url}` in the invoice email, `invoice.sent` carries `document_id`, new `document.delivered` notification | stacked on #1210 |
 | 5b | Email for documents: opt-in `notify` on upload, issue and deliver-contract (checkbox on upload and issue), `document_delivered` template | stacked on #1213 |
-| 6 | Cut-over (follow-up release): participants lose the live invoice and report endpoints | — |
+| 6a | Credit notes: kind `credit_note`, delivered when the credit note's PDF first exists, backfill, bell | stacked on #1214 |
+| 6b | Cut-over (follow-up release): participants lose the live invoice, credit note and report endpoints | — |
 
-Each increment is its own PR and can ship alone. Phases 1–5 add; only phase 6 removes anything.
+Each increment is its own PR and can ship alone. Phases 1–6a add; only phase 6b removes anything.
 
 ---
 
@@ -114,10 +115,10 @@ New Django app `inbox` (`backend/inbox/`, registered in `INSTALLED_APPS`). One m
 | `id` | `UUIDField` | `uuid4` | PK |
 | `zev` | `FK(zev.Zev, CASCADE)` | — | `related_name="delivered_documents"`. Denormalised copy of `participant.zev`, set in `save()` as `ContractIssue.save` does. `CASCADE`, unlike `ContractIssue.zev`: once the ZEV is purged nobody is left who could reach the document, and the purge erases what is under a ZEV (§4.2) |
 | `participant` | `FK(zev.Participant, SET_NULL)` | — | `null=True`, `related_name="delivered_documents"`. `SET_NULL`, never `CASCADE`: deleting a participant must not delete what was delivered (#793) |
-| `kind` | `CharField(32)` | — | `DocumentKind` choices: `invoice`, `contract`, `annual_statement`, `financial_summary`, `tariff_overview`, `operator` |
+| `kind` | `CharField(32)` | — | `DocumentKind` choices: `invoice`, `contract`, `annual_statement`, `financial_summary`, `tariff_overview`, `credit_note`, `operator` |
 | `title` | `CharField(200)` | — | Shown in the list. Invoice: invoice number; contract: document number; statement: localised title with the year; operator: the manager's title |
 | `document_number` | `CharField(64)` | `""` | Invoice or contract number; blank otherwise |
-| `period_start` / `period_end` | `DateField` | — | `null=True`. Invoice period, statement year (1 Jan – 31 Dec); blank for contract and operator documents |
+| `period_start` / `period_end` | `DateField` | — | `null=True`. Invoice period (a credit note: its source invoice's), statement year (1 Jan – 31 Dec); blank for contract and operator documents |
 | `file` | `FileField(upload_to=inbox_upload_to, max_length=255)` | `""` | `blank=True`, not null (Django stores an empty `FileField` as `""`). Stored copy; empty only for a contract held by reference, whose bytes stay in `ContractIssue.pdf` |
 | `file_name` | `CharField(255)` | `""` | Download name, sanitised with `config.http.sanitize_filename` |
 | `content_type` | `CharField(100)` | `"application/pdf"` | |
@@ -139,6 +140,7 @@ New Django app `inbox` (`backend/inbox/`, registered in `INSTALLED_APPS`). One m
 
 - `inbox_document_has_one_body`: `CheckConstraint` — either `kind="contract"` with `contract_issue` not null and `file=""`, or `contract_issue` null and a non-empty `file`. The second branch also holds a contract that arrived through a transfer archive (migration `0002`).
 - `inbox_one_per_invoice`: `UniqueConstraint(fields=["invoice"], condition=Q(invoice__isnull=False))`. Delivery is idempotent: a resent email does not add a row.
+- `inbox_one_per_credit_note`: `UniqueConstraint(fields=["zev", "document_number"], condition=Q(kind=credit_note))` (migration `0003`). A credit note is keyed by its number, which is unique per ZEV, and carries no foreign key to `Credit`: a document is a fact and survives the row it came from. Delivery is idempotent on it, so re-rendering the credit note's PDF never replaces the delivered copy.
 - `inbox_one_per_contract_issue`: `UniqueConstraint(fields=["contract_issue", "participant"], condition=Q(contract_issue__isnull=False))`.
 - `inbox_one_current_report`: `UniqueConstraint(fields=["participant", "kind", "period_start", "period_end"], condition=Q(kind__in=[annual_statement, financial_summary], superseded_at__isnull=True))`. Re-issuing a year supersedes the earlier one instead of duplicating it.
 - `inbox_one_current_tariff_overview`: `UniqueConstraint(fields=["participant", "kind"], condition=Q(kind=tariff_overview, superseded_at__isnull=True))`. The overview has no period, and NULL periods compare as distinct, so it needs its own key.
@@ -231,6 +233,7 @@ Managers and admins keep every one of these. `participant_visible`, `participant
 | Invoice emailed | `workflow.record_email_delivery` when `first_delivery` | `deliver(kind="invoice", body=<the attachment bytes>, delivered_at=sent_at)`. The email task already reads `invoice.pdf_file`; it passes those same bytes. A resent email does not create a row |
 | Invoice marked sent by hand | `workflow.mark_invoice_sent` | Delivers `invoice.pdf_file`, or a render from `generate_pdf` when it is missing (not stored on the invoice). If rendering fails the transition still succeeds (the invoice is the deliverable), the failure is audited, and `inbox_backfill` picks it up |
 | Invoice cancelled | `cancel_invoice` | Nothing to do: a sent invoice that is cancelled stays in the inbox, marked cancelled through its invoice status (`invoice_status` in the serializer). Nothing is deleted (ADR 0037). There is no replacement link between invoices (a sent invoice is corrected by a credit note, `correct_invoice`), so `supersede()` has no invoice producer; it serves reports only |
+| Credit note issued | `invoices.tasks.generate_credit_pdf_task`, after a successful render | `deliver(kind="credit_note", body=<the rendered bytes>, document_number=<credit number>, period=<source invoice period>, delivered_at=credit.created_at)` through `inbox.producers.deliver_credit_note`, which never raises. A credit note has no "sent" step: today a participant reads it from the moment it exists, so the first render that succeeds is the delivery. The row is made once (by number); a manager's re-render later does not touch it, and a failed render delivers nothing until a render succeeds. A failed delivery is audited like an invoice's. The participant gets a `document.delivered` notification when the row is new |
 | Contract | `POST /inbox/documents/deliver-contract/` | `deliver(kind="contract", contract_issue=...)`; no copy. Title and document number are the contract's document number |
 | Reports | `POST /inbox/issue/*` | `deliver(...)` / `supersede(...)` |
 | Operator document | `POST /inbox/documents/` | one `deliver` per recipient, same stored file |
@@ -255,7 +258,7 @@ Decision for this spec, to be honoured by #793:
 ### 6.5 Notifications and email
 
 - `invoice.sent` (exists) gains `document_id` in its payload (absent when the invoice could not be delivered into the inbox), so the bell links to `/me/documents` instead of the live invoice list. It is raised after the inbox delivery for that reason, in both `mark_invoice_sent` and `record_email_delivery`. No second event for the same fact.
-- New registry type `document.delivered` (audience `participant`, not mandatory) for `contract`, `annual_statement`, `financial_summary`, `tariff_overview`, `operator`; payload `{ document_id, kind, title }`; `dedupe_key = f"document.delivered:{document.pk}"`.
+- New registry type `document.delivered` (audience `participant`, not mandatory) for `contract`, `annual_statement`, `financial_summary`, `tariff_overview`, `credit_note`, `operator`; payload `{ document_id, kind, title }`; `dedupe_key = f"document.delivered:{document.pk}"`.
 - The notification is raised by `inbox.views.delivery_response` for the rows a call wrote (`Delivery.fresh`), so every delivering route announces and an idempotent repeat does not. The bell page link is `/me/documents` for both types.
 - **Email for non-invoice documents is opt-in per delivery** (`notify`, default off), link-only and without an attachment. It is queued by `delivery_response` through `inbox.emails.queue_document_emails` for the rows the call wrote (`Delivery.fresh`), once the transaction commits, so a repeated idempotent delivery and a refused one send nothing, and an invoice never goes through it (its own email carries the PDF). A participant with no email address is skipped and counted in `without_email`; one without a login is still emailed, the link then leads to sign-in.
 - New `EmailTemplate` key `document_delivered`, variables `{participant_name}`, `{zev_name}`, `{title}`, `{inbox_url}` (`build_document_email_context`, field catalogue `admin.emailTemplates.fields.*`). Like the sign-in mail it is sent to one participant of one ZEV, so the shipped default follows the ZEV's `invoice_language` (`DOCUMENT_EMAIL_DEFAULTS_BY_LANGUAGE`, with `DEFAULT_DOCUMENT_EMAIL_SUBJECT` / `_BODY` as the English default in `EMAIL_TEMPLATE_DEFAULTS`); a saved override replaces every language, and an invalid override falls back to the language default. Admins edit it beside the others, in `TRANSLATED_TEMPLATE_KEYS` for the language note.
@@ -264,7 +267,7 @@ Decision for this spec, to be honoured by #793:
 
 ### 6.6 Backfill
 
-`python manage.py openzev_inbox_backfill [--zev ID] [--dry-run]`, also callable as the Celery task `inbox.tasks.inbox_backfill_task` (logic in `inbox/backfill.py`, `backfill_invoices()` returning a `BackfillReport`). For each invoice matching `sent_to_participant()` with a stored `pdf_file` and no row, it delivers with `delivered_at = sent_at or approved_at or updated_at`. It never renders. Invoices with no `pdf_file` (`no_document`) or whose file is missing from storage (`file_missing`) are listed in the report and skipped; they remain reachable through the live path until phase 6, and the **cut-over PR is blocked until the report is empty or accepted by the operator**. It does not touch contracts (explicit delivery) or reports (never issued before). Idempotent by the unique constraints.
+`python manage.py openzev_inbox_backfill [--zev ID] [--dry-run]`, also callable as the Celery task `inbox.tasks.inbox_backfill_task` (logic in `inbox/backfill.py`, `backfill_invoices()` and `backfill_credits()`, each returning a `BackfillReport`; the task answers the combined figures plus the credit notes under `credit_notes`, and the command prints one block per kind). For each invoice matching `sent_to_participant()` with a stored `pdf_file` and no row, it delivers with `delivered_at = sent_at or approved_at or updated_at`; for each credit note with a stored `pdf_file` and no row, with `delivered_at = created_at`. It never renders. Invoices and credit notes with no `pdf_file` (`no_document`; for a credit note this also means its render failed or is still queued, and regenerating the PDF delivers it) or whose file is missing from storage (`file_missing`) are listed in the report and skipped; they remain reachable through the live path until phase 6b, and the **cut-over PR is blocked until both reports are empty or accepted by the operator**. It does not touch contracts (explicit delivery) or reports (never issued before). Idempotent by the unique constraints.
 
 ## 7. Frontend
 
@@ -300,7 +303,7 @@ Decision for this spec, to be honoured by #793:
 ```typescript
 export type DocumentKind =
   | 'invoice' | 'contract' | 'annual_statement'
-  | 'financial_summary' | 'tariff_overview' | 'operator'
+  | 'financial_summary' | 'tariff_overview' | 'credit_note' | 'operator'
 
 export interface DeliveredDocument {
   id: string
@@ -436,6 +439,7 @@ The statement and summary generators are mocked, so these tests pin who is eligi
 
 ### Backend — other
 
+- `inbox/test_credit_notes.py` (increment 6a, 16 tests): `DeliveryOnRenderTests` (6) the first render delivers the credit note with its number, period and issue date and the exact bytes, a re-render leaves the delivered copy alone, a failed render delivers nothing and a later one does, the participant is told once, a failing delivery neither raises nor undoes the render (and is audited), a credit note with no document is not delivered; `ServiceTests` (4) the number is required, the same number returns the row, another ZEV's identical number is its own document, the database refuses a second row; `BackfillTests` (6) the stored PDF is delivered dated by issue, missing documents are reported, idempotent and `--dry-run` writes nothing, a note delivered by the render is not delivered again, `--zev` limits the run, the command and the task cover credit notes.
 - `inbox/test_backfill.py` (increment 2, 8 tests): creates rows for sent invoices dated by `sent_at`, leaves drafts and approved invoices alone, skips and reports missing documents (`no_document`, `file_missing`), `--dry-run` writes nothing, idempotent, the date falls back to approval, `--zev` limits the run, the command prints what it skipped.
 - `backups/test_archive.py`: the existing coverage tests pass with the model and file field registered (increment 1).
 - `zev/test_transfer_delivered_documents.py` (increment 1b, 20 tests): export / import round trip at format 11 (bytes, history, supersession chain, contract held as a file, invoice link), a v10 archive imports without rows, and rejected archives (checksum, missing member, non-PDF, kind, participant, count) leave no files behind.

@@ -801,6 +801,7 @@ export const en = {
         },
         kind: {
             invoice: 'Invoice',
+            credit_note: 'Credit note',
             contract: 'Participation contract',
             annual_statement: 'Annual statement',
             financial_summary: 'Financial summary',

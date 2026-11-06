@@ -792,6 +792,7 @@ export const fr = {
         },
         kind: {
             invoice: 'Facture',
+            credit_note: 'Avoir',
             contract: 'Contrat de participation',
             annual_statement: 'Décompte annuel',
             financial_summary: 'Aperçu fiscal',
