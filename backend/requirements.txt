@@ -51,7 +51,7 @@ pycparser==3.0
 pydyf==0.12.1
 pyOpenSSL==26.4.0
 pyotp==2.10.0  # direct: TOTP secret generation and code verification
-pypdf==6.14.2
+pypdf==7.0.0
 Pygments==2.20.0
 PyJWT==2.13.0
 pyphen==0.17.2
@@ -60,7 +60,7 @@ pytest-cov==7.1.0
 pytest-django==4.12.0
 pytest-xdist==3.8.0
 python-crontab==3.3.0
-python-dateutil==2.9.0.post0  # direct: lenient timestamp parsing in the metering CSV import
+python-dateutil==4.0.0  # direct: lenient timestamp parsing in the metering CSV import
 python-stdnum==2.2
 PyYAML==6.0.3
 qrbill==1.2.0
