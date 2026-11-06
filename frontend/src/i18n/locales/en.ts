@@ -36,6 +36,7 @@ export const en = {
         billing: 'Billing',
         myInvoices: 'My invoices',
         myDocuments: 'My documents',
+        participantDocuments: 'Documents',
         annualStatement: 'Annual statement',
         myMeteringPoints: 'My metering points',
         myEnergy: 'My energy system',
@@ -3834,8 +3835,10 @@ export const en = {
             tabs: {
                 invoices: 'Invoices',
                 emails: 'Emails',
-                documents: 'Delivered documents',
             },
+        },
+        participantDocuments: {
+            description: 'What the community has delivered to its participants. Issue the annual statements, financial summaries and tariff overview here, or upload a notice.',
         },
         billingPeriods: {
             failed: 'Failed to load billing periods.',

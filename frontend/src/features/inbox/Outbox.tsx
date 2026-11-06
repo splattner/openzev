@@ -22,13 +22,14 @@ import { StandingBadge, useDownloadDocument } from './DocumentsList'
 import { IssueReportsDialog, issueYears } from './IssueReportsDialog'
 import { UploadDocumentDialog } from './UploadDocumentDialog'
 import './inbox.css'
+import './InvoiceDocuments.css'
 
 /**
- * The *Delivered documents* tab of the billing hub (spec §7.2): what the community delivered to
- * whom and when, so "did Anna get her statement?" has an answer. Withdrawn rows stay visible here
- * and are marked; participants no longer see them.
+ * The manager's *Participant documents* page body (spec §7.2): what the community delivered to
+ * whom and when, so "did Anna get her statement?" has an answer, and where documents are issued or
+ * uploaded. Withdrawn rows stay visible here and are marked; participants no longer see them.
  */
-export function OutboxTab() {
+export function Outbox() {
   const { t } = useTranslation()
   const { settings } = useAppSettings()
   const { pushToast } = useToast()
@@ -139,7 +140,7 @@ export function OutboxTab() {
         </div>
       ) : (
         <section className="table-card">
-          <div className="table-scroll">
+          <div className="table-scroll doc-wide">
             <table className="billing-workflow-table">
               <thead>
                 <tr>
@@ -202,6 +203,44 @@ export function OutboxTab() {
               </tbody>
             </table>
           </div>
+          <ul className="doc-cards">
+            {documents.map((document) => {
+              const addressee = document.participant ? byId.get(document.participant) : undefined
+              const withoutAccount = addressee != null && addressee.user == null
+              return (
+                <li key={document.id} className="doc-card">
+                  <div className="doc-card-head">
+                    <strong><FontAwesomeIcon icon={KIND_ICON[document.kind]} fixedWidth aria-hidden="true" /> {document.title}</strong>
+                    <span>
+                      <StandingBadge document={document} />
+                      {withoutAccount && <span className="badge badge-neutral">{t('inbox.outbox.noAccount')}</span>}
+                    </span>
+                  </div>
+                  <p className="muted doc-card-meta">
+                    {document.participant_name ?? '—'} · {t(`inbox.kind.${document.kind}`)} · {documentYear(document)}
+                  </p>
+                  <p className="muted doc-card-meta">
+                    {formatShortDate(document.delivered_at.slice(0, 10), settings)}
+                    {document.delivered_by_name ? ` · ${document.delivered_by_name}` : ''}
+                  </p>
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    aria-label={t('inbox.downloadLabel', { title: document.title })}
+                    onClick={() => void download(document)}
+                  >
+                    <FontAwesomeIcon icon={faDownload} fixedWidth />
+                    {t('inbox.download')}
+                  </button>
+                  {canWriteSelectedCommunity && document.kind === 'operator' && !document.withdrawn_at && (
+                    <button type="button" className="button button-secondary" onClick={() => askWithdraw(document)}>
+                      {t('inbox.outbox.withdraw')}
+                    </button>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
         </section>
       )}
 

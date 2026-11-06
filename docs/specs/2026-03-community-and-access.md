@@ -1732,7 +1732,8 @@ reaches every ZEV-scope route and sees its pages read-only
 | `/metering-data` | any authenticated | alias → `/metering/chart`, except `?tab=quality` → guarded `/metering/quality`; `tab` is always stripped, remaining params preserved |
 | `/imports` | ZEV scope | alias → `/metering/imports` (query preserved) |
 | `/tariffs` | ZEV scope | `TariffsPage` |
-| `/billing/invoices` · `/billing/emails` · `/billing/documents` | ZEV scope | `BillingHubPage tab=…` (invoices · email delivery/history + retry · delivered documents, the participant inbox's outbox: [participant document inbox §7.2](2026-11-participant-document-inbox.md)) |
+| `/billing/invoices` · `/billing/emails` | ZEV scope | `BillingHubPage tab=…` (invoices · email delivery/history + retry) |
+| `/documents` | ZEV scope | `ParticipantDocumentsPage` (what was delivered to the community's participants, and where to issue or upload: the participant inbox's outbox, [participant document inbox §7.2](2026-11-participant-document-inbox.md)); `/billing/documents`, the old billing tab, redirects here |
 | `/billing/statements` | any authenticated | alias → `/reports` (the annual-statement ZIP moved there with the other yearly documents) |
 | `/billing/periods` | ZEV scope | compatibility alias → `/`, where period work lives on manager Overview |
 | `/billing/invoices?period_start&period_end` | ZEV scope | deep link from the Overview period table preselects that period |
@@ -1797,7 +1798,7 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 
 | Section | Condition |
 |---|---|
-| Overview (`/`), Energy balance (`/dashboard`), Metering (`/metering/chart`, active on `/metering/chart` + `/metering/quality` + `/metering/imports`), Billing (`/billing/invoices`, active on `/billing/*`), Reports | `isZevScope` (shell role `admin`, `manager` or `viewer`; the `/reports` route itself also allows participants) |
+| Overview (`/`), Energy balance (`/dashboard`), Metering (`/metering/chart`, active on `/metering/chart` + `/metering/quality` + `/metering/imports`), Billing (`/billing/invoices`, active on `/billing/*`), Documents (`/documents`, right after Billing), Reports | `isZevScope` (shell role `admin`, `manager` or `viewer`; the `/reports` route itself also allows participants) |
 | Live energy (`/my-energy`, right after Energy balance) | `isZevScope` + `live_energy_data_enabled` effective (`GET /metering/live/enabled/`) |
 | Account (`/account`) | shell role `none` (only nav entry; landing page explains the unlinked state) |
 | Dashboard (`/`) | shell role `participant` |

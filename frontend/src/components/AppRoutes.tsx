@@ -17,6 +17,7 @@ const AccountProfilePage = lazy(async () => ({ default: (await import('../pages/
 const AdminOverviewHubPage = lazy(async () => ({ default: (await import('../pages/AdminOverviewHubPage')).AdminOverviewHubPage }))
 const AdminAccountsHubPage = lazy(async () => ({ default: (await import('../pages/AdminAccountsHubPage')).AdminAccountsHubPage }))
 const AdminTemplatesHubPage = lazy(async () => ({ default: (await import('../pages/AdminTemplatesHubPage')).AdminTemplatesHubPage }))
+const ParticipantDocumentsPage = lazy(async () => ({ default: (await import('../pages/ParticipantDocumentsPage')).ParticipantDocumentsPage }))
 const BillingHubPage = lazy(async () => ({ default: (await import('../pages/BillingHubPage')).BillingHubPage }))
 const FeasibilityCalculatorPage = lazy(async () => ({ default: (await import('../pages/FeasibilityCalculatorPage')).FeasibilityCalculatorPage }))
 const AdminSystemSettingsPage = lazy(async () => ({ default: (await import('../pages/AdminSystemSettingsPage')).AdminSystemSettingsPage }))
@@ -257,11 +258,13 @@ export function AppRoutes() {
               </ProtectedRoute>
             }
           />
+          {/* The participant documents moved out of the billing hub into a page of their own. */}
+          <Route path="billing/documents" element={<AliasNavigate to="/documents" />} />
           <Route
-            path="billing/documents"
+            path="documents"
             element={
               <ProtectedRoute allowedRoles={ZEV_SCOPE}>
-                <BillingHubPage tab="documents" />
+                <ParticipantDocumentsPage />
               </ProtectedRoute>
             }
           />

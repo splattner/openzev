@@ -319,6 +319,8 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         expect(page.hasHref('/metering/imports')).toBe(false)
         expect(page.hasHref('/dashboard')).toBe(true)
         expect(page.hasHref('/billing/invoices')).toBe(true)
+        // What was delivered to participants has a page of its own, not a billing tab.
+        expect(page.hasHref('/documents')).toBe(true)
         expect(page.hasHref('/reports')).toBe(true)
         // Audit log is a ZEV-settings tab now (deep link only).
         expect(page.hasHref('/audit-logs')).toBe(false)
@@ -401,7 +403,7 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         expect(page.hasHref('/me/invoices')).toBe(true)
         expect(page.hasHref('/me/documents')).toBe(true)
         expect(page.hasHref('/me/statement')).toBe(true)
-        for (const href of ['/reports', '/metering/imports', '/participants', '/tariffs', '/zev-settings', '/audit-logs', '/admin']) {
+        for (const href of ['/reports', '/documents', '/metering/imports', '/participants', '/tariffs', '/zev-settings', '/audit-logs', '/admin']) {
             expect(page.hasHref(href)).toBe(false)
         }
         // "My consumption" folded into the participant dashboard (phase 2):

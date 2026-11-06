@@ -85,6 +85,7 @@ vi.mock('../src/pages/TariffsPage', () => ({ TariffsPage: marker('tariffs') }))
 vi.mock('../src/pages/InvoicesPage', () => ({ InvoicesContent: marker('invoices') }))
 vi.mock('../src/pages/MyInvoicesPage', () => ({ MyInvoicesPage: marker('my-invoices') }))
 vi.mock('../src/pages/DocumentsPage', () => ({ DocumentsPage: marker('my-documents') }))
+vi.mock('../src/pages/ParticipantDocumentsPage', () => ({ ParticipantDocumentsPage: marker('participant-documents') }))
 vi.mock('../src/pages/MyMeteringPointsPage', () => ({ MyMeteringPointsPage: marker('my-metering-points') }))
 vi.mock('../src/pages/InvoiceDetailPage', () => ({ InvoiceDetailPage: marker('invoice-detail') }))
 vi.mock('../src/pages/ReportsPage', () => ({ ReportsPage: marker('reports') }))
@@ -174,6 +175,9 @@ const MATRIX: Array<{ path: string; marker: string; allow: Record<ShellRole, boo
     { path: '/billing/periods', marker: 'periods-alias', allow: { admin: true, manager: true, viewer: true, participant: false, former: false, none: false } },
     { path: '/billing/invoices', marker: 'billing-hub', allow: { admin: true, manager: true, viewer: true, participant: false, former: false, none: false } },
     { path: '/billing/emails', marker: 'billing-hub', allow: { admin: true, manager: true, viewer: true, participant: false, former: false, none: false } },
+    { path: '/documents', marker: 'participant-documents', allow: { admin: true, manager: true, viewer: true, participant: false, former: false, none: false } },
+    // The old tab of the billing hub redirects to the page of its own.
+    { path: '/billing/documents', marker: 'participant-documents', allow: { admin: true, manager: true, viewer: true, participant: false, former: false, none: false } },
     { path: '/billing/statements', marker: 'reports', allow: { admin: true, manager: true, viewer: true, participant: true, former: false, none: false } },
     { path: '/billing/invoices/42', marker: 'invoice-detail', allow: { admin: true, manager: true, viewer: true, participant: true, former: true, none: false } },
     { path: '/me/statement', marker: 'reports', allow: { admin: false, manager: false, viewer: false, participant: true, former: false, none: false } },

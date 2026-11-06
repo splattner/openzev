@@ -27,6 +27,7 @@ export const fr = {
         billing: 'Facturation',
         myInvoices: 'Mes factures',
         myDocuments: 'Mes documents',
+        participantDocuments: 'Documents',
         annualStatement: 'Décompte annuel',
         myMeteringPoints: 'Mes points de mesure',
         myEnergy: 'Mon système énergétique',
@@ -3823,8 +3824,10 @@ export const fr = {
             tabs: {
                 invoices: 'Factures',
                 emails: 'E-mails',
-                documents: 'Documents remis',
             },
+        },
+        participantDocuments: {
+            description: 'Ce que la communauté a remis à ses participants. Émettez ici les relevés annuels, les récapitulatifs fiscaux et l\'aperçu des tarifs, ou téléversez une communication.',
         },
         billingPeriods: {
             failed: 'Échec du chargement des périodes de facturation.',

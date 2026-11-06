@@ -27,6 +27,7 @@ export const de = {
         billing: 'Abrechnung',
         myInvoices: 'Meine Rechnungen',
         myDocuments: 'Meine Dokumente',
+        participantDocuments: 'Dokumente',
         annualStatement: 'Jahresabrechnung',
         myMeteringPoints: 'Meine Messpunkte',
         myEnergy: 'Mein Energiesystem',
@@ -3823,8 +3824,10 @@ export const de = {
             tabs: {
                 invoices: 'Rechnungen',
                 emails: 'E-Mails',
-                documents: 'Zugestellte Dokumente',
             },
+        },
+        participantDocuments: {
+            description: 'Was die Gemeinschaft ihren Teilnehmenden zugestellt hat. Hier stellst du Jahresabrechnungen, Steuerübersichten und die Tarifübersicht aus oder lädst eine Mitteilung hoch.',
         },
         billingPeriods: {
             failed: 'Abrechnungsperioden konnten nicht geladen werden.',

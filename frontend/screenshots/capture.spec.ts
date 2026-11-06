@@ -541,9 +541,9 @@ test.describe('User Guide Screenshots', () => {
     await screenshotFull(page, '08c-my-invoices')
   })
 
-  // 08k — what the community delivered, for the manager (the inbox's outbox tab).
+  // 08k — what the community delivered, for the manager (the inbox's outbox page).
   test('08k-delivered-documents', async ({ page }) => {
-    await navigateTo(page, '/billing/documents')
+    await navigateTo(page, '/documents')
     await page.waitForSelector('tbody tr', { timeout: 10_000 })
     await page.waitForTimeout(400)
     await screenshotFull(page, '08k-delivered-documents')

@@ -155,7 +155,7 @@ missing PDF automatically. **Mark sent** records manual delivery without
 generating a PDF; you can generate it afterwards. Later address or bank-detail
 changes do not change the approved document.
 
-## Billing Hub (Invoices · Emails · Delivered documents)
+## Billing Hub (Invoices · Emails)
 
 The sidebar entry **Billing** (`/billing/invoices`) opens the invoice-first
 billing hub. Its tabs are routes — each is directly linkable:
@@ -165,9 +165,9 @@ billing hub. Its tabs are routes — each is directly linkable:
   invoices: the latest email status per invoice, a filter by status, a
   failed-email banner, **View history** for the actual attempt log, and an
   inline **Retry** per failed latest attempt.
-- **Delivered documents** (`/billing/documents`) — what the community has
-  delivered to its participants, and when (see
-  [Delivered documents](#delivered-documents)).
+
+What the community has delivered to its participants has its own sidebar entry,
+**Documents** (see [Delivered documents](#delivered-documents)).
 
 The yearly whole-ZEV annual-statement ZIP is on **Reports** (see
 [Reports: Annual Report, Statements and Tax Overviews](#reports-annual-report-statements-and-tax-overviews)).
@@ -198,7 +198,7 @@ history panel.
 
 ## Delivered documents
 
-The **Delivered documents** tab answers "did Anna get her statement?". It lists
+The **Documents** page (`/documents`, in the sidebar right after **Billing**) answers "did Anna get her statement?". It lists
 every document delivered to the selected community's participants — with the
 participant, the type, the delivery date, who delivered it, and a **No account
 yet** badge for a participant who has no linked account (they will see the
