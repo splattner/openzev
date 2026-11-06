@@ -80,10 +80,11 @@ def generate_credit_pdf(credit) -> bytes:
     return render_pdf(html_string)
 
 
-def save_credit_pdf(credit) -> None:
+def save_credit_pdf(credit) -> bytes:
     """Render and attach the PDF with a targeted ``UPDATE`` (never a full
-    ``save`` of a possibly stale instance). Raises ``Credit.DoesNotExist`` when
-    the credit vanished meanwhile, after removing the orphaned file."""
+    ``save`` of a possibly stale instance). Returns the rendered bytes. Raises
+    ``Credit.DoesNotExist`` when the credit vanished meanwhile, after removing
+    the orphaned file."""
     from .models import Credit, InvoicePdfStatus
 
     pdf_bytes = generate_credit_pdf(credit)
@@ -106,3 +107,4 @@ def save_credit_pdf(credit) -> None:
     if previous_name and previous_name != stored_name:
         delete_stored_pdf(storage, previous_name)
     logger.info("Saved PDF for credit note %s", credit.credit_number)
+    return pdf_bytes

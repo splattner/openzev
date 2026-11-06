@@ -60,6 +60,7 @@ describe('countByKind', () => {
     expect(counts.invoice).toBe(2)
     expect(counts.contract).toBe(1)
     expect(counts.tariff_overview).toBe(0)
+    expect(counts.credit_note).toBe(0)
   })
 })
 

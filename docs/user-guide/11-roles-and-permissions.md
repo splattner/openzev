@@ -128,7 +128,7 @@ The participant sidebar shows **Dashboard**, **My invoices**, **My documents**, 
 
 - **Dashboard:** View own energy consumption/production overview
 - **My invoices:** View and download own invoices (read-only; shows invoices even before a PDF exists)
-- **My documents:** Read and download what the community delivered to them (invoices, statements, contract, notices); a former participant keeps this access
+- **My documents:** Read and download what the community delivered to them (invoices, credit notes, statements, contract, notices); a former participant keeps this access
 - **Annual statement:** View their own annual statement and tax overview
 - **Metering Data:** Direct route to own consumption charts and trends
 - **Account Profile:** Update personal information

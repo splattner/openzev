@@ -4,7 +4,7 @@ from celery import shared_task
 
 from zev.models import Zev
 
-from .backfill import backfill_invoices
+from .backfill import backfill_credits, backfill_invoices
 
 logger = logging.getLogger(__name__)
 
@@ -13,13 +13,20 @@ logger = logging.getLogger(__name__)
 def inbox_backfill_task(zev_id: str | None = None, dry_run: bool = False) -> dict:
     """The ``openzev_inbox_backfill`` command as a task."""
     zev = Zev.objects.get(pk=zev_id) if zev_id else None
-    report = backfill_invoices(zev=zev, dry_run=dry_run)
+    invoices = backfill_invoices(zev=zev, dry_run=dry_run)
+    credits = backfill_credits(zev=zev, dry_run=dry_run)
     return {
-        "delivered": report.delivered,
-        "already_delivered": report.already_delivered,
-        "missing": report.missing,
-        "failed": report.failed,
-        "dry_run": report.dry_run,
+        "delivered": invoices.delivered + credits.delivered,
+        "already_delivered": invoices.already_delivered + credits.already_delivered,
+        "missing": invoices.missing + credits.missing,
+        "failed": invoices.failed + credits.failed,
+        "credit_notes": {
+            "delivered": credits.delivered,
+            "already_delivered": credits.already_delivered,
+            "missing": credits.missing,
+            "failed": credits.failed,
+        },
+        "dry_run": dry_run,
     }
 
 

@@ -3064,7 +3064,7 @@ export interface TariffErrorResponse {
 
 export type DocumentKind =
     | 'invoice' | 'contract' | 'annual_statement'
-    | 'financial_summary' | 'tariff_overview' | 'operator'
+    | 'financial_summary' | 'tariff_overview' | 'credit_note' | 'operator'
 
 export interface DeliveredDocument {
     id: string

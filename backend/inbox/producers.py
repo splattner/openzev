@@ -1,4 +1,4 @@
-"""Delivering an invoice into the participant's inbox (SPEC-2026-11-participant-document-inbox §6.2).
+"""Delivering an invoice or a credit note into the participant's inbox (SPEC-2026-11-participant-document-inbox §6.2).
 
 An invoice reaches its participant when it is emailed or marked as sent. Both
 hooks call ``deliver_sent_invoice`` after their own transition has committed;
@@ -91,3 +91,66 @@ def _record_failure(invoice, exc) -> None:
         )
     except Exception:
         logger.exception("The failed inbox delivery of invoice %s could not be audited", invoice.pk)
+
+
+def stored_credit_bytes(credit) -> bytes | None:
+    """The credit note's stored PDF, or ``None`` when there is none or it cannot be read."""
+    if not credit.pdf_file:
+        return None
+    try:
+        with credit.pdf_file.open("rb") as source:
+            return source.read()
+    except (OSError, ValueError):
+        return None
+
+
+def credit_note_title(credit) -> str:
+    return credit.credit_number
+
+
+def deliver_credit_document(credit, body: bytes, *, delivered_at=None):
+    """Deliver ``body`` as ``credit``'s document. Idempotent by credit number: a re-render
+    of the credit note's PDF never replaces what the participant already holds."""
+    source = credit.source_invoice
+    return deliver(
+        participant=credit.participant,
+        kind=DocumentKind.CREDIT_NOTE,
+        title=credit_note_title(credit),
+        body=body,
+        file_name=f"credit_{credit.credit_number}.pdf",
+        document_number=credit.credit_number,
+        period=(source.period_start, source.period_end) if source else None,
+        delivered_at=delivered_at or credit.created_at,
+    )
+
+
+def deliver_credit_note(credit, *, body: bytes | None = None):
+    """Hand an issued credit note to its participant's inbox once its PDF exists. Never raises.
+
+    ``body`` is the PDF just rendered; without it the stored one is read. Returns
+    ``(document, created)``, or ``None`` when nothing could be delivered.
+    """
+    try:
+        if body is None:
+            body = stored_credit_bytes(credit)
+        if body is None:
+            raise FileNotFoundError(f"Credit note {credit.credit_number} has no document to deliver.")
+        return deliver_credit_document(credit, body)
+    except Exception as exc:
+        logger.exception("Inbox delivery of credit note %s failed", getattr(credit, "credit_number", credit))
+        try:
+            record_audit_event(
+                action_category=AuditActionCategory.PARTICIPANT,
+                action_type="inbox.document.delivered",
+                target_type="invoices.Credit",
+                target_id=str(credit.pk),
+                target_display=credit.credit_number,
+                summary=f"Delivering credit note {credit.credit_number} to the participant inbox failed: {exc}",
+                status=AuditEventStatus.FAILED,
+                zev=credit.zev,
+                source=AuditEventSource.SYSTEM,
+                metadata={"error": str(exc), "kind": DocumentKind.CREDIT_NOTE},
+            )
+        except Exception:
+            logger.exception("The failed inbox delivery of credit note %s could not be audited", credit.pk)
+        return None

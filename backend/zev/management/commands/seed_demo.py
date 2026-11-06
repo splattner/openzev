@@ -25,7 +25,7 @@ from accounts.models import FeatureFlag, VatRate
 from allocation.validity import active_during, business_tz, civil_date, period_start_dt, period_window, wall_clock
 from audit.models import AuditActionCategory, AuditEvent, AuditEventStatus
 from audit.services import record_audit_event
-from inbox.backfill import backfill_invoices
+from inbox.backfill import backfill_credits, backfill_invoices
 from inbox.models import DeliveredDocument, DocumentKind
 from inbox.services import deliver, remove_file_if_unreferenced
 from invoices.contract_pdf import issue_contract_pdf
@@ -1210,7 +1210,7 @@ class Command(BaseCommand):
             DeliveredDocument.objects.filter(zev__in=zevs).delete()
             for name in old_files:
                 remove_file_if_unreferenced(name)
-            delivered = sum(backfill_invoices(zev=zev).delivered for zev in zevs)
+            delivered = sum(backfill_invoices(zev=zev).delivered + backfill_credits(zev=zev).delivered for zev in zevs)
             main = zevs[0]
             overview = generate_tariff_overview_pdf(main)
             notice = render_pdf(
@@ -1228,7 +1228,7 @@ class Command(BaseCommand):
                     participant=participant, kind=DocumentKind.OPERATOR,
                     title="Hausordnung Solaranlage", body=notice, file_name="hausordnung.pdf",
                 )
-            self.stdout.write(f"  Inbox: {delivered} invoices backfilled, tariff overview and notice delivered")
+            self.stdout.write(f"  Inbox: {delivered} invoices and credit notes backfilled, tariff overview and notice delivered")
         except Exception as exc:
             self.stdout.write(
                 self.style.WARNING(f"seed_demo: inbox skipped ({exc.__class__.__name__}: {exc})")

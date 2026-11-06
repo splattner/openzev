@@ -93,8 +93,12 @@ def _audit(action, document, *, user=None, summary, source=None, metadata=None, 
     )
 
 
-def _existing(*, kind, participant, invoice, contract_issue, period):
+def _existing(*, kind, participant, invoice, contract_issue, period, document_number=""):
     """The row this delivery would duplicate, or ``None``."""
+    if kind == DocumentKind.CREDIT_NOTE:
+        return DeliveredDocument.objects.filter(
+            kind=kind, zev=participant.zev, document_number=document_number
+        ).first()
     if invoice is not None:
         return DeliveredDocument.objects.filter(invoice=invoice).first()
     if contract_issue is not None:
@@ -120,20 +124,23 @@ def deliver(
 ) -> tuple[DeliveredDocument, bool]:
     """Record that a document reached ``participant``. Returns ``(row, created)``.
 
-    Idempotent for an invoice and for a contract version: delivering one again
-    returns the existing row. Delivering a report kind that already has a
-    current row for the period supersedes it. A contract carries no file
-    (``contract_issue`` is the body); every other kind needs ``body`` or
-    ``stored``.
+    Idempotent for an invoice, a credit note (by its number) and a contract
+    version: delivering one again returns the existing row. Delivering a
+    report kind that already has a current row for the period supersedes it.
+    A contract carries no file (``contract_issue`` is the body); every other
+    kind needs ``body`` or ``stored``.
     """
     if kind == DocumentKind.CONTRACT:
         if contract_issue is None or body is not None or stored is not None:
             raise ValueError("A contract is delivered by reference to its ContractIssue, with no file.")
     elif (body is None) == (stored is None):
         raise ValueError("Give exactly one of body and stored.")
+    if kind == DocumentKind.CREDIT_NOTE and not document_number:
+        raise ValueError("A credit note is delivered under its number.")
 
     existing = _existing(
-        kind=kind, participant=participant, invoice=invoice, contract_issue=contract_issue, period=period
+        kind=kind, participant=participant, invoice=invoice, contract_issue=contract_issue, period=period,
+        document_number=document_number,
     )
     if existing is not None:
         return existing, False
@@ -189,7 +196,8 @@ def deliver(
         if wrote_here:
             discard_file(stored.name)
         existing = _existing(
-            kind=kind, participant=participant, invoice=invoice, contract_issue=contract_issue, period=period
+            kind=kind, participant=participant, invoice=invoice, contract_issue=contract_issue, period=period,
+            document_number=document_number,
         ) or _current_report(participant, kind, period)
         if existing is None:
             raise
