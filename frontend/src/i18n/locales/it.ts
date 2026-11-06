@@ -488,6 +488,7 @@ export const it = {
             magicLinkEmail: 'E-mail con link di accesso',
             zevAccessInvitationEmail: 'E-mail di invito all\'accesso',
             zevAccessGrantedEmail: 'E-mail di avviso di accesso',
+            documentDeliveredEmail: 'E-mail documento consegnato',
             magicLinkLanguageNote: 'Cos\u00ec com\u2019\u00e8, questa e-mail viene inviata nella lingua di fatturazione di ogni ZEV. Un testo personalizzato salvato qui la sostituisce per tutte e quattro le lingue.',
             subject: 'Oggetto:',
             body: 'Messaggio',
@@ -501,6 +502,7 @@ export const it = {
                 totalChf: 'Importo totale della fattura in CHF',
                 amountDueChf: 'Importo dovuto in CHF, dopo l\'imputazione delle note di credito',
                 inboxUrl: 'Link alla pagina «I miei documenti» del partecipante; vuoto se non ha un account',
+                documentTitle: 'Titolo del documento consegnato',
                 inviterName: 'Nome della persona che ha aggiunto il partecipante',
                 verifyUrl: 'URL del link di verifica e-mail',
                 linkUrl: 'URL del link di accesso monouso',
@@ -806,6 +808,10 @@ export const it = {
             selected: 'Partecipanti scelti',
             participants: 'Partecipanti',
         },
+        notify: {
+            label: 'Avvisa anche i partecipanti per e-mail',
+            hint: 'Invia una breve e-mail con un link a «I miei documenti», senza il file. I partecipanti senza indirizzo e-mail vengono saltati.',
+        },
         upload: {
             title: 'Carica documento',
             titleField: 'Titolo',
@@ -841,6 +847,10 @@ export const it = {
             delivered_other: 'Consegnato a {{count}} partecipanti.',
             withoutAccount_one: '{{count}} partecipante non ha ancora un account e lo vedrà quando ne verrà collegato uno.',
             withoutAccount_other: '{{count}} partecipanti non hanno ancora un account e lo vedranno quando ne verrà collegato uno.',
+            emailed_one: '{{count}} e-mail in coda.',
+            emailed_other: '{{count}} e-mail in coda.',
+            withoutEmail_one: '{{count}} partecipante non ha un indirizzo e-mail e non è stato avvisato.',
+            withoutEmail_other: '{{count}} partecipanti non hanno un indirizzo e-mail e non sono stati avvisati.',
         },
         outbox: {
             issue: 'Emetti documenti',

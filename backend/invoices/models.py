@@ -617,6 +617,57 @@ DEFAULT_INVOICE_EMAIL_BODY = (
     "Kind regards,\n{zev_name}"
 )
 
+DEFAULT_DOCUMENT_EMAIL_SUBJECT = "New document from {zev_name}: {title}"
+DEFAULT_DOCUMENT_EMAIL_BODY = (
+    "Hello {participant_name},\n\n"
+    "{zev_name} has delivered a document to you: {title}.\n\n"
+    "You can open and download it under My documents:\n\n"
+    "{inbox_url}\n\n"
+    "Best regards,\n{zev_name}"
+)
+
+# Sent to one participant of one ZEV, so the shipped text follows that ZEV's
+# ``invoice_language`` like the sign-in mail. A saved override replaces every
+# language (one row, one text).
+DOCUMENT_EMAIL_DEFAULTS_BY_LANGUAGE = {
+    "en": {
+        "subject": DEFAULT_DOCUMENT_EMAIL_SUBJECT,
+        "body": DEFAULT_DOCUMENT_EMAIL_BODY,
+    },
+    "de": {
+        "subject": "Neues Dokument von {zev_name}: {title}",
+        "body": (
+            "Guten Tag {participant_name}\n\n"
+            "{zev_name} hat Ihnen ein Dokument zugestellt: {title}.\n\n"
+            "Sie finden es unter «Meine Dokumente» und können es dort "
+            "herunterladen:\n\n"
+            "{inbox_url}\n\n"
+            "Freundliche Grüsse\n{zev_name}"
+        ),
+    },
+    "fr": {
+        "subject": "Nouveau document de {zev_name} : {title}",
+        "body": (
+            "Bonjour {participant_name},\n\n"
+            "{zev_name} vous a remis un document : {title}.\n\n"
+            "Vous le trouverez sous « Mes documents », où vous pouvez le "
+            "télécharger :\n\n"
+            "{inbox_url}\n\n"
+            "Cordialement,\n{zev_name}"
+        ),
+    },
+    "it": {
+        "subject": "Nuovo documento da {zev_name}: {title}",
+        "body": (
+            "Buongiorno {participant_name},\n\n"
+            "{zev_name} le ha consegnato un documento: {title}.\n\n"
+            "Lo trova in «I miei documenti» e può scaricarlo da lì:\n\n"
+            "{inbox_url}\n\n"
+            "Cordiali saluti\n{zev_name}"
+        ),
+    },
+}
+
 DEFAULT_ONBOARDING_EMAIL_SUBJECT = "You have been added to {zev_name} on OpenZEV"
 DEFAULT_ONBOARDING_EMAIL_BODY = (
     "Hello {participant_name},\n\n"
@@ -852,6 +903,7 @@ EMAIL_TEMPLATE_DEFAULTS = {
     },
     "zev_access_invitation": ZEV_ACCESS_INVITATION_EMAIL_DEFAULTS_BY_LANGUAGE["en"],
     "zev_access_granted": ZEV_ACCESS_GRANTED_EMAIL_DEFAULTS_BY_LANGUAGE["en"],
+    "document_delivered": DOCUMENT_EMAIL_DEFAULTS_BY_LANGUAGE["en"],
 }
 
 

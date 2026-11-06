@@ -213,6 +213,13 @@ Invoices arrive here by themselves when they are sent, by email or by
   list; the earlier one stays visible to them as superseded. Statements and
   summaries are rendered when you issue them, so issue them once the year's
   invoices are final.
+
+Participants with an account always get a notification in the app. Both dialogs
+also offer **Also notify participants by email**, off by default: it sends a short
+email with a link to **My documents** and no attachment, and the result says how
+many emails were queued and how many participants were skipped because they have
+no email address. The text of that email is edited by admins under **Platform →
+Templates → Email templates**.
 - **Withdraw** — takes an uploaded notice back from participants (for example sent
   to the wrong person). The record and the file are kept and the row stays here,
   marked as withdrawn. Invoices, statements and the other issued documents are

@@ -743,6 +743,18 @@ _EMAIL_FIELDS = {
             ],
         },
     ],
+    "document_delivered": [
+        {
+            "group_key": "documentDelivered",
+            "group_title_key": None,
+            "fields": [
+                {"variable": "{participant_name}", "description_key": "admin.emailTemplates.fields.participantName", "sample_path": "participant_name"},
+                {"variable": "{zev_name}", "description_key": "admin.emailTemplates.fields.zevName", "sample_path": "zev_name"},
+                {"variable": "{title}", "description_key": "admin.emailTemplates.fields.documentTitle", "sample_path": "title"},
+                {"variable": "{inbox_url}", "description_key": "admin.emailTemplates.fields.inboxUrl", "sample_path": "inbox_url"},
+            ],
+        },
+    ],
     "zev_access_granted": [
         {
             "group_key": "zevAccessGranted",

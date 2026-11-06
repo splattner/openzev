@@ -407,7 +407,7 @@ Admins manage system-wide default email templates in **Platform → Templates �
 
 ### Overview
 
-OpenZEV uses six email templates:
+OpenZEV uses seven email templates:
 
 | Template | Purpose |
 | --- | --- |
@@ -417,8 +417,9 @@ OpenZEV uses six email templates:
 | **Sign-in Link Email** | Sent when a participant asks for a sign-in link from the QR code on their invoice (see [Participant Access from the Invoice](02-zev-setup.md#participant-access-from-the-invoice)) |
 | **ZEV Access Invitation Email** | Sent when someone is given access to a community (as manager or viewer) and has no account yet; its link, valid for 7 days, activates the account and asks for a password |
 | **ZEV Access Notice Email** | Sent when an existing account is given access to a community |
+| **Document Delivered Email** | Sent when a manager ticks **Also notify participants by email** while delivering a document (see [Delivered documents](09-invoice-management.md#delivered-documents)); a link to **My documents**, without the file |
 
-The sign-in link and the two access emails are sent in each community's invoice
+The sign-in link, the two access emails and the document email are sent in each community's invoice
 language until you save your own text, which then replaces all four languages.
 
 The **Sign-in Link Email** is the one template whose recipient never sees a copy
@@ -431,7 +432,7 @@ Administrators can edit the default subject and body for each template. Managers
 ### Accessing Email Templates
 
 1. Navigate to **Platform → Templates → Email templates**
-2. The page displays six tabs — one per template type
+2. The page displays seven tabs — one per template type
 
 ![Admin Email Templates](screenshots/14b-admin-email-templates.png)
 
@@ -462,6 +463,15 @@ See [Email Configuration → Email Templates](10-email-configuration.md#email-te
 | `{zev_name}` | Name of the ZEV |
 | `{link_url}` | Reusable onboarding link |
 | `{expiry_date}` | Formatted onboarding-link expiry date |
+
+#### Document Delivered Email Variables
+
+| Variable | Description |
+| --- | --- |
+| `{participant_name}` | Full name of the participant |
+| `{zev_name}` | Name of the ZEV |
+| `{title}` | Title of the delivered document |
+| `{inbox_url}` | Link to the participant's **My documents** page |
 
 #### Verification Email Variables
 

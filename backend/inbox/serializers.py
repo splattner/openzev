@@ -33,6 +33,7 @@ class DeliverContractSerializer(serializers.Serializer):
 
     contract_issue = serializers.UUIDField(required=False)
     participant = serializers.UUIDField(required=False)
+    notify = serializers.BooleanField(default=False)
 
     def validate(self, attrs):
         if ("contract_issue" in attrs) == ("participant" in attrs):
@@ -46,6 +47,9 @@ class DeliveryResultSerializer(serializers.Serializer):
     batch_id = serializers.UUIDField()
     delivered = serializers.IntegerField()
     without_account = serializers.IntegerField()
+    # Emails queued, and recipients skipped for want of an address; both 0 unless ``notify`` was set.
+    emailed = serializers.IntegerField()
+    without_email = serializers.IntegerField()
     documents = DeliveredDocumentSerializer(many=True)
 
 
@@ -61,6 +65,7 @@ class UploadDocumentSerializer(serializers.Serializer):
     file = serializers.FileField(allow_empty_file=True)
     audience = serializers.ChoiceField(choices=["all", "selected"], default="all")
     participant_ids = serializers.ListField(child=serializers.UUIDField(), required=False, allow_empty=True)
+    notify = serializers.BooleanField(default=False)
 
     def validate_title(self, value):
         value = value.strip()
@@ -91,6 +96,7 @@ class IssueSerializer(serializers.Serializer):
 
     zev = serializers.UUIDField()
     participant_ids = serializers.ListField(child=serializers.UUIDField(), required=False, allow_empty=False)
+    notify = serializers.BooleanField(default=False)
 
 
 class IssueYearSerializer(IssueSerializer):

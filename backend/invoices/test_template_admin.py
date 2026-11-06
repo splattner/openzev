@@ -122,7 +122,7 @@ class TemplateAdminPermissionTests(TestCase):
     def test_zev_owner_cannot_read_other_global_email_templates(self):
         auth(self.client, self.owner)
 
-        for template_key in ("participant_onboarding", "email_verification", "participant_magic_link"):
+        for template_key in ("participant_onboarding", "email_verification", "participant_magic_link", "document_delivered"):
             with self.subTest(template_key=template_key):
                 resp = self.client.get(f"/api/v1/invoices/invoices/email-template/{template_key}/")
                 self.assertEqual(resp.status_code, 403)

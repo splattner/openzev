@@ -22,7 +22,7 @@
 | 3 | Operator documents (upload, withdraw), issued annual statement / financial summary / tariff overview | #1209, stacked on #1208 |
 | 4 | Frontend: participant *My documents* page, manager *Delivered documents* tab, upload and issue dialogs, deliver-contract action; `deliver-contract` also by participant; demo seed | stacked on #1209 |
 | 5 | Links and the bell: the public invoice PDF serves the delivered snapshot, `{inbox_url}` in the invoice email, `invoice.sent` carries `document_id`, new `document.delivered` notification | stacked on #1210 |
-| 5b | Email for documents: opt-in `notify` on upload and issue, `document_delivered` template | — |
+| 5b | Email for documents: opt-in `notify` on upload, issue and deliver-contract (checkbox on upload and issue), `document_delivered` template | stacked on #1213 |
 | 6 | Cut-over (follow-up release): participants lose the live invoice and report endpoints | — |
 
 Each increment is its own PR and can ship alone. Phases 1–5 add; only phase 6 removes anything.
@@ -174,7 +174,7 @@ The list for a participant is a single indexed query on `participant__user`. It 
 
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
-| `/api/v1/inbox/documents/` | POST (`multipart/form-data`) | manager of `zev` | Deliver an operator document. Fields: `zev` (required), `title` (required, ≤200), `file` (required), `audience` (`all` \| `selected`, default `all`), `participant_ids` (required when `selected`). `notify` joins in phase 5, with the notification it controls |
+| `/api/v1/inbox/documents/` | POST (`multipart/form-data`) | manager of `zev` | Deliver an operator document. Fields: `zev` (required), `title` (required, ≤200), `file` (required), `audience` (`all` \| `selected`, default `all`), `participant_ids` (required when `selected`), `notify` (boolean, default `false`: also email the participants, §6.5) |
 | `/api/v1/inbox/documents/{id}/withdraw/` | POST | manager of the row's ZEV | Sets `withdrawn_at` / `withdrawn_by` on an `operator` row and answers 200 with the document; any other kind → 400. Idempotent. A participant, a viewer and a manager of another ZEV get 404; a disabled ZEV refuses a manager (400) but not an admin |
 
 Validation for `POST`:
@@ -183,16 +183,16 @@ Validation for `POST`:
 - `audience="all"`: one row for every participant of the ZEV whose link is current **now** (`live_participant_q`; anonymisation, #793, does not exist yet and will have to leave its rows out of this set). No participant to deliver to → 400 on `audience`. A participant who joins later gets nothing (same rule as notification recipients).
 - `selected`: every id must belong to `zev`; otherwise 400 naming the field, not the other ZEV.
 - The ZEV must not be disabled (`assert_zev_not_disabled`).
-- Response `201`: `{ batch_id, delivered: <n>, without_account: <m>, documents: [...] }`. `without_account` counts rows whose participant has no linked account, so the manager sees "3 of 12 will see this once an account is linked".
+- Response `201`: `{ batch_id, delivered: <n>, without_account: <m>, emailed: <e>, without_email: <w>, documents: [...] }`. `without_account` counts rows whose participant has no linked account, so the manager sees "3 of 12 will see this once an account is linked". `emailed` and `without_email` are 0 unless `notify` was set: emails queued, and recipients skipped for want of an address (§6.5).
 
 ### 5.3 Write: issue reports, deliver a contract
 
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
-| `/api/v1/inbox/issue/annual-statement/` | POST | manager of `zev` | Body `{ zev, year, participant_ids? }`; omitted `participant_ids` = every participant with a billed invoice that year **that reached them** (`billed_invoices` and `sent_to_participant()`, because the statement is rendered with `sent_only=True` and would otherwise list nothing). Renders with the existing `generate_annual_statement_pdf(..., sent_only=True)` and stores the bytes. Re-issuing a year supersedes the earlier row |
+| `/api/v1/inbox/issue/annual-statement/` | POST | manager of `zev` | Body `{ zev, year, participant_ids?, notify? }`; omitted `participant_ids` = every participant with a billed invoice that year **that reached them** (`billed_invoices` and `sent_to_participant()`, because the statement is rendered with `sent_only=True` and would otherwise list nothing). Renders with the existing `generate_annual_statement_pdf(..., sent_only=True)` and stores the bytes. Re-issuing a year supersedes the earlier row |
 | `/api/v1/inbox/issue/financial-summary/` | POST | manager of `zev` | Same, for producers. `FinancialSummaryView` has no eligibility rule of its own (it renders for whoever is named), so the inbox defines one from what the summary reports: a participant with a billed invoice in the year that carries a `feed_in` item or a `local_energy` item below zero (`issuing.summary_participant_ids`) |
-| `/api/v1/inbox/issue/tariff-overview/` | POST | manager of `zev` | Body `{ zev, participant_ids? }`; delivers the tariff overview as of today (`scope=valid`) to every current participant, or to the named ones. It is rendered once and every row shares the file. Re-issuing supersedes each participant's earlier overview |
-| `/api/v1/inbox/documents/deliver-contract/` | POST | manager of `zev` | Body `{ contract_issue }` **or** `{ participant }` (exactly one, else 400); with `participant` it means that participant's latest issued version, and a participant with no issued contract answers 404. Delivers that stored version to its participant. Refuses a version that is not the participant's latest (409) so an outdated contract is not handed over. An unknown issue and one of another ZEV both answer 404; a disabled ZEV refuses a manager (400) but not an admin; delivering the same version again answers 200 with `delivered: 0`. The first delivery answers 201 |
+| `/api/v1/inbox/issue/tariff-overview/` | POST | manager of `zev` | Body `{ zev, participant_ids?, notify? }`; delivers the tariff overview as of today (`scope=valid`) to every current participant, or to the named ones. It is rendered once and every row shares the file. Re-issuing supersedes each participant's earlier overview |
+| `/api/v1/inbox/documents/deliver-contract/` | POST | manager of `zev` | Body `{ contract_issue }` **or** `{ participant }` (exactly one, else 400), plus optional `notify`; with `participant` it means that participant's latest issued version, and a participant with no issued contract answers 404. Delivers that stored version to its participant. Refuses a version that is not the participant's latest (409) so an outdated contract is not handed over. An unknown issue and one of another ZEV both answer 404; a disabled ZEV refuses a manager (400) but not an admin; delivering the same version again answers 200 with `delivered: 0`. The first delivery answers 201 |
 
 **Contracts are delivered explicitly, not on issue.** A `ContractIssue` is minted whenever a manager downloads the contract (`issue_contract_pdf` in the participant `contract` action), including to preview or print it for signing. Delivering at that moment would put a contract into the participant's inbox before the operator has handed it over. (This refines #862, which proposed delivery "when a `ContractIssue` version is issued".)
 
@@ -257,7 +257,10 @@ Decision for this spec, to be honoured by #793:
 - `invoice.sent` (exists) gains `document_id` in its payload (absent when the invoice could not be delivered into the inbox), so the bell links to `/me/documents` instead of the live invoice list. It is raised after the inbox delivery for that reason, in both `mark_invoice_sent` and `record_email_delivery`. No second event for the same fact.
 - New registry type `document.delivered` (audience `participant`, not mandatory) for `contract`, `annual_statement`, `financial_summary`, `tariff_overview`, `operator`; payload `{ document_id, kind, title }`; `dedupe_key = f"document.delivered:{document.pk}"`.
 - The notification is raised by `inbox.views.delivery_response` for the rows a call wrote (`Delivery.fresh`), so every delivering route announces and an idempotent repeat does not. The bell page link is `/me/documents` for both types.
-- Email for non-invoice documents (**increment 5b, not yet built**) is **opt-in per delivery** (`notify`), link-only and without an attachment: new `EmailTemplate` type `document_delivered` with defaults `DEFAULT_DOCUMENT_EMAIL_SUBJECT` / `_BODY` in `invoices/models.py`, edited in the admin console beside the others. Recipients without an email address are skipped and counted in the response. Sent through the existing email task and `EmailLog`.
+- **Email for non-invoice documents is opt-in per delivery** (`notify`, default off), link-only and without an attachment. It is queued by `delivery_response` through `inbox.emails.queue_document_emails` for the rows the call wrote (`Delivery.fresh`), once the transaction commits, so a repeated idempotent delivery and a refused one send nothing, and an invoice never goes through it (its own email carries the PDF). A participant with no email address is skipped and counted in `without_email`; one without a login is still emailed, the link then leads to sign-in.
+- New `EmailTemplate` key `document_delivered`, variables `{participant_name}`, `{zev_name}`, `{title}`, `{inbox_url}` (`build_document_email_context`, field catalogue `admin.emailTemplates.fields.*`). Like the sign-in mail it is sent to one participant of one ZEV, so the shipped default follows the ZEV's `invoice_language` (`DOCUMENT_EMAIL_DEFAULTS_BY_LANGUAGE`, with `DEFAULT_DOCUMENT_EMAIL_SUBJECT` / `_BODY` as the English default in `EMAIL_TEMPLATE_DEFAULTS`); a saved override replaces every language, and an invalid override falls back to the language default. Admins edit it beside the others, in `TRANSLATED_TEMPLATE_KEYS` for the language note.
+- Sent by the Celery task `inbox.tasks.send_document_email_task(document_id)` (`max_retries=3`, 60 s apart). It sends nothing for a document that is gone, withdrawn or superseded, or whose participant has lost the address.
+- **Traceability is the audit trail, not `EmailLog`.** `EmailLog.invoice` is a required foreign key and the table feeds the readiness view and the invoice detail, so it is left alone. Each send is an `inbox.document.emailed` event (category `participant`, source `celery`, status `SUCCESS`); a send that gave up after its retries is the same action with status `FAILED` and `metadata.error` holding the exception **class** only. The address is never written to the audit event, because an SMTP error text can quote it. Extending `EmailLog` (an optional document link and a migration) is possible later if operators want one log for both.
 
 ### 6.6 Backfill
 
@@ -286,7 +289,7 @@ Decision for this spec, to be honoured by #793:
 - *Issue documents* (dialog): which document (annual statement, financial summary, tariff overview), the year (not for the tariff overview; `YearPicker` over this year and the five before, defaulting to the year just ended), all eligible or selected participants, and a note that issuing again supersedes. The same result view.
 - *Withdraw* (row action on an operator document, behind a `ConfirmDialog`).
 - *Deliver contract to inbox*: an item in the participant's action menu on the participants page (`ParticipantCardsSection`), never automatic. It posts `{ participant }` to `deliver-contract`, which delivers the participant's latest issued version (§5.3). There is no contract version list in the UI, so naming the participant is what lets the page act without knowing an issue id. An unissued contract answers 404, which the page explains ("download it first").
-- **`notify` is not in the UI yet:** the bell notification is always raised (increment 5); the email and the checkbox that controls it arrive in increment 5b.
+- **`notify`:** a `NotifyField` checkbox (off by default, "Also notify participants by email", with a hint that the email has a link and no file) in the upload and issue dialogs, and the result view adds `inbox.result.emailed` and `inbox.result.withoutEmail`. The bell notification is not optional. Deliver contract does not offer the checkbox: a single, deliberate action that the participant is told about by the bell; the API accepts `notify` for it.
 - All user-facing text in the locale files (`frontend/src/i18n/locales`), a top-level `inbox` block in `de`, `fr`, `it` and `en` (plus `nav.myDocuments` and `pages.billingHub.tabs.documents`).
 - **Demo data:** `seed_demo` clears and refills the inbox of both demo communities after the invoice PDFs are written (backfill of the sent invoices, plus a tariff overview and a notice for every current participant with an account of the main community), so the guide screenshots have something to show and a re-seed never lists a document twice.
 
@@ -328,6 +331,8 @@ export interface DeliveryResult {
   batch_id: string
   delivered: number
   without_account: number
+  emailed: number
+  without_email: number
   documents: DeliveredDocument[]
 }
 ```
@@ -356,7 +361,7 @@ Decisions the issue left open, and how this spec settles them:
 |---|---|---|
 | Retention and anonymisation (#793) | Files stay; anonymisation unlinks the account (§6.3) | Accounting retention wins over metadata; the account link is what grants access |
 | Annual statement automatic or issued | **Issued by the operator**, bulk action available | Figures can still be corrected after year end; a wrong statement must not arrive unreviewed |
-| Read receipts | **No.** Only `delivered_at`; the outbox shows email delivery from `EmailLog` | Tracking when a person opened a document is monitoring; "delivered" is enough for a dispute about whether something was sent |
+| Read receipts | **No.** Only `delivered_at`; the outbox shows the delivery date, and a document email, when sent, is in the audit trail (§6.5) | Tracking when a person opened a document is monitoring; "delivered" is enough for a dispute about whether something was sent |
 | Upload limits and types | PDF only, `%PDF-` magic bytes, 10 MiB (`INBOX_MAX_UPLOAD_BYTES`) | One safe, previewable type; no active content to serve |
 | Notification | `invoice.sent` reused; `document.delivered` new; email opt-in, link-only, no attachment | The invoice email already attaches the PDF; a second mail for the same fact is noise |
 | Contract delivery | Explicit action, not on issue (§5.3) | `ContractIssue` also records manager previews |
@@ -436,7 +441,9 @@ The statement and summary generators are mocked, so these tests pin who is eligi
 - `zev/test_transfer_delivered_documents.py` (increment 1b, 20 tests): export / import round trip at format 11 (bytes, history, supersession chain, contract held as a file, invoice link), a v10 archive imports without rows, and rejected archives (checksum, missing member, non-PDF, kind, participant, count) leave no files behind.
 - `notifications/test_producers.py` (increment 5, 3 changed or added): `invoice.sent` payload carries `document_id`, names the inbox entry of the invoice, and omits it when the delivery failed.
 - `inbox/test_issue_reports.py::AnnouncementTests` (increment 5, 5 tests): an upload notifies participants with a login only, the tariff overview notifies per row, a contract delivered twice notifies once, a refused delivery notifies nobody, a re-issued statement notifies again.
+- `inbox/test_document_email.py` (increment 5b, 15 tests): `NotifyFlagTests` (10) nothing is emailed unless asked, every recipient with an address is emailed, a participant without one is counted and skipped, the email links to the inbox with no attachment, the default follows the ZEV's language, a saved template replaces it, a broken template falls back, the tariff overview emails too, a contract delivered twice is emailed once, a refused delivery emails nobody; `SendTaskTests` (5) a send is audited without the address, a withdrawn document is not emailed, an unknown document is ignored, an invoice is never emailed from here, a failing send retries and audits once when it gives up. `invoices/test_field_catalog.py` and `test_template_admin.py` cover the new key.
 - `invoices/test_public_invoice_access.py` (increment 5, 3 added): the public PDF serves the delivered snapshot over the current file, serves it when the invoice file is gone, and falls back to the invoice file when the snapshot file is missing.
+- `frontend/tests/inbox-notify.test.ts` (increment 5b, 4 tests): `notify` is sent with an upload or an issue only when set, and the result notice reports emails queued and recipients without an address only when there are some.
 - `frontend/tests/notifications.test.ts` (increment 5, 2 added): links for `invoice.sent` with and without `document_id`, and for `document.delivered`.
 - Phase 6: `invoices/test_participant_invoice_visibility.py` is rewritten so a participant gets 404 on every live endpoint and managers are unchanged (≈6 changed).
 

@@ -179,8 +179,9 @@ class CatalogPayloadShapeTests(SimpleTestCase):
                         self.assertTrue(entry["description_key"].startswith("admin."))
 
     def test_email_catalog_payload_has_the_ui_shape(self):
-        for template_key in ("invoice_email", "participant_onboarding", "email_verification", "participant_magic_link"):
+        for template_key in ("invoice_email", "participant_onboarding", "email_verification", "participant_magic_link", "document_delivered"):
             with self.subTest(template_key=template_key):
+                self.assertTrue(email_field_catalog(template_key))
                 for group in email_field_catalog(template_key):
                     self.assertIsNone(group["group_title_key"])
                     for entry in group["fields"]:

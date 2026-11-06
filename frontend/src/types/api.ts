@@ -3097,5 +3097,8 @@ export interface DeliveryResult {
     batch_id: string
     delivered: number
     without_account: number
+    /** Emails queued, and recipients skipped for want of an address; 0 unless `notify` was set. */
+    emailed: number
+    without_email: number
     documents: DeliveredDocument[]
 }

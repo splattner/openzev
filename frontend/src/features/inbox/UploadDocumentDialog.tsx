@@ -11,6 +11,7 @@ import { queryKeys } from '../../lib/api/queryKeys'
 import type { DeliveryResult, Participant } from '../../types/api'
 import { AudienceFields, type Audience } from './AudienceFields'
 import { DeliveryResultNotice } from './DeliveryResultNotice'
+import { NotifyField } from './NotifyField'
 import { formatFileSize, MAX_UPLOAD_BYTES, uploadFileProblem } from './documentPresentation'
 import './inbox.css'
 
@@ -38,10 +39,11 @@ function UploadForm({ onClose, zevId, participants }: Omit<UploadDocumentDialogP
   const [file, setFile] = useState<File | null>(null)
   const [audience, setAudience] = useState<Audience>('all')
   const [selected, setSelected] = useState<string[]>([])
+  const [notify, setNotify] = useState(false)
   const [result, setResult] = useState<DeliveryResult | null>(null)
 
   const mutation = useMutation({
-    mutationFn: () => uploadInboxDocument({ zev: zevId, title: title.trim(), file: file as File, audience, participantIds: selected }),
+    mutationFn: () => uploadInboxDocument({ zev: zevId, title: title.trim(), file: file as File, audience, participantIds: selected, notify }),
     onSuccess: (data) => {
       setResult(data)
       void queryClient.invalidateQueries({ queryKey: queryKeys.inbox.all })
@@ -99,6 +101,7 @@ function UploadForm({ onClose, zevId, participants }: Omit<UploadDocumentDialogP
         allLabel={t('inbox.upload.audienceAll')}
         disabled={mutation.isPending}
       />
+      <NotifyField checked={notify} onChange={setNotify} disabled={mutation.isPending} />
       {mutation.isError && (
         <p role="alert" className="text-error grid-span-full m-0">{formatApiError(mutation.error, t('common.error'))}</p>
       )}

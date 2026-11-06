@@ -25,10 +25,11 @@ const EMAIL_TEMPLATE_LABEL_KEYS: Record<EmailTemplateKey, string> = {
     participant_magic_link: 'admin.emailTemplates.magicLinkEmail',
     zev_access_invitation: 'admin.emailTemplates.zevAccessInvitationEmail',
     zev_access_granted: 'admin.emailTemplates.zevAccessGrantedEmail',
+    document_delivered: 'admin.emailTemplates.documentDeliveredEmail',
 }
 
 /** Templates shipped in the ZEV's invoice language until an operator overrides them. */
-const TRANSLATED_TEMPLATE_KEYS = new Set<EmailTemplateKey>(['participant_magic_link', 'zev_access_invitation', 'zev_access_granted'])
+const TRANSLATED_TEMPLATE_KEYS = new Set<EmailTemplateKey>(['participant_magic_link', 'zev_access_invitation', 'zev_access_granted', 'document_delivered'])
 
 type EmailDraft = Pick<EmailTemplateResponse, 'subject' | 'body'>
 const selectEmailDraft = ({ subject, body }: EmailDraft): EmailDraft => ({ subject, body })
@@ -216,6 +217,7 @@ export function AdminEmailTemplatesPage({ embedded = false, template }: {
         { key: 'participant_magic_link', label: t(EMAIL_TEMPLATE_LABEL_KEYS.participant_magic_link) },
         { key: 'zev_access_invitation', label: t(EMAIL_TEMPLATE_LABEL_KEYS.zev_access_invitation) },
         { key: 'zev_access_granted', label: t(EMAIL_TEMPLATE_LABEL_KEYS.zev_access_granted) },
+        { key: 'document_delivered', label: t(EMAIL_TEMPLATE_LABEL_KEYS.document_delivered) },
     ]
 
     return (
