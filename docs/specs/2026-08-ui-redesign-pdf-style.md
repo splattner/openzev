@@ -493,19 +493,7 @@ live on Reports; participant invoice PDF actions remain on the dashboard.
   3. `ConsumptionSplitCard`: stacked from-ZEV / from-grid kWh bars plus a
      right-hand 0–100 % axis with the `from_zev_rate` line.
   4. `HourlyProfileCard` when the profile has data.
-  5. `ParticipantInvoicesCard`: the invoice list, fetched alongside the summary
-     and not tied to the period. It renders outside the analytics block, so it
-     also shows when the summary request fails. Its rows are the invoice rows of
-     the account's document inbox (`listInboxDocuments`, kept to the account's own
-     participations with `ownParticipantIds`, SPEC-2026-11-participant-document-inbox
-     §7.1), shown by `InvoiceDocumentsTable` with their live figures and a download. It spans all the account's communities and
-     says so in its title and community column when the account has more than
-     one membership, including former or disabled communities.
-
-Dashboard and My invoices share the unscoped `invoices.mine()` cache and poll
-every 15 s while a personal invoice PDF is pending. Existing PDFs stay usable
-during regeneration. Failed refetches keep cached rows under a retry warning;
-an initial failure shows an error, and the first load shows a table skeleton.
+  There is no invoice list on the participant dashboard (removed with the document inbox, #862): *My invoices* and *My documents* are the places for invoices, so the dashboard keeps to energy.
 Invoice actions, email retries and admin deletion invalidate the shared cache.
 
 ### 7.10 TypeScript types

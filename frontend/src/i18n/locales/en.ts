@@ -199,7 +199,7 @@ export const en = {
     dashboard: {
         title: 'Dashboard',
         description: 'Start building your Swiss ZEV or vZEV billing workflow.',
-        participantDescription: 'Your consumption, your share from the ZEV, and your invoices.',
+        participantDescription: 'Your consumption and your share from the ZEV.',
     },
     common: {
         timeHours: 'Hour',
@@ -3660,9 +3660,6 @@ export const en = {
                 description: 'Average hourly energy draw over the billing period — split between local ZEV energy and grid import.',
                 ownSystemNote: 'The dashed line shows consumption as the participant\'s own system (for example Solar Manager) reports it, not read from the meter.',
             },
-            invoicesSection: 'Invoices',
-            invoicesAllCommunitiesSection: 'Invoices from all communities',
-            failedInvoices: 'Failed to load invoices.',
             cockpit: {
                 title: 'Billing cockpit',
                 failed: 'Failed to load period readiness.',
@@ -3739,7 +3736,6 @@ export const en = {
                     participantExpiring: '{{name}} ends {{validTo}} — check meter assignments',
                 },
             },
-            noInvoices: 'No invoices available.',
             energyFlow: {
                 title: 'Energy Flow',
                 gridImport: 'Grid Import',

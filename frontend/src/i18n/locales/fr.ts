@@ -190,7 +190,7 @@ export const fr = {
     dashboard: {
         title: 'Tableau de bord',
         description: 'Commencez avec votre flux de facturation RCP ou RCPv suisse.',
-        participantDescription: 'Votre consommation, votre part issue du RCP et vos factures.',
+        participantDescription: 'Votre consommation et votre part issue du RCP.',
     },
     common: {
         timeHours: 'Heure',
@@ -3649,9 +3649,6 @@ export const fr = {
                 description: 'Consommation horaire moyenne sur la période de facturation — répartie entre énergie locale CEL et importation réseau.',
                 ownSystemNote: 'La ligne en pointillés montre la consommation selon le propre système de la personne (p. ex. Solar Manager), non relevée sur le compteur.',
             },
-            invoicesSection: 'Factures',
-            invoicesAllCommunitiesSection: 'Factures de tous les RCP',
-            failedInvoices: 'Impossible de charger les factures.',
             cockpit: {
                 title: 'Cockpit de facturation',
                 failed: 'Impossible de charger l\'état de la période.',
@@ -3728,7 +3725,6 @@ export const fr = {
                     participantExpiring: '{{name}} se termine le {{validTo}} — vérifiez les affectations de compteurs',
                 },
             },
-            noInvoices: 'Aucune facture disponible.',
             energyFlow: {
                 title: 'Flux d\'énergie',
                 gridImport: 'Import réseau',

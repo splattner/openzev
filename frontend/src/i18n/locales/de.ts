@@ -190,7 +190,7 @@ export const de = {
     dashboard: {
         title: 'Dashboard',
         description: 'Starten Sie mit Ihrem Schweizer ZEV oder vZEV-Abrechnungsworkflow.',
-        participantDescription: 'Ihr Verbrauch, Ihr Anteil aus dem ZEV und Ihre Rechnungen.',
+        participantDescription: 'Ihr Verbrauch und Ihr Anteil aus dem ZEV.',
     },
     common: {
         timeHours: 'Stunde',
@@ -3649,9 +3649,6 @@ export const de = {
                 description: 'Durchschnittlicher stündlicher Energiebezug über die Abrechnungsperiode — aufgeteilt in lokale ZEV-Energie und Netzbezug.',
                 ownSystemNote: 'Die gestrichelte Linie zeigt den Verbrauch laut dem eigenen System der Person (z. B. Solar Manager), nicht vom Zähler abgelesen.',
             },
-            invoicesSection: 'Rechnungen',
-            invoicesAllCommunitiesSection: 'Rechnungen aller ZEVs',
-            failedInvoices: 'Rechnungen konnten nicht geladen werden.',
             cockpit: {
                 title: 'Abrechnungs-Cockpit',
                 failed: 'Abrechnungsbereitschaft konnte nicht geladen werden.',
@@ -3728,7 +3725,6 @@ export const de = {
                     participantExpiring: '{{name}} endet am {{validTo}} — Messpunkt-Zuweisungen prüfen',
                 },
             },
-            noInvoices: 'Keine Rechnungen verfügbar.',
             energyFlow: {
                 title: 'Energiefluss',
                 gridImport: 'Netzbezug',
