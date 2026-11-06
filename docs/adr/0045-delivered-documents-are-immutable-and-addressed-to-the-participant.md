@@ -1,6 +1,6 @@
 # ADR 0045: Delivered documents are immutable, held as their own copy, and addressed to the participant
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-05
 
 ## Context
@@ -63,7 +63,8 @@ Positive:
 
 Trade-offs:
 - Storage is duplicated for invoices (the inbox copy beside `Invoice.pdf_file`); a broadcast upload
-  stores one file for many rows.
+  stores one file for many rows. A person who holds several participant rows gets one copy of a
+  broadcast, on the first row; rows without an account are addressed one by one.
 - Relinking a participant row to a different account gives that account the row's history. The row is
   the relationship, so this is by design, and is covered by the existing link audit events.
 - A document delivered to the wrong participant cannot be recalled for invoices and reports (they are
