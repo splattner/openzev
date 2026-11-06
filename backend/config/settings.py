@@ -247,6 +247,8 @@ REST_FRAMEWORK["NUM_PROXIES"] = NUM_PROXIES
 # Rationale: docs/specs/2026-03-metering-import-and-quality.md §4.4.
 IMPORT_MAX_ROWS = env.int("IMPORT_MAX_ROWS", default=200_000)
 TRANSFER_MAX_DECOMPRESSED_MB = env.int("TRANSFER_MAX_DECOMPRESSED_MB", default=500)
+# One operator document uploaded to the participant inbox (SPEC-2026-11-participant-document-inbox §5.2).
+INBOX_MAX_UPLOAD_BYTES = env.int("INBOX_MAX_UPLOAD_BYTES", default=10 * 1024 * 1024)
 
 from datetime import timedelta
 

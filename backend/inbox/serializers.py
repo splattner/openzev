@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework import serializers
 
 from .models import DeliveredDocument
@@ -38,3 +39,51 @@ class DeliveryResultSerializer(serializers.Serializer):
     delivered = serializers.IntegerField()
     without_account = serializers.IntegerField()
     documents = DeliveredDocumentSerializer(many=True)
+
+
+class UploadDocumentSerializer(serializers.Serializer):
+    """An operator document for the whole ZEV or a chosen few (spec §5.2).
+
+    The file is judged by its content, never by its name or the client's
+    content type: it has to start with the PDF magic bytes.
+    """
+
+    zev = serializers.UUIDField()
+    title = serializers.CharField(max_length=200)
+    file = serializers.FileField(allow_empty_file=True)
+    audience = serializers.ChoiceField(choices=["all", "selected"], default="all")
+    participant_ids = serializers.ListField(child=serializers.UUIDField(), required=False, allow_empty=True)
+
+    def validate_title(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("This field may not be blank.")
+        return value
+
+    def validate_file(self, value):
+        limit = settings.INBOX_MAX_UPLOAD_BYTES
+        if value.size == 0:
+            raise serializers.ValidationError("The file is empty.")
+        if value.size > limit:
+            raise serializers.ValidationError(f"The file is larger than {limit // (1024 * 1024)} MiB.")
+        head = value.read(5)
+        value.seek(0)
+        if head != b"%PDF-":
+            raise serializers.ValidationError("Only PDF files can be delivered.")
+        return value
+
+    def validate(self, attrs):
+        if attrs["audience"] == "selected" and not attrs.get("participant_ids"):
+            raise serializers.ValidationError({"participant_ids": ["Choose at least one participant."]})
+        return attrs
+
+
+class IssueSerializer(serializers.Serializer):
+    """Shared by the three issue endpoints; ``year`` and ``participant_ids`` apply where meaningful."""
+
+    zev = serializers.UUIDField()
+    participant_ids = serializers.ListField(child=serializers.UUIDField(), required=False, allow_empty=False)
+
+
+class IssueYearSerializer(IssueSerializer):
+    year = serializers.IntegerField(min_value=1900, max_value=9998)
