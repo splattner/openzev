@@ -10,12 +10,20 @@ vi.mock('../src/lib/managedZev', () => {
     const context = { useManagedZev: () => ({ selectedZev: { id: 'z1', name: 'Sonnenhof' }, relation: 'manager' }) }
     return { ...context, useOptionalManagedZev: context.useManagedZev }
 })
+let canWrite = true
+vi.mock('../src/lib/communityAccess', () => ({
+    useCommunityAccess: () => ({ canWriteSelectedCommunity: canWrite }),
+    useScopeNote: () => undefined,
+}))
 vi.mock('../src/features/inbox/Outbox', () => ({ Outbox: () => createElement('div', { 'data-testid': 'outbox' }) }))
 
 import { ParticipantDocumentsPage } from '../src/pages/ParticipantDocumentsPage'
 
 const cleanups: Array<() => void> = []
-afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()))
+afterEach(() => {
+    cleanups.splice(0).forEach((cleanup) => cleanup())
+    canWrite = true
+})
 
 describe('ParticipantDocumentsPage', () => {
     it('is a page of its own: the community, a title and the outbox, with no billing tabs', () => {
@@ -26,9 +34,21 @@ describe('ParticipantDocumentsPage', () => {
         cleanups.push(() => { act(() => root.unmount()); container.remove() })
 
         expect(container.querySelector('h1')?.textContent).toBe('nav.documents')
-        expect(container.textContent).toContain('pages.participantDocuments.description')
+        expect(container.textContent).toMatch(/pages\.participantDocuments\.description(?!ReadOnly)/)
         expect(container.textContent).toContain('Sonnenhof')
         expect(container.querySelector('[data-testid="outbox"]')).not.toBeNull()
         expect(container.querySelector('[role="tablist"]')).toBeNull()
+    })
+
+    it('describes only what is listed to a role that cannot issue or upload', () => {
+        canWrite = false
+        const container = document.createElement('div')
+        document.body.appendChild(container)
+        const root = createRoot(container)
+        act(() => root.render(createElement(MemoryRouter, null, createElement(MantineProvider, null, createElement(ParticipantDocumentsPage)))))
+        cleanups.push(() => { act(() => root.unmount()); container.remove() })
+
+        expect(container.textContent).toContain('pages.participantDocuments.descriptionReadOnly')
+        expect(container.textContent).not.toMatch(/pages\.participantDocuments\.description(?!ReadOnly)/)
     })
 })

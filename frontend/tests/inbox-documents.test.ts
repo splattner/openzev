@@ -4,6 +4,7 @@ import {
   documentStanding,
   documentYear,
   formatFileSize,
+  groupOutbox,
   uploadFileProblem,
 } from '../src/features/inbox/documentPresentation'
 import { issueYears } from '../src/features/inbox/IssueReportsDialog'
@@ -72,5 +73,34 @@ describe('formatFileSize', () => {
 describe('issueYears', () => {
   it('lists this year and the five before, newest first', () => {
     expect(issueYears('2026-11-05')).toEqual([2026, 2025, 2024, 2023, 2022, 2021])
+  })
+})
+
+describe('groupOutbox', () => {
+  const row = (id: string, overrides: Partial<DeliveredDocument> = {}) => doc({ id, batch_id: 'b1', participant: id, ...overrides })
+
+  it('folds the rows of one notice delivery into a single entry, where its first row was', () => {
+    const entries = groupOutbox([row('a'), doc({ id: 'inv', kind: 'invoice', batch_id: null }), row('b'), row('c')])
+
+    expect(entries.map((entry) => entry.documents.map((document) => document.id))).toEqual([['a', 'b', 'c'], ['inv']])
+  })
+
+  it('groups the tariff overview the same way and keeps two deliveries apart', () => {
+    const entries = groupOutbox([
+      row('a', { kind: 'tariff_overview' }), row('b', { kind: 'tariff_overview' }),
+      row('c', { batch_id: 'b2' }), row('d', { batch_id: 'b2' }),
+    ])
+
+    expect(entries.map((entry) => entry.documents.length)).toEqual([2, 2])
+    expect(new Set(entries.map((entry) => entry.key)).size).toBe(2)
+  })
+
+  it('leaves statements, invoices and anything without a batch as one entry per row', () => {
+    const entries = groupOutbox([
+      row('a', { kind: 'annual_statement' }), row('b', { kind: 'annual_statement' }),
+      doc({ id: 'c', batch_id: null }), doc({ id: 'd', batch_id: null }),
+    ])
+
+    expect(entries).toHaveLength(4)
   })
 })

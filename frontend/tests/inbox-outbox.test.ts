@@ -13,7 +13,8 @@ vi.mock('../src/lib/appSettings', async (importOriginal) => ({
 }))
 vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast: vi.fn() }) }))
 vi.mock('../src/lib/managedZev', () => ({ useManagedZev: () => ({ selectedZevId: 'z1' }) }))
-vi.mock('../src/lib/communityAccess', () => ({ useCommunityAccess: () => ({ canWriteSelectedCommunity: true }) }))
+let canWrite = true
+vi.mock('../src/lib/communityAccess', () => ({ useCommunityAccess: () => ({ canWriteSelectedCommunity: canWrite }) }))
 vi.mock('../src/lib/api/inbox', () => ({
     listInboxDocuments: vi.fn(),
     withdrawInboxDocument: vi.fn(),
@@ -66,7 +67,7 @@ const headers = (container: HTMLElement) =>
     Array.from(container.querySelectorAll('.doc-wide th')).map((cell) => cell.textContent)
 
 describe('Outbox table', () => {
-    afterEach(() => vi.clearAllMocks())
+    afterEach(() => { vi.clearAllMocks(); canWrite = true })
 
     it('leaves out the empty Status column when no row has a badge', async () => {
         vi.mocked(inboxApi.listInboxDocuments).mockResolvedValue([doc({ id: 'a', participant: 'p1' })])
@@ -102,5 +103,42 @@ describe('Outbox table', () => {
         expect(actionsCell?.classList.contains('doc-actions-col')).toBe(true)
         expect(page.container.querySelectorAll('.doc-wide tbody [style]')).toHaveLength(0)
         page.unmount()
+    })
+
+    it('shows one notice sent to several people as one row that opens to the addressees', async () => {
+        vi.mocked(inboxApi.listInboxDocuments).mockResolvedValue([
+            doc({ id: 'a', participant: 'p1', participant_name: 'Anna', batch_id: 'b1' }),
+            doc({ id: 'b', participant: 'p2', participant_name: 'Ben', batch_id: 'b1' }),
+            doc({ id: 'c', participant: 'p1', participant_name: 'Anna', kind: 'invoice', title: 'OZV-1' }),
+        ])
+        const page = render()
+        await settled(page, 'OZV-1')
+
+        const rows = [...page.container.querySelectorAll('.doc-wide tbody tr')]
+        expect(rows).toHaveLength(2)
+        expect(rows[0].textContent).toContain('inbox.outbox.recipients')
+        expect([...rows[0].querySelectorAll('.doc-recipients li')].map((item) => item.textContent)).toEqual([
+            'Anna', expect.stringContaining('Ben'),
+        ])
+        expect(rows[1].textContent).toContain('Anna')
+        page.unmount()
+    })
+
+    it('puts Withdraw in a menu and not beside Download, and offers none to a read-only role', async () => {
+        vi.mocked(inboxApi.listInboxDocuments).mockResolvedValue([doc({ id: 'a' })])
+        const page = render()
+        await settled(page, 'House rules')
+
+        const row = page.container.querySelector('.doc-wide tbody tr') as HTMLElement
+        const labels = [...row.querySelectorAll('button')].map((button) => button.getAttribute('aria-label'))
+        expect(labels).toEqual(['inbox.downloadLabel', 'inbox.outbox.moreActions'])
+        expect(row.textContent).not.toContain('inbox.outbox.withdraw')
+        page.unmount()
+
+        canWrite = false
+        const readOnly = render()
+        await settled(readOnly, 'House rules')
+        expect([...readOnly.container.querySelectorAll('.doc-wide tbody tr button')]).toHaveLength(1)
+        readOnly.unmount()
     })
 })

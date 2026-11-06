@@ -41,6 +41,8 @@ function UploadForm({ onClose, zevId, participants }: Omit<UploadDocumentDialogP
   const [selected, setSelected] = useState<string[]>([])
   const [notify, setNotify] = useState(false)
   const [result, setResult] = useState<DeliveryResult | null>(null)
+  // Errors show after the first submit, by the field, instead of a button that is dead for no stated reason.
+  const [submitted, setSubmitted] = useState(false)
 
   const mutation = useMutation({
     mutationFn: () => uploadInboxDocument({ zev: zevId, title: title.trim(), file: file as File, audience, participantIds: selected, notify }),
@@ -51,10 +53,14 @@ function UploadForm({ onClose, zevId, participants }: Omit<UploadDocumentDialogP
   })
 
   const problem = file ? uploadFileProblem(file) : null
-  const invalid = !title.trim() || !file || problem !== null || (audience === 'selected' && selected.length === 0)
+  const titleMissing = !title.trim()
+  const fileMissing = !file
+  const audienceMissing = audience === 'selected' && selected.length === 0
+  const invalid = titleMissing || fileMissing || problem !== null || audienceMissing
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
+    setSubmitted(true)
     if (invalid || mutation.isPending) return
     mutation.mutate()
   }
@@ -74,7 +80,15 @@ function UploadForm({ onClose, zevId, participants }: Omit<UploadDocumentDialogP
     <form className="inline-form grid" onSubmit={submit} noValidate>
       <label className="grid-span-full">
         <span>{t('inbox.upload.titleField')}</span>
-        <input type="text" maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} required />
+        <input
+          type="text"
+          maxLength={200}
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          aria-invalid={submitted && titleMissing ? true : undefined}
+          required
+        />
+        {submitted && titleMissing && <small className="text-error">{t('inbox.upload.error.title')}</small>}
       </label>
       <label className="grid-span-full">
         <span>{t('inbox.upload.file')}</span>
@@ -82,13 +96,15 @@ function UploadForm({ onClose, zevId, participants }: Omit<UploadDocumentDialogP
           type="file"
           accept="application/pdf,.pdf"
           onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-          aria-invalid={problem ? true : undefined}
+          aria-invalid={problem || (submitted && fileMissing) ? true : undefined}
           required
         />
-        <small className={problem ? 'text-error' : 'muted'}>
+        <small className={problem || (submitted && fileMissing) ? 'text-error' : 'muted'}>
           {problem
             ? t(`inbox.upload.problem.${problem}`, { limit: formatFileSize(MAX_UPLOAD_BYTES) })
-            : t('inbox.upload.fileHint', { limit: formatFileSize(MAX_UPLOAD_BYTES) })}
+            : submitted && fileMissing
+              ? t('inbox.upload.error.file')
+              : t('inbox.upload.fileHint', { limit: formatFileSize(MAX_UPLOAD_BYTES) })}
         </small>
       </label>
       <AudienceFields
@@ -101,6 +117,7 @@ function UploadForm({ onClose, zevId, participants }: Omit<UploadDocumentDialogP
         allLabel={t('inbox.upload.audienceAll')}
         disabled={mutation.isPending}
       />
+      {submitted && audienceMissing && <p role="alert" className="text-error grid-span-full m-0">{t('inbox.upload.error.audience')}</p>}
       <NotifyField checked={notify} onChange={setNotify} disabled={mutation.isPending} />
       {mutation.isError && (
         <p role="alert" className="text-error grid-span-full m-0">{formatApiError(mutation.error, t('common.error'))}</p>
@@ -108,7 +125,6 @@ function UploadForm({ onClose, zevId, participants }: Omit<UploadDocumentDialogP
       <FormModalFooter
         onCancel={onClose}
         isPending={mutation.isPending}
-        disabled={invalid}
         submitIcon={<FontAwesomeIcon icon={faPaperPlane} fixedWidth />}
         submitLabel={t('inbox.upload.submit')}
       />

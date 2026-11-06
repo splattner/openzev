@@ -1,9 +1,11 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faDownload, faFileArrowUp, faPaperPlane } from '@fortawesome/free-solid-svg-icons'
+import { faDownload, faEllipsis, faFileArrowUp, faPaperPlane } from '@fortawesome/free-solid-svg-icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ActionMenu } from '../../components/ActionMenu'
 import { ConfirmDialog, useConfirmDialog } from '../../components/ConfirmDialog'
+import { Disclosure } from '../../components/Disclosure'
 import { Notice } from '../../components/Notice'
 import { PageSkeleton } from '../../components/PageSkeleton'
 import { Toolbar } from '../../components/Toolbar'
@@ -17,7 +19,7 @@ import { useManagedZev } from '../../lib/managedZev'
 import { useToast } from '../../lib/toast'
 import type { DeliveredDocument, DocumentKind } from '../../types/api'
 import { participantLabel } from './AudienceFields'
-import { DOCUMENT_KINDS, documentStanding, documentYear, KIND_ICON } from './documentPresentation'
+import { DOCUMENT_KINDS, documentStanding, documentYear, groupOutbox, KIND_ICON, type OutboxEntry } from './documentPresentation'
 import { StandingBadge, useDownloadDocument } from './DocumentsList'
 import { IssueReportsDialog, issueYears } from './IssueReportsDialog'
 import { UploadDocumentDialog } from './UploadDocumentDialog'
@@ -66,7 +68,7 @@ export function Outbox() {
   const byId = useMemo(() => new Map(participants.map((participant) => [participant.id, participant])), [participants])
 
   const withdraw = useMutation({
-    mutationFn: (document: DeliveredDocument) => withdrawInboxDocument(document.id),
+    mutationFn: (documents: DeliveredDocument[]) => Promise.all(documents.map((document) => withdrawInboxDocument(document.id))),
     onSuccess: () => {
       pushToast(t('inbox.outbox.withdrawn'), 'success')
       void queryClient.invalidateQueries({ queryKey: queryKeys.inbox.all })
@@ -74,25 +76,98 @@ export function Outbox() {
     onError: () => pushToast(t('common.error'), 'error'),
   })
 
-  function askWithdraw(document: DeliveredDocument) {
+  /** The rows of an entry that can still be taken back: an operator document not yet withdrawn. */
+  const withdrawable = (entry: OutboxEntry) =>
+    canWriteSelectedCommunity ? entry.documents.filter((document) => document.kind === 'operator' && !document.withdrawn_at) : []
+
+  function askWithdraw(entry: OutboxEntry) {
+    const rows = withdrawable(entry)
+    const first = entry.documents[0]
     confirm({
       title: t('inbox.outbox.withdrawTitle'),
-      message: t('inbox.outbox.withdrawMessage', { title: document.title, name: document.participant_name ?? '' }),
+      message: rows.length > 1
+        ? t('inbox.outbox.withdrawGroupMessage', { title: first.title, count: rows.length })
+        : t('inbox.outbox.withdrawMessage', { title: first.title, name: rows[0]?.participant_name ?? '' }),
       confirmText: t('inbox.outbox.withdraw'),
       isDangerous: true,
-      onConfirm: () => withdraw.mutateAsync(document).then(() => undefined),
+      onConfirm: () => withdraw.mutateAsync(rows).then(() => undefined),
     })
   }
 
   const documents = documentsQuery.data ?? []
+  const entries = useMemo(() => groupOutbox(documentsQuery.data ?? []), [documentsQuery.data])
   const isWithoutAccount = (document: DeliveredDocument) => {
     const addressee = document.participant ? byId.get(document.participant) : undefined
     return addressee != null && addressee.user == null
   }
+  /** What an entry says about itself: one standing when all its rows share it, and who has no account yet. */
+  const statusOf = (entry: OutboxEntry) => {
+    const standings = entry.documents.map(documentStanding)
+    return {
+      standing: standings.every((standing) => standing === standings[0]) ? standings[0] : null,
+      withoutAccount: entry.documents.filter(isWithoutAccount).length,
+    }
+  }
   // The Status column only earns its width when a row has something to say.
-  const showStatus = documents.some((document) => documentStanding(document) !== null || isWithoutAccount(document))
+  const showStatus = entries.some((entry) => {
+    const status = statusOf(entry)
+    return status.standing !== null || status.withoutAccount > 0
+  })
+  const isGroup = (entry: OutboxEntry) => entry.documents.length > 1
   const years = issueYears(today)
   const filtered = !!(participantId || kind || year)
+
+  const participantCell = (entry: OutboxEntry) => {
+    if (!isGroup(entry)) return entry.documents[0].participant_name ?? '—'
+    return (
+      <Disclosure summary={t('inbox.outbox.recipients', { count: entry.documents.length })} className="doc-recipients">
+        <ul>
+          {entry.documents.map((document) => (
+            <li key={document.id}>
+              {document.participant_name ?? '—'}
+              {isWithoutAccount(document) && <small className="muted"> · {t('inbox.outbox.noAccount')}</small>}
+            </li>
+          ))}
+        </ul>
+      </Disclosure>
+    )
+  }
+  const statusBadges = (entry: OutboxEntry) => {
+    const status = statusOf(entry)
+    return (
+      <>
+        {status.standing && <StandingBadge document={entry.documents[0]} />}
+        {status.withoutAccount > 0 && (
+          <span className="badge badge-neutral">
+            {isGroup(entry) ? t('inbox.outbox.noAccountCount', { count: status.withoutAccount }) : t('inbox.outbox.noAccount')}
+          </span>
+        )}
+      </>
+    )
+  }
+  const downloadButton = (entry: OutboxEntry, compact: boolean) => {
+    const document = entry.documents[0]
+    return (
+      <button
+        type="button"
+        className={`button button-secondary${compact ? ' button-compact' : ''}`}
+        aria-label={t('inbox.downloadLabel', { title: document.title })}
+        onClick={() => void download(document)}
+      >
+        <FontAwesomeIcon icon={faDownload} fixedWidth />
+        {t('inbox.download')}
+      </button>
+    )
+  }
+  const moreActions = (entry: OutboxEntry) =>
+    withdrawable(entry).length > 0 ? (
+      <ActionMenu
+        label={t('inbox.outbox.moreActions')}
+        icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
+        iconOnly
+        items={[{ key: 'withdraw', label: t('inbox.outbox.withdraw'), danger: true, onClick: () => askWithdraw(entry) }]}
+      />
+    ) : null
 
   return (
     <div className="page-stack">
@@ -158,10 +233,10 @@ export function Outbox() {
                 </tr>
               </thead>
               <tbody>
-                {documents.map((document) => {
-                  const withoutAccount = isWithoutAccount(document)
+                {entries.map((entry) => {
+                  const document = entry.documents[0]
                   return (
-                    <tr key={document.id}>
+                    <tr key={entry.key}>
                       <td>
                         <FontAwesomeIcon icon={KIND_ICON[document.kind]} fixedWidth aria-hidden="true" />{' '}
                         {document.title}
@@ -169,39 +244,18 @@ export function Outbox() {
                           {t(`inbox.kind.${document.kind}`)} · {documentYear(document)}
                         </small>
                       </td>
-                      <td>{document.participant_name ?? '—'}</td>
+                      <td>{participantCell(entry)}</td>
                       <td>
                         {formatShortDate(document.delivered_at.slice(0, 10), settings)}
                         {document.delivered_by_name && (
                           <small className="muted doc-note">{document.delivered_by_name}</small>
                         )}
                       </td>
-                      {showStatus && (
-                        <td>
-                          <StandingBadge document={document} />
-                          {withoutAccount && <span className="badge badge-neutral">{t('inbox.outbox.noAccount')}</span>}
-                        </td>
-                      )}
+                      {showStatus && <td>{statusBadges(entry)}</td>}
                       <td className="doc-actions-col">
                         <div className="actions-row">
-                          <button
-                            type="button"
-                            className="button button-secondary button-compact"
-                            aria-label={t('inbox.downloadLabel', { title: document.title })}
-                            onClick={() => void download(document)}
-                          >
-                            <FontAwesomeIcon icon={faDownload} fixedWidth />
-                            {t('inbox.download')}
-                          </button>
-                          {canWriteSelectedCommunity && document.kind === 'operator' && !document.withdrawn_at && (
-                            <button
-                              type="button"
-                              className="button button-secondary button-compact"
-                              onClick={() => askWithdraw(document)}
-                            >
-                              {t('inbox.outbox.withdraw')}
-                            </button>
-                          )}
+                          {downloadButton(entry, true)}
+                          {moreActions(entry)}
                         </div>
                       </td>
                     </tr>
@@ -211,38 +265,26 @@ export function Outbox() {
             </table>
           </div>
           <ul className="doc-cards">
-            {documents.map((document) => {
-              const withoutAccount = isWithoutAccount(document)
+            {entries.map((entry) => {
+              const document = entry.documents[0]
               return (
-                <li key={document.id} className="doc-card">
+                <li key={entry.key} className="doc-card">
                   <div className="doc-card-head">
                     <strong><FontAwesomeIcon icon={KIND_ICON[document.kind]} fixedWidth aria-hidden="true" /> {document.title}</strong>
-                    <span>
-                      <StandingBadge document={document} />
-                      {withoutAccount && <span className="badge badge-neutral">{t('inbox.outbox.noAccount')}</span>}
-                    </span>
+                    <span>{statusBadges(entry)}</span>
                   </div>
                   <p className="muted doc-card-meta">
-                    {document.participant_name ?? '—'} · {t(`inbox.kind.${document.kind}`)} · {documentYear(document)}
+                    {isGroup(entry) ? t('inbox.outbox.recipients', { count: entry.documents.length }) : (document.participant_name ?? '—')}
+                    {' · '}{t(`inbox.kind.${document.kind}`)} · {documentYear(document)}
                   </p>
                   <p className="muted doc-card-meta">
                     {formatShortDate(document.delivered_at.slice(0, 10), settings)}
                     {document.delivered_by_name ? ` · ${document.delivered_by_name}` : ''}
                   </p>
-                  <button
-                    type="button"
-                    className="button button-secondary"
-                    aria-label={t('inbox.downloadLabel', { title: document.title })}
-                    onClick={() => void download(document)}
-                  >
-                    <FontAwesomeIcon icon={faDownload} fixedWidth />
-                    {t('inbox.download')}
-                  </button>
-                  {canWriteSelectedCommunity && document.kind === 'operator' && !document.withdrawn_at && (
-                    <button type="button" className="button button-secondary" onClick={() => askWithdraw(document)}>
-                      {t('inbox.outbox.withdraw')}
-                    </button>
-                  )}
+                  <div className="doc-card-actions">
+                    {downloadButton(entry, false)}
+                    {moreActions(entry)}
+                  </div>
                 </li>
               )
             })}

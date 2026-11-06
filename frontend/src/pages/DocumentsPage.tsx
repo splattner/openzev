@@ -46,6 +46,7 @@ export function DocumentsPage() {
   const inYear = year ? inCommunity.filter((document) => String(documentYear(document)) === year) : inCommunity
   const visible = kind === 'all' ? inYear : inYear.filter((document) => document.kind === kind)
   const counts = countByKind(inYear)
+  const kindsPresent = DOCUMENT_KINDS.filter((value) => counts[value] > 0 || value === kind)
 
   return (
     <div className="page-stack">
@@ -70,15 +71,26 @@ export function DocumentsPage() {
       ) : (
         <>
           <div className="actions-row actions-row-wrap">
-            <FilterTabs<KindFilter>
-              label={t('inbox.filter.kind')}
-              value={kind}
-              onChange={setKind}
-              tabs={[
-                { value: 'all', label: t('inbox.filter.all'), count: inYear.length },
-                ...DOCUMENT_KINDS.map((value) => ({ value, label: t(`inbox.kind.${value}`), count: counts[value] })),
-              ]}
-            />
+            <div className="doc-filter-wide">
+              <FilterTabs<KindFilter>
+                label={t('inbox.filter.kind')}
+                value={kind}
+                onChange={setKind}
+                tabs={[
+                  { value: 'all', label: t('inbox.filter.all'), count: inYear.length },
+                  ...DOCUMENT_KINDS.map((value) => ({ value, label: t(`inbox.kind.${value}`), count: counts[value] })),
+                ]}
+              />
+            </div>
+            {kindsPresent.length > 1 && (
+              <label className="doc-filter-narrow">
+                <span className="visually-hidden">{t('inbox.filter.kind')}</span>
+                <select value={kind} onChange={(event) => setKind(event.target.value as KindFilter)} aria-label={t('inbox.filter.kind')}>
+                  <option value="all">{t('inbox.filter.all')} ({inYear.length})</option>
+                  {kindsPresent.map((value) => <option key={value} value={value}>{t(`inbox.kind.${value}`)} ({counts[value]})</option>)}
+                </select>
+              </label>
+            )}
             {years.length > 1 && (
               <label>
                 <span className="visually-hidden">{t('inbox.outbox.year')}</span>

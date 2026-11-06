@@ -92,6 +92,11 @@ function StatusCell({ document }: { document: DeliveredDocument }) {
   return <StandingBadge document={document} />
 }
 
+/** Whether the status cell of a document has anything to show. */
+function hasStatus(document: DeliveredDocument): boolean {
+  return !!(document.invoice_figures || document.credit_figures || documentStanding(document))
+}
+
 /**
  * What was delivered to the account: a sheet like the other lists (the same table and header as the
  * manager's *Documents* page), newest first; a small card per document on a phone. Invoices and credit
@@ -102,6 +107,8 @@ export function DocumentsList({ documents, showCommunity }: { documents: readonl
   const { settings } = useAppSettings()
   const download = useDownloadDocument()
   const showAmount = documents.some((document) => document.invoice_figures || document.credit_figures)
+  // Status only earns its column when a row has something to say, as for the amount.
+  const showStatus = documents.some(hasStatus)
 
   const meta = (document: DeliveredDocument) =>
     [
@@ -132,7 +139,7 @@ export function DocumentsList({ documents, showCommunity }: { documents: readonl
               {showCommunity && <th scope="col">{t('inbox.col.community')}</th>}
               <th scope="col">{t('inbox.outbox.col.delivered')}</th>
               {showAmount && <th scope="col" className="numeric">{t('inbox.col.amount')}</th>}
-              <th scope="col">{t('inbox.outbox.col.status')}</th>
+              {showStatus && <th scope="col">{t('inbox.outbox.col.status')}</th>}
               <th scope="col">{t('inbox.outbox.col.actions')}</th>
             </tr>
           </thead>
@@ -147,7 +154,7 @@ export function DocumentsList({ documents, showCommunity }: { documents: readonl
                 {showCommunity && <td>{document.zev_name}</td>}
                 <td>{formatShortDate(document.delivered_at.slice(0, 10), settings)}</td>
                 {showAmount && <td className="numeric"><AmountCell document={document} /></td>}
-                <td><StatusCell document={document} /></td>
+                {showStatus && <td><StatusCell document={document} /></td>}
                 <td>{downloadButton(document, true)}</td>
               </tr>
             ))}
@@ -165,7 +172,7 @@ export function DocumentsList({ documents, showCommunity }: { documents: readonl
               {meta(document)} · {t('inbox.deliveredOn', { date: formatShortDate(document.delivered_at.slice(0, 10), settings) })}
               {showCommunity ? ` · ${document.zev_name}` : ''}
             </p>
-            <div><StatusCell document={document} /></div>
+            {hasStatus(document) && <div><StatusCell document={document} /></div>}
             {downloadButton(document, false)}
           </li>
         ))}

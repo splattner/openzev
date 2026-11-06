@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Outbox } from '../features/inbox/Outbox'
 import { PageHeader } from '../components/PageHeader'
 import { useManagedZev } from '../lib/managedZev'
-import { useScopeNote } from '../lib/communityAccess'
+import { useCommunityAccess, useScopeNote } from '../lib/communityAccess'
 
 /**
  * What the community delivered to its participants, and where to issue or upload a document
@@ -13,6 +13,7 @@ export function ParticipantDocumentsPage() {
     const { t } = useTranslation()
     const scopeNote = useScopeNote()
     const { selectedZev } = useManagedZev()
+    const { canWriteSelectedCommunity } = useCommunityAccess()
 
     return (
         <div className="page-stack">
@@ -21,7 +22,7 @@ export function ParticipantDocumentsPage() {
                 communitySwitch
                 scopeNote={scopeNote}
                 title={t('nav.documents')}
-                description={t('pages.participantDocuments.description')}
+                description={t(canWriteSelectedCommunity ? 'pages.participantDocuments.description' : 'pages.participantDocuments.descriptionReadOnly')}
             />
             <Outbox />
         </div>
