@@ -41,6 +41,28 @@
   justify-content: center;
 }
 
+/* A card's actions: Download takes the width, a menu trigger keeps its own. */
+
+.doc-card-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.doc-card .doc-card-actions .button {
+  width: auto;
+}
+
+.doc-card .doc-card-actions .button:first-child {
+  flex: 1;
+}
+
+/* The addressees of a broadcast, folded under "7 participants". */
+
+.doc-recipients ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1rem;
+}
+
 .doc-issue {
   margin-top: 0.25rem;
 }
@@ -49,13 +71,34 @@
   display: block;
 }
 
+/* Two buttons share a line while there is room and stack when there is not, so the table
+   never grows wider than its sheet and clips the second one. */
+
+.doc-wide .doc-actions-col .actions-row {
+  flex-wrap: wrap;
+}
+
 /* The amount column: the header sits over its right-aligned figures. */
 
 .doc-wide th.numeric {
   text-align: right;
 }
 
+/* Kind filter: chips on a wide screen, one select beside the year on a phone. */
+
+.doc-filter-narrow {
+  display: none;
+}
+
 @media (max-width: 640px) {
+  .doc-filter-wide {
+    display: none;
+  }
+
+  .doc-filter-narrow {
+    display: block;
+  }
+
   .doc-wide {
     display: none;
   }

@@ -103,7 +103,7 @@ describe('DocumentsPage', () => {
         ])
         const page = render()
         await settled(page, 'Statement 2025')
-        const select = page.container.querySelector('select') as HTMLSelectElement
+        const select = page.container.querySelector('select[aria-label="inbox.outbox.year"]') as HTMLSelectElement
         expect([...select.options].map((option) => option.value)).toEqual(['', '2026', '2025'])
 
         await act(async () => {
@@ -114,6 +114,40 @@ describe('DocumentsPage', () => {
         expect([...page.container.querySelectorAll('tbody tr')].map((row) => row.textContent)).toEqual([
             expect.stringContaining('Statement 2025'),
         ])
+        page.unmount()
+    })
+
+    it('offers the kind as a select for a phone, next to the chips, and filters by it', async () => {
+        vi.mocked(inboxApi.listInboxDocuments).mockResolvedValue([
+            doc({ id: 'b', title: 'House rules' }),
+            doc({ id: 'a', title: 'Statement 2025', kind: 'annual_statement', period_start: '2026-01-01' }),
+        ])
+        const page = render()
+        await settled(page, 'Statement 2025')
+
+        expect(page.container.querySelector('.doc-filter-wide .filter-tabs')).not.toBeNull()
+        const select = page.container.querySelector('.doc-filter-narrow select') as HTMLSelectElement
+        expect([...select.options].map((option) => option.value)).toEqual(['all', 'annual_statement', 'operator'])
+
+        await act(async () => {
+            select.value = 'operator'
+            select.dispatchEvent(new Event('change', { bubbles: true }))
+        })
+        await flush()
+        expect([...page.container.querySelectorAll('tbody tr')].map((row) => row.textContent)).toEqual([
+            expect.stringContaining('House rules'),
+        ])
+        page.unmount()
+    })
+
+    it('leaves out the empty Status column when no row has anything to say', async () => {
+        vi.mocked(inboxApi.listInboxDocuments).mockResolvedValue([doc({ id: 'b', title: 'House rules' })])
+        const page = render()
+        await settled(page, 'House rules')
+
+        const headers = [...page.container.querySelectorAll('.doc-wide th')].map((cell) => cell.textContent)
+        expect(headers).not.toContain('inbox.outbox.col.status')
+        expect(page.container.querySelectorAll('.doc-wide tbody tr td')).toHaveLength(3)
         page.unmount()
     })
 

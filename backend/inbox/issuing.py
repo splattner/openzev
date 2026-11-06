@@ -54,6 +54,28 @@ def current_participants(zev):
     return Participant.objects.filter(live_participant_q(), zev=zev).select_related("zev", "user")
 
 
+def one_per_person(participants) -> list:
+    """One row per person for a document that is the same for every participant row.
+
+    A person with two participant rows (a flat and a parking space) has one
+    account and reads one inbox, so a notice or the tariff overview sent to
+    both rows would show up twice. The first row, in the given order, stands
+    for the person. Rows without a linked account stay as they are: nothing
+    says two of them are the same person, and each is a separate addressee
+    until an account is linked. Statements and summaries are not reduced here,
+    because their content differs per participant row.
+    """
+    seen: set = set()
+    kept = []
+    for participant in participants:
+        if participant.user_id is not None:
+            if participant.user_id in seen:
+                continue
+            seen.add(participant.user_id)
+        kept.append(participant)
+    return kept
+
+
 def statement_participant_ids(zev, year: int) -> set:
     """Participants with an invoice in ``year`` that reached them (what the statement lists)."""
     invoices = billed_invoices(zev, date(year, 1, 1), date(year, 12, 31)).filter(sent_to_participant())

@@ -257,6 +257,15 @@ class TariffOverviewTests(IssueBase):
         self.assertEqual(len({row.file.name for row in rows}), 1)
         self.assertIsNone(rows[0].period_start)
 
+    def test_a_person_with_two_participant_rows_gets_one_overview(self):
+        make_participant(self.zev, user=self.anna.user, first="Anna", last="Second")
+
+        response = self.post(TARIFFS)
+
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(response.json()["delivered"], 2)
+        self.assertEqual(DeliveredDocument.objects.filter(participant__user=self.anna.user).count(), 1)
+
     def test_reissuing_supersedes_the_earlier_overview_per_participant(self):
         self.post(TARIFFS)
         self.post(TARIFFS)

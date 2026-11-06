@@ -834,6 +834,11 @@ export const fr = {
             },
             audienceAll: 'Toute la communauté',
             submit: 'Remettre',
+            error: {
+                title: 'Saisissez un titre.',
+                file: 'Choisissez un fichier PDF.',
+                audience: 'Choisissez au moins un participant.',
+            },
         },
         issue: {
             title: 'Établir des documents',
@@ -886,6 +891,12 @@ export const fr = {
             withdrawTitle: 'Retirer le document ?',
             withdrawMessage: '« {{title}} » ne sera plus visible pour {{name}}. L\'enregistrement et le fichier sont conservés.',
             withdrawn: 'Le document a été retiré.',
+            moreActions: 'Autres actions',
+            recipients_one: '{{count}} participant',
+            recipients_other: '{{count}} participants',
+            noAccountCount_one: '{{count}} sans compte pour l\'instant',
+            noAccountCount_other: '{{count}} sans compte pour l\'instant',
+            withdrawGroupMessage: '« {{title}} » ne sera plus visible pour {{count}} participants. Les enregistrements et le fichier sont conservés.',
         },
         deliverContract: {
             action: 'Remettre le contrat dans la boîte',
@@ -3808,6 +3819,7 @@ export const fr = {
         },
         participantDocuments: {
             description: 'Ce que la communauté a remis à ses participants. Émettez ici les relevés annuels, les récapitulatifs fiscaux et l\'aperçu des tarifs, ou téléversez une communication.',
+            descriptionReadOnly: 'Ce que la communauté a remis à ses participants.',
         },
         billingPeriods: {
             failed: 'Échec du chargement des périodes de facturation.',

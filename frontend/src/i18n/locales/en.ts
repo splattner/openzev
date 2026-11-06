@@ -843,6 +843,11 @@ export const en = {
             },
             audienceAll: 'Everyone in this community',
             submit: 'Deliver',
+            error: {
+                title: 'Enter a title.',
+                file: 'Choose a PDF file.',
+                audience: 'Choose at least one participant.',
+            },
         },
         issue: {
             title: 'Issue documents',
@@ -895,6 +900,12 @@ export const en = {
             withdrawTitle: 'Withdraw document?',
             withdrawMessage: '“{{title}}” will no longer be visible to {{name}}. The record and the file are kept.',
             withdrawn: 'The document was withdrawn.',
+            moreActions: 'More actions',
+            recipients_one: '{{count}} participant',
+            recipients_other: '{{count}} participants',
+            noAccountCount_one: '{{count}} without an account yet',
+            noAccountCount_other: '{{count}} without an account yet',
+            withdrawGroupMessage: '“{{title}}” will no longer be visible to {{count}} participants. The records and the file are kept.',
         },
         deliverContract: {
             action: 'Deliver contract to inbox',
@@ -3819,6 +3830,7 @@ export const en = {
         },
         participantDocuments: {
             description: 'What the community has delivered to its participants. Issue the annual statements, financial summaries and tariff overview here, or upload a notice.',
+            descriptionReadOnly: 'What the community has delivered to its participants.',
         },
         billingPeriods: {
             failed: 'Failed to load billing periods.',

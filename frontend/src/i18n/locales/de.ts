@@ -834,6 +834,11 @@ export const de = {
             },
             audienceAll: 'Alle in dieser Gemeinschaft',
             submit: 'Zustellen',
+            error: {
+                title: 'Geben Sie einen Titel ein.',
+                file: 'Wählen Sie eine PDF-Datei.',
+                audience: 'Wählen Sie mindestens eine teilnehmende Person.',
+            },
         },
         issue: {
             title: 'Dokumente ausstellen',
@@ -872,7 +877,7 @@ export const de = {
             noMatch: 'Kein Dokument passt zu diesen Filtern.',
             empty: {
                 title: 'Noch nichts zugestellt',
-                description: 'Rechnungen erscheinen hier, sobald sie gesendet sind. Du kannst auch eine Mitteilung hochladen oder Jahresabrechnungen ausstellen.',
+                description: 'Rechnungen erscheinen hier, sobald sie gesendet sind. Sie können auch eine Mitteilung hochladen oder Jahresabrechnungen ausstellen.',
             },
             col: {
                 document: 'Dokument',
@@ -886,6 +891,12 @@ export const de = {
             withdrawTitle: 'Dokument zurückziehen?',
             withdrawMessage: '«{{title}}» ist für {{name}} nicht mehr sichtbar. Eintrag und Datei bleiben erhalten.',
             withdrawn: 'Das Dokument wurde zurückgezogen.',
+            moreActions: 'Weitere Aktionen',
+            recipients_one: '{{count}} Teilnehmende',
+            recipients_other: '{{count}} Teilnehmende',
+            noAccountCount_one: '{{count}} noch ohne Konto',
+            noAccountCount_other: '{{count}} noch ohne Konto',
+            withdrawGroupMessage: '«{{title}}» ist für {{count}} Teilnehmende nicht mehr sichtbar. Einträge und Datei bleiben erhalten.',
         },
         deliverContract: {
             action: 'Vertrag ins Postfach zustellen',
@@ -3807,7 +3818,8 @@ export const de = {
             },
         },
         participantDocuments: {
-            description: 'Was die Gemeinschaft ihren Teilnehmenden zugestellt hat. Hier stellst du Jahresabrechnungen, Steuerübersichten und die Tarifübersicht aus oder lädst eine Mitteilung hoch.',
+            description: 'Was die Gemeinschaft ihren Teilnehmenden zugestellt hat. Hier stellen Sie Jahresabrechnungen, Steuerübersichten und die Tarifübersicht aus oder laden eine Mitteilung hoch.',
+            descriptionReadOnly: 'Was die Gemeinschaft ihren Teilnehmenden zugestellt hat.',
         },
         billingPeriods: {
             failed: 'Abrechnungsperioden konnten nicht geladen werden.',
