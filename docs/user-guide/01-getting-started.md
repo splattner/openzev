@@ -600,6 +600,8 @@ If logged in as a community's manager:
 - Go to **Tariffs** to configure energy pricing
 - Go to **Billing** to generate and manage invoices and inspect/retry email delivery
 - Go to **Reports** for the annual report (self-consumption, self-sufficiency, participant savings), annual statements, and tax overviews
+- Go to **Documents** to see what has been delivered to participants, and to issue or upload documents
+- If you are also a participant (or hold a metering point yourself), the **Personal** block of the menu has **My metering points** and **My documents**
 
 ![Manager Overview](screenshots/02-dashboard.png)
 
