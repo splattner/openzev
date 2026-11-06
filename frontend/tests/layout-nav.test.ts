@@ -336,6 +336,8 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         const page = await renderLayout()
         try {
             expect(page.hasHref('/me/metering-points')).toBe(true)
+            const group = page.container.querySelector('[role="group"][aria-label="nav.personalGroup"]')
+            expect([...group!.querySelectorAll('a')].map((link) => link.getAttribute('href'))).toEqual(['/me/metering-points'])
         } finally {
             page.unmount()
         }
@@ -382,6 +384,10 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         const holding = await renderLayout()
         try {
             expect(holding.hasHref('/me/documents')).toBe(true)
+            // Their own side is a block of its own, apart from the community's navigation.
+            const group = holding.container.querySelector('[role="group"][aria-label="nav.personalGroup"]')
+            expect(group).not.toBeNull()
+            expect([...group!.querySelectorAll('a')].map((link) => link.getAttribute('href'))).toEqual(['/me/documents'])
         } finally {
             holding.unmount()
         }
@@ -390,6 +396,7 @@ describe('role navigation (see docs/specs/2026-03-community-and-access.md §9.3)
         const plain = await renderLayout()
         try {
             expect(plain.hasHref('/me/documents')).toBe(false)
+            expect(plain.container.querySelector('[aria-label="nav.personalGroup"]')).toBeNull()
         } finally {
             plain.unmount()
         }

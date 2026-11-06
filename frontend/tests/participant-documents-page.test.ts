@@ -25,7 +25,7 @@ describe('ParticipantDocumentsPage', () => {
         act(() => root.render(createElement(MemoryRouter, null, createElement(MantineProvider, null, createElement(ParticipantDocumentsPage)))))
         cleanups.push(() => { act(() => root.unmount()); container.remove() })
 
-        expect(container.querySelector('h1')?.textContent).toBe('nav.participantDocuments')
+        expect(container.querySelector('h1')?.textContent).toBe('nav.documents')
         expect(container.textContent).toContain('pages.participantDocuments.description')
         expect(container.textContent).toContain('Sonnenhof')
         expect(container.querySelector('[data-testid="outbox"]')).not.toBeNull()

@@ -20,7 +20,7 @@ export function ParticipantDocumentsPage() {
                 eyebrow={selectedZev?.name}
                 communitySwitch
                 scopeNote={scopeNote}
-                title={t('nav.participantDocuments')}
+                title={t('nav.documents')}
                 description={t('pages.participantDocuments.description')}
             />
             <Outbox />

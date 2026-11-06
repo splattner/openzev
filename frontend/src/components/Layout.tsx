@@ -302,16 +302,8 @@ export function Layout() {
                                 {liveEnabled && <SidebarLink to="/my-energy" label={t('nav.liveEnergy')} icon={<LiveIcon />} collapsed={isNavigationCollapsed} />}
                                 <SidebarLink to="/metering/chart" label={t('nav.metering')} icon={<ChartIcon />} active={meteringActive} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/billing/invoices" label={t('nav.billing')} icon={<InvoiceIcon />} active={billingActive} collapsed={isNavigationCollapsed} />
-                                <SidebarLink to="/documents" label={t('nav.participantDocuments')} icon={<DocumentIcon />} collapsed={isNavigationCollapsed} />
+                                <SidebarLink to="/documents" label={t('nav.documents')} icon={<DocumentIcon />} collapsed={isNavigationCollapsed} />
                                 <SidebarLink to="/reports" label={t('nav.reports')} icon={<ReportsIcon />} collapsed={isNavigationCollapsed} />
-                                {holdsOwnFlaggedMeter && (
-                                    <SidebarLink to="/me/metering-points" label={t('nav.myMeteringPoints')} icon={<PlugIcon />} collapsed={isNavigationCollapsed} />
-                                )}
-                                {/* A manager who is also a participant (here or elsewhere) is addressed documents like any
-                                    participant; the outbox under Billing shows what was sent to everyone. */}
-                                {holdsParticipation && (
-                                    <SidebarLink to="/me/documents" label={t('nav.myDocuments')} icon={<DocumentIcon />} collapsed={isNavigationCollapsed} />
-                                )}
                             </>
                         )}
 
@@ -350,6 +342,20 @@ export function Layout() {
 
                         {canManage && feasibilityEnabledQuery.data === true && (
                             <SidebarLink to="/feasibility" label={t('nav.feasibility')} icon={<CalculatorIcon />} className="nav-standalone" collapsed={isNavigationCollapsed} />
+                        )}
+
+                        {/* A manager who is also a participant (here or elsewhere) has a personal side: their own
+                            meters and the documents addressed to them, apart from the community they manage. */}
+                        {canManage && (holdsOwnFlaggedMeter || holdsParticipation) && (
+                            <div className="nav-section nav-section-start" role="group" aria-label={t('nav.personalGroup')}>
+                                <div className="nav-group-label" aria-hidden="true">{t('nav.personalGroup')}</div>
+                                {holdsOwnFlaggedMeter && (
+                                    <SidebarLink to="/me/metering-points" label={t('nav.myMeteringPoints')} icon={<PlugIcon />} collapsed={isNavigationCollapsed} />
+                                )}
+                                {holdsParticipation && (
+                                    <SidebarLink to="/me/documents" label={t('nav.myDocuments')} icon={<DocumentIcon />} collapsed={isNavigationCollapsed} />
+                                )}
+                            </div>
                         )}
 
                         {user?.role === 'admin' && (
