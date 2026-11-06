@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.31.0](https://github.com/splattner/openzev/compare/v1.30.0...v1.31.0) (2026-11-06)
+
+
+### Features
+
+* **inbox:** carry the participant inbox in the transfer archive ([#862](https://github.com/splattner/openzev/issues/862)) ([#1207](https://github.com/splattner/openzev/issues/1207)) ([26bad4d](https://github.com/splattner/openzev/commit/26bad4d2687d18ecc612c7d7014a5ad57b022be3))
+* **inbox:** deliver credit notes to the participant inbox ([#862](https://github.com/splattner/openzev/issues/862)) ([#1215](https://github.com/splattner/openzev/issues/1215)) ([542c319](https://github.com/splattner/openzev/commit/542c3192d47531bbe5998fbc9b830d1ad7b5873d))
+* **inbox:** deliver sent invoices and contracts to the inbox ([#862](https://github.com/splattner/openzev/issues/862)) ([#1208](https://github.com/splattner/openzev/issues/1208)) ([2e5f29c](https://github.com/splattner/openzev/commit/2e5f29cbac5ae5c904e99887d80c1978c76c53dc))
+* **inbox:** links and notifications for delivered documents ([#862](https://github.com/splattner/openzev/issues/862)) ([#1213](https://github.com/splattner/openzev/issues/1213)) ([361c287](https://github.com/splattner/openzev/commit/361c2872bde9e273927c33e499b4bc74785ab8dd))
+* **inbox:** operator documents and issued reports ([#862](https://github.com/splattner/openzev/issues/862)) ([#1209](https://github.com/splattner/openzev/issues/1209)) ([e85c53d](https://github.com/splattner/openzev/commit/e85c53d52c33ef1250da6fc310b7d4edee551d33))
+* **inbox:** optional email for delivered documents ([#862](https://github.com/splattner/openzev/issues/862)) ([#1214](https://github.com/splattner/openzev/issues/1214)) ([23addc9](https://github.com/splattner/openzev/commit/23addc9c7e90e2216d00db7ebb389b7df6c8cc1a))
+* **inbox:** participant document inbox core ([#862](https://github.com/splattner/openzev/issues/862)) ([#1206](https://github.com/splattner/openzev/issues/1206)) ([f7890fd](https://github.com/splattner/openzev/commit/f7890fde02e6478e158fe83bd2c1cd988e6443fd))
+* **inbox:** participant documents page, delivered documents tab and issue dialogs ([#862](https://github.com/splattner/openzev/issues/862)) ([#1210](https://github.com/splattner/openzev/issues/1210)) ([4b6f85a](https://github.com/splattner/openzev/commit/4b6f85a6d1f6b1517a0772dc47dd87e659f68d84))
+* **inbox:** participants read invoices, credit notes and reports from the inbox ([#862](https://github.com/splattner/openzev/issues/862)) ([#1216](https://github.com/splattner/openzev/issues/1216)) ([a2cbff5](https://github.com/splattner/openzev/commit/a2cbff578b5480d2efefdd9eae6abbd360e9b0cf))
+* **tariffs:** localize API errors ([#1203](https://github.com/splattner/openzev/issues/1203)) ([6168d06](https://github.com/splattner/openzev/commit/6168d067e622ffda22c23ef650be118e0bd771bc))
+
+
+### Bug Fixes
+
+* **inbox:** one copy per person and the UI review findings for the documents pages ([#862](https://github.com/splattner/openzev/issues/862)) ([#1219](https://github.com/splattner/openzev/issues/1219)) ([744392e](https://github.com/splattner/openzev/commit/744392ef46cdd66490fe4880fcbe3068d8943950))
+
 ## [1.30.0](https://github.com/splattner/openzev/compare/v1.29.0...v1.30.0) (2026-11-04)
 
 
