@@ -3017,6 +3017,7 @@ export interface ProductionForecast {
 // ── Notification center (SPEC-2026-11-notification-center) ──
 export type NotificationType =
     | 'invoice.sent'
+    | 'document.delivered'
     | 'invoice.paid'
     | 'metering.data'
     | 'import.finished'
@@ -3026,7 +3027,7 @@ export type NotificationType =
 
 export type NotificationAudience = 'manager' | 'participant'
 
-export type NotificationTargetType = 'invoice' | 'metering_point' | 'import_log' | 'period' | ''
+export type NotificationTargetType = 'invoice' | 'document' | 'metering_point' | 'import_log' | 'period' | ''
 
 /** Ids, dates and counts only; the server never puts amounts or names in a payload. */
 export type NotificationPayload = Record<string, string | number | null>

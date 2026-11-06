@@ -43,6 +43,7 @@ def build_sample_invoice_email_context() -> dict:
         due_date="14.02.2026",
         total_chf="486.45",
         amount_due_chf="436.45",
+        inbox_url="https://app.example.com/me/documents",
     )
 
 

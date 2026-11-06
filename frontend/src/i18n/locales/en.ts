@@ -509,6 +509,7 @@ export const en = {
                 dueDate: 'Payment due date (formatted date)',
                 totalChf: 'Total invoice amount in CHF',
                 amountDueChf: 'Amount due in CHF, after credit notes applied',
+                inboxUrl: 'Link to the participant\'s My documents page; empty when the participant has no login',
                 inviterName: 'Name of the person who added the participant',
                 verifyUrl: 'Email verification link URL',
                 linkUrl: 'One-time sign-in link URL',
@@ -4855,6 +4856,7 @@ export const en = {
         unreadMarker: 'Unread:',
         types: {
             'invoice.sent': 'Invoice {{invoice_number}} for {{period_start}} to {{period_end}} is available.',
+            'document.delivered': 'A document was delivered to you: {{title}}.',
             'invoice.paid': 'Payment received: invoice {{invoice_number}} is paid.',
             'metering.data': 'New data for metering point {{meter_id}} ({{first_day}} to {{last_day}}).',
             'import.finished': 'Import finished: {{rows_imported}} rows imported, {{rows_skipped}} skipped, {{issues}} notes.',

@@ -13,7 +13,7 @@ leaves nothing delivered.
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 from django.db import transaction
@@ -40,6 +40,8 @@ class Delivery:
     documents: list
     created: int
     without_account: int
+    # The rows this call wrote, which are the ones to announce; ``documents`` also holds repeats.
+    fresh: list = field(default_factory=list)
 
 
 def _title(translations: dict, zev, key: str, suffix: str = "") -> str:
@@ -75,7 +77,10 @@ def _count(created_rows: list) -> tuple[int, int]:
 def delivery_of(batch_id, results) -> Delivery:
     created = [(document, was_created) for document, was_created in results if was_created]
     count, without_account = _count(created)
-    return Delivery(batch_id, [document for document, _ in results], count, without_account)
+    return Delivery(
+        batch_id, [document for document, _ in results], count, without_account,
+        fresh=[document for document, _ in created],
+    )
 
 
 def issue_per_participant(zev, participants, *, kind, year, render, user) -> Delivery:

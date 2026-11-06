@@ -293,3 +293,57 @@ class TariffOverviewTests(IssueBase):
 def _stored(zev):
     folder = f"inbox/documents/{zev.pk}"
     return set(default_storage.listdir(folder)[1]) if default_storage.exists(folder) else set()
+
+
+class AnnouncementTests(IssueBase):
+    """Every route that delivers also tells the participant, once (spec §6.5)."""
+
+    def notifications(self):
+        from notifications.models import Notification
+
+        return Notification.objects.filter(type="document.delivered")
+
+    def upload(self, **extra):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        return self.client.post(
+            "/api/v1/inbox/documents/",
+            {"zev": self.zev.pk, "title": "House rules", "file": SimpleUploadedFile("r.pdf", b"%PDF-1.7\n"), **extra},
+            format="multipart",
+        )
+
+    def test_an_uploaded_document_notifies_participants_with_a_login(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            self.assertEqual(self.upload().status_code, 201)
+        row = self.notifications().get()
+        document = DeliveredDocument.objects.get(participant=self.anna)
+        self.assertEqual(row.recipient, self.account)
+        self.assertEqual(row.payload, {"document_id": str(document.pk), "kind": "operator", "title": "House rules"})
+        self.assertEqual(row.target_id, str(document.pk))
+
+    def test_the_tariff_overview_notifies_each_row_it_wrote(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            self.assertEqual(self.client.post(TARIFFS, {"zev": self.zev.pk}, format="json").status_code, 201)
+        self.assertEqual(self.notifications().count(), 1)
+
+    def test_a_contract_delivered_twice_notifies_once(self):
+        from inbox.test_helpers import make_contract_issue
+
+        issue = make_contract_issue(self.anna, self.owner)
+        for _ in range(2):
+            with self.captureOnCommitCallbacks(execute=True):
+                self.client.post("/api/v1/inbox/documents/deliver-contract/", {"contract_issue": issue.pk}, format="json")
+        self.assertEqual(self.notifications().count(), 1)
+
+    def test_a_refused_delivery_notifies_nobody(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.upload(audience="selected", participant_ids=[99999])
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.notifications().count(), 0)
+
+    def test_a_re_issued_statement_notifies_again_because_it_is_a_new_document(self):
+        sent_invoice(self.zev, self.anna)
+        for _ in range(2):
+            with self.captureOnCommitCallbacks(execute=True):
+                self.client.post(STATEMENT, {"zev": self.zev.pk, "year": YEAR}, format="json")
+        self.assertEqual(self.notifications().count(), 2)

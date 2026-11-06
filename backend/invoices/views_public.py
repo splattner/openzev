@@ -182,6 +182,19 @@ def public_invoice_pdf(request, prefix):
         return error
 
     invoice = token.invoice
+    # What was delivered is what the link opens: the invoice's own file is cleared on
+    # approval and may be rendered again later, the inbox copy is the one that was sent.
+    delivered = invoice.delivered_documents.order_by("-delivered_at").first()
+    if delivered is not None:
+        try:
+            source = delivered.open_file()
+        except (OSError, ValueError):
+            source = None
+        if source is not None:
+            return FileResponse(
+                source, content_type="application/pdf",
+                filename=sanitize_filename(f"{invoice.invoice_number}.pdf"),
+            )
     if not invoice.pdf_file:
         return _not_found()
 

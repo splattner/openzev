@@ -692,6 +692,7 @@ _EMAIL_FIELDS = {
                 {"variable": "{due_date}", "description_key": "admin.emailTemplates.fields.dueDate", "sample_path": "due_date"},
                 {"variable": "{total_chf}", "description_key": "admin.emailTemplates.fields.totalChf", "sample_path": "total_chf"},
                 {"variable": "{amount_due_chf}", "description_key": "admin.emailTemplates.fields.amountDueChf", "sample_path": "amount_due_chf"},
+                {"variable": "{inbox_url}", "description_key": "admin.emailTemplates.fields.inboxUrl", "sample_path": "inbox_url"},
             ],
         },
     ],

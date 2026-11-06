@@ -24,6 +24,17 @@ describe('notificationLink', () => {
         expect(notificationLink(make({ audience: 'manager' }))).toBe('/billing/invoices/inv-1')
     })
 
+    it('sends a participant to the inbox once the invoice was delivered into it, and to the list before', () => {
+        expect(notificationLink(make({ type: 'invoice.sent', payload: { invoice_number: 'INV-1', document_id: 'd1' } }))).toBe('/me/documents')
+        expect(notificationLink(make({ type: 'invoice.sent' }))).toBe('/me/invoices')
+    })
+
+    it('sends a delivered document to the inbox', () => {
+        const delivered = make({ type: 'document.delivered', target_type: 'document', target_id: 'd1', payload: { document_id: 'd1', kind: 'operator', title: 'House rules' } })
+        expect(notificationLink(delivered)).toBe('/me/documents')
+        expect(isKnownNotificationType('document.delivered')).toBe(true)
+    })
+
     it('maps the other targets', () => {
         expect(notificationLink(make({ type: 'metering.data', target_type: 'metering_point' }))).toBe('/me/metering-points')
         expect(notificationLink(make({ type: 'import.failed', audience: 'manager', target_type: 'import_log' }))).toBe('/metering/imports')

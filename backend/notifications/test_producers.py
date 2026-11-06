@@ -4,11 +4,13 @@ from datetime import datetime, timezone as dt_timezone
 from decimal import Decimal
 from unittest import mock
 
+from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from inbox.models import DeliveredDocument
 from invoices.models import Invoice, InvoiceStatus
 from invoices.test_helpers import make_invoice
 from invoices.workflow import mark_invoice_paid, mark_invoice_sent, record_email_delivery, record_payment
@@ -38,13 +40,28 @@ class InvoiceEventTests(TestCase):
     def test_first_email_delivery_notifies_the_participant_but_a_resend_does_not(self):
         invoice = self.sent_invoice(status=InvoiceStatus.APPROVED)
         with self.captureOnCommitCallbacks(execute=True):
-            record_email_delivery(invoice, timezone.now())
+            record_email_delivery(invoice, timezone.now(), document=b"%PDF-1.7\n")
         row = Notification.objects.get()
         self.assertEqual((row.recipient, row.type, row.target_id), (self.c.login, "invoice.sent", str(invoice.pk)))
-        self.assertEqual(set(row.payload), {"invoice_number", "period_start", "period_end"})
+        self.assertEqual(set(row.payload), {"invoice_number", "period_start", "period_end", "document_id"})
         with self.captureOnCommitCallbacks(execute=True):
             record_email_delivery(invoice, timezone.now())
         self.assertEqual(Notification.objects.count(), 1)
+
+    def test_the_notification_names_the_inbox_entry_of_the_invoice(self):
+        invoice = self.sent_invoice(status=InvoiceStatus.APPROVED)
+        invoice.pdf_file.save("x.pdf", ContentFile(b"%PDF-1.7\n"), save=True)
+        with self.captureOnCommitCallbacks(execute=True):
+            mark_invoice_sent(invoice)
+        document = DeliveredDocument.objects.get(invoice=invoice)
+        self.assertEqual(Notification.objects.get().payload["document_id"], str(document.pk))
+
+    def test_an_invoice_that_could_not_be_delivered_is_still_announced_without_an_entry(self):
+        invoice = self.sent_invoice(status=InvoiceStatus.APPROVED)
+        with mock.patch("inbox.producers.deliver_invoice_document", side_effect=OSError("disk full")):
+            with self.captureOnCommitCallbacks(execute=True):
+                mark_invoice_sent(invoice)
+        self.assertNotIn("document_id", Notification.objects.get().payload)
 
     def test_marking_an_invoice_sent_by_hand_notifies_once(self):
         invoice = self.sent_invoice(status=InvoiceStatus.APPROVED)

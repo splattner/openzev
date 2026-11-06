@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 
 from config.http import sanitize_filename
 from invoices.models import ContractIssue
+from notifications import producers as notification_producers
 from zev.access import can_manage
 from zev.models import Participant, Zev
 from zev.scoping import ZevScopedQuerySetMixin, assert_zev_not_disabled
@@ -47,7 +48,12 @@ def manageable_zev(request, zev_id) -> Zev:
 
 
 def delivery_response(delivery: issuing.Delivery, context, *, created_status=status.HTTP_201_CREATED):
-    """The response of every write that delivers documents (spec §5.2)."""
+    """The response of every write that delivers documents (spec §5.2).
+
+    The participants are told here, once the documents are written: the one
+    place every route that delivers passes through.
+    """
+    notification_producers.notify_documents_delivered(delivery.fresh)
     payload = {
         "batch_id": delivery.batch_id,
         "delivered": delivery.created,
@@ -247,16 +253,8 @@ class DocumentViewSet(
             delivered_by=request.user,
             batch_id=batch_id,
         )
-        payload = {
-            "batch_id": document.batch_id or batch_id,
-            "delivered": 1 if created else 0,
-            "without_account": 1 if created and participant.user_id is None else 0,
-            "documents": [document],
-        }
-        return Response(
-            DeliveryResultSerializer(payload, context=self.get_serializer_context()).data,
-            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
-        )
+        delivery = issuing.delivery_of(document.batch_id or batch_id, [(document, created)])
+        return delivery_response(delivery, self.get_serializer_context())
 
 
 class IssueView(APIView):

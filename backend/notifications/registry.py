@@ -49,7 +49,10 @@ _MANAGER = NotificationAudience.MANAGER
 EVENTS: dict[str, EventType] = {
     event.key: event
     for event in (
-        _event("invoice.sent", _PARTICIPANT, "invoice", ("invoice_number", "period_start", "period_end")),
+        _event(
+            "invoice.sent", _PARTICIPANT, "invoice", ("invoice_number", "period_start", "period_end", "document_id")
+        ),
+        _event("document.delivered", _PARTICIPANT, "document", ("document_id", "kind", "title")),
         _event("invoice.paid", _PARTICIPANT, "invoice", ("invoice_number",)),
         _event(
             "metering.data", _PARTICIPANT, "metering_point", ("meter_id", "first_day", "last_day"),
