@@ -700,7 +700,8 @@ test.describe('User Guide Screenshots', () => {
   test('23b-participant-annual-statement', async ({ page }) => {
     await impersonateDemoParticipant(page)
     await navigateTo(page, '/me/statement')
-    await page.getByRole('combobox', { name: 'Jahr', exact: true }).selectOption(String(new Date().getFullYear()))
+    // The page shows what the community issued: the demo seed issues Anna's statement of the year just ended.
+    await page.getByRole('combobox', { name: 'Jahr', exact: true }).selectOption(String(new Date().getFullYear() - 1))
     await page.waitForSelector('#yearly-documents-preview iframe[title]', { timeout: 30_000 })
     await assertPdfLoaded(page)
     await closePdfSidebar(page)
