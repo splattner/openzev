@@ -21,7 +21,8 @@
 | 2 | Producers: invoice sent, explicit contract delivery, backfill command | stacked on #1207 |
 | 3 | Operator documents (upload, withdraw), issued annual statement / financial summary / tariff overview | #1209, stacked on #1208 |
 | 4 | Frontend: participant *My documents* page, manager *Delivered documents* tab, upload and issue dialogs, deliver-contract action; `deliver-contract` also by participant; demo seed | stacked on #1209 |
-| 5 | Links and notifications: public invoice link and invoice email resolve to the inbox entry, `document.delivered` | — |
+| 5 | Links and the bell: the public invoice PDF serves the delivered snapshot, `{inbox_url}` in the invoice email, `invoice.sent` carries `document_id`, new `document.delivered` notification | stacked on #1210 |
+| 5b | Email for documents: opt-in `notify` on upload and issue, `document_delivered` template | — |
 | 6 | Cut-over (follow-up release): participants lose the live invoice and report endpoints | — |
 
 Each increment is its own PR and can ship alone. Phases 1–5 add; only phase 6 removes anything.
@@ -60,7 +61,7 @@ The access rules also differ by endpoint, so every new participant-visible resou
 | API | participant list / detail / download; manager outbox (same endpoints, wider scope); operator upload and withdraw; statement, summary and tariff-overview issue actions |
 | Producers | invoice sent (`mark_invoice_sent`, `record_email_delivery`); invoice cancelled / replaced; explicit contract delivery |
 | Public link | the login-free invoice page and its PDF serve the delivered snapshot |
-| Notifications | `invoice.sent` links to the inbox entry; new `document.delivered` for every other kind |
+| Notifications | `invoice.sent` links to the inbox entry; new `document.delivered` for every other kind; opt-in email for documents (increment 5b) |
 | Backfill | idempotent command that creates entries for invoices already sent |
 | Backup, transfer | the model and its files are covered by both archives |
 | Audit | delivery, supersession and withdrawal events |
@@ -202,7 +203,7 @@ Everything is rendered before anything is written, in one transaction: a generat
 ### 5.4 Links already sent out
 
 - `GET /api/v1/public/invoices/<prefix>/pdf/` (`views_public.public_invoice_pdf`) serves the invoice's **delivered** snapshot when one exists; with none (an invoice sent before the backfill), it keeps today's behaviour. The token still resolves to the invoice; the inbox row is looked up through `DeliveredDocument.invoice`.
-- The invoice email template variable set gains `{inbox_url}` (`{FRONTEND_URL}/documents/<id>`) for participants with an account. The attachment is unchanged.
+- The invoice email template variable set gains `{inbox_url}`: `{FRONTEND_URL}/me/documents` (`inbox.links.inbox_url`) for a participant with a login, empty otherwise. It points at the list, not at one entry, because the email is rendered before the invoice is delivered, so there is no row to name yet. It is in the field catalogue (`admin.emailTemplates.fields.inboxUrl`), not in the default body: stored templates and the shipped text keep reading as they do. The attachment is unchanged.
 
 ### 5.5 Phase 6: removed for participants
 
@@ -253,9 +254,10 @@ Decision for this spec, to be honoured by #793:
 
 ### 6.5 Notifications and email
 
-- `invoice.sent` (exists) gains `document_id` in its payload so the bell links to `/documents/<id>`. No second event for the same fact.
+- `invoice.sent` (exists) gains `document_id` in its payload (absent when the invoice could not be delivered into the inbox), so the bell links to `/me/documents` instead of the live invoice list. It is raised after the inbox delivery for that reason, in both `mark_invoice_sent` and `record_email_delivery`. No second event for the same fact.
 - New registry type `document.delivered` (audience `participant`, not mandatory) for `contract`, `annual_statement`, `financial_summary`, `tariff_overview`, `operator`; payload `{ document_id, kind, title }`; `dedupe_key = f"document.delivered:{document.pk}"`.
-- Email for non-invoice documents is **opt-in per delivery** (`notify`), link-only and without an attachment: new `EmailTemplate` type `document_delivered` with defaults `DEFAULT_DOCUMENT_EMAIL_SUBJECT` / `_BODY` in `invoices/models.py`, edited in the admin console beside the others. Recipients without an email address are skipped and counted in the response. Sent through the existing email task and `EmailLog`.
+- The notification is raised by `inbox.views.delivery_response` for the rows a call wrote (`Delivery.fresh`), so every delivering route announces and an idempotent repeat does not. The bell page link is `/me/documents` for both types.
+- Email for non-invoice documents (**increment 5b, not yet built**) is **opt-in per delivery** (`notify`), link-only and without an attachment: new `EmailTemplate` type `document_delivered` with defaults `DEFAULT_DOCUMENT_EMAIL_SUBJECT` / `_BODY` in `invoices/models.py`, edited in the admin console beside the others. Recipients without an email address are skipped and counted in the response. Sent through the existing email task and `EmailLog`.
 
 ### 6.6 Backfill
 
@@ -284,7 +286,7 @@ Decision for this spec, to be honoured by #793:
 - *Issue documents* (dialog): which document (annual statement, financial summary, tariff overview), the year (not for the tariff overview; `YearPicker` over this year and the five before, defaulting to the year just ended), all eligible or selected participants, and a note that issuing again supersedes. The same result view.
 - *Withdraw* (row action on an operator document, behind a `ConfirmDialog`).
 - *Deliver contract to inbox*: an item in the participant's action menu on the participants page (`ParticipantCardsSection`), never automatic. It posts `{ participant }` to `deliver-contract`, which delivers the participant's latest issued version (§5.3). There is no contract version list in the UI, so naming the participant is what lets the page act without knowing an issue id. An unissued contract answers 404, which the page explains ("download it first").
-- **`notify` is not in the UI yet:** the notification and the email arrive in phase 5, together with the checkbox that controls them.
+- **`notify` is not in the UI yet:** the bell notification is always raised (increment 5); the email and the checkbox that controls it arrive in increment 5b.
 - All user-facing text in the locale files (`frontend/src/i18n/locales`), a top-level `inbox` block in `de`, `fr`, `it` and `en` (plus `nav.myDocuments` and `pages.billingHub.tabs.documents`).
 - **Demo data:** `seed_demo` clears and refills the inbox of both demo communities after the invoice PDFs are written (backfill of the sent invoices, plus a tariff overview and a notice for every current participant with an account of the main community), so the guide screenshots have something to show and a re-seed never lists a document twice.
 
@@ -432,8 +434,10 @@ The statement and summary generators are mocked, so these tests pin who is eligi
 - `inbox/test_backfill.py` (increment 2, 8 tests): creates rows for sent invoices dated by `sent_at`, leaves drafts and approved invoices alone, skips and reports missing documents (`no_document`, `file_missing`), `--dry-run` writes nothing, idempotent, the date falls back to approval, `--zev` limits the run, the command prints what it skipped.
 - `backups/test_archive.py`: the existing coverage tests pass with the model and file field registered (increment 1).
 - `zev/test_transfer_delivered_documents.py` (increment 1b, 20 tests): export / import round trip at format 11 (bytes, history, supersession chain, contract held as a file, invoice link), a v10 archive imports without rows, and rejected archives (checksum, missing member, non-PDF, kind, participant, count) leave no files behind.
-- `notifications/test_producers.py`: `invoice.sent` payload carries `document_id`; `document.delivered` dedupes (≈3).
-- `invoices/test_public_invoice_access.py`: public PDF serves the delivered snapshot, falls back when none (≈2).
+- `notifications/test_producers.py` (increment 5, 3 changed or added): `invoice.sent` payload carries `document_id`, names the inbox entry of the invoice, and omits it when the delivery failed.
+- `inbox/test_issue_reports.py::AnnouncementTests` (increment 5, 5 tests): an upload notifies participants with a login only, the tariff overview notifies per row, a contract delivered twice notifies once, a refused delivery notifies nobody, a re-issued statement notifies again.
+- `invoices/test_public_invoice_access.py` (increment 5, 3 added): the public PDF serves the delivered snapshot over the current file, serves it when the invoice file is gone, and falls back to the invoice file when the snapshot file is missing.
+- `frontend/tests/notifications.test.ts` (increment 5, 2 added): links for `invoice.sent` with and without `document_id`, and for `document.delivered`.
 - Phase 6: `invoices/test_participant_invoice_visibility.py` is rewritten so a participant gets 404 on every live endpoint and managers are unchanged (≈6 changed).
 
 ### Frontend

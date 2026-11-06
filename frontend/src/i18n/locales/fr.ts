@@ -500,6 +500,7 @@ export const fr = {
                 dueDate: 'Date d\'échéance (date formatée)',
                 totalChf: 'Montant total de la facture en CHF',
                 amountDueChf: 'Montant dû en CHF, après imputation des avoirs',
+                inboxUrl: 'Lien vers la page «Mes documents» du participant; vide si le participant n\'a pas de compte',
                 inviterName: 'Nom de la personne qui a ajouté le participant',
                 verifyUrl: 'URL du lien de vérification de l\'e-mail',
                 linkUrl: 'URL du lien de connexion à usage unique',
@@ -4844,6 +4845,7 @@ export const fr = {
         unreadMarker: 'Non lu :',
         types: {
             'invoice.sent': 'La facture {{invoice_number}} pour la période du {{period_start}} au {{period_end}} est disponible.',
+            'document.delivered': 'Un document vous a été remis: {{title}}.',
             'invoice.paid': 'Paiement reçu : la facture {{invoice_number}} est payée.',
             'metering.data': 'Nouvelles données pour le point de mesure {{meter_id}} (du {{first_day}} au {{last_day}}).',
             'import.finished': 'Importation terminée : {{rows_imported}} lignes importées, {{rows_skipped}} ignorées, {{issues}} remarques.',

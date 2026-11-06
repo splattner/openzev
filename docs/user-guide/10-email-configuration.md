@@ -102,6 +102,7 @@ Use placeholders to personalize emails:
 | `{due_date}` | Payment due date (formatted per regional settings; empty when unset) | `14.02.2026` |
 | `{total_chf}` | Invoice total in CHF | `123.45` |
 | `{amount_due_chf}` | Amount still to pay in CHF: the total less any credit note applied | `98.45` |
+| `{inbox_url}` | Link to the participant's **My documents** page; empty when the participant has no account | `https://app.example.com/me/documents` |
 
 ### Default Template
 

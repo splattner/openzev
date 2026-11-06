@@ -174,8 +174,8 @@ def mark_invoice_sent(invoice: Invoice) -> dict:
         extra_fields={"sent_at": timezone.now()},
     )
     # The invoice is the deliverable: a failure to reach the inbox never undoes the transition.
-    inbox_producers.deliver_sent_invoice(invoice, delivered_at=invoice.sent_at, render_missing=True)
-    notification_producers.notify_invoice_sent(invoice)
+    document = inbox_producers.deliver_sent_invoice(invoice, delivered_at=invoice.sent_at, render_missing=True)
+    notification_producers.notify_invoice_sent(invoice, document)
     return before
 
 
@@ -588,11 +588,12 @@ def record_email_delivery(invoice: Invoice, sent_at, *, document: bytes | None =
     invoice.status = locked.status
     invoice.sent_at = locked.sent_at
     invoice.updated_at = locked.updated_at
+    delivered = None
     if first_delivery:
-        inbox_producers.deliver_sent_invoice(invoice, body=document, delivered_at=sent_at)
+        delivered = inbox_producers.deliver_sent_invoice(invoice, body=document, delivered_at=sent_at)
     # A resend, or a delivery after the invoice was cancelled, tells the participant nothing new.
     if first_delivery and locked.status == InvoiceStatus.SENT:
-        notification_producers.notify_invoice_sent(invoice)
+        notification_producers.notify_invoice_sent(invoice, delivered)
     return previous_status
 
 

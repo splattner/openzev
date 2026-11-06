@@ -9,6 +9,8 @@ from audit.models import AuditActionCategory, AuditEventSource, AuditEventStatus
 from audit.services import record_audit_event
 from notifications import producers as notification_producers
 
+from inbox.links import inbox_url
+
 from .email_context import build_invoice_email_context
 
 logger = logging.getLogger(__name__)
@@ -96,6 +98,7 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
         due_date=formatted_due_date,
         total_chf=invoice.total_chf,
         amount_due_chf=invoice.amount_due_chf,
+        inbox_url=inbox_url(invoice.participant),
     )
 
     # Resolution order: per-ZEV override → admin global override → hardcoded default

@@ -883,6 +883,7 @@ Email subjects and bodies resolve through a three-tier fallback chain:
 | `{due_date}` | Payment due date, formatted per `AppSettings.date_format_short`; empty string if the invoice has no `due_date` |
 | `{total_chf}` | Invoice total amount |
 | `{amount_due_chf}` | Amount still to pay: the total less any credit applied (equals `{total_chf}` without credit). The default body uses it ("Amount due: CHF …"); stored per-ZEV and global templates keep their text |
+| `{inbox_url}` | The participant's *My documents* page (`{FRONTEND_URL}/me/documents`, `inbox.links.inbox_url`); empty when the participant has no login. Offered in the field catalogue, not in the default body (SPEC-2026-11-participant-document-inbox §5.4) |
 
 Templates are rendered with `config.safe_format.safe_format`, which resolves
 bare named placeholders and rejects attribute/item traversal. If rendering

@@ -35,19 +35,44 @@ def best_effort(function):
 
 
 @best_effort
-def notify_invoice_sent(invoice) -> None:
+def notify_invoice_sent(invoice, document=None) -> None:
+    """Tell the participant an invoice reached them; ``document`` is its inbox entry, when there is one."""
+    payload = {
+        "invoice_number": invoice.invoice_number,
+        "period_start": invoice.period_start.isoformat(),
+        "period_end": invoice.period_end.isoformat(),
+    }
+    if document is not None:
+        payload["document_id"] = str(document.pk)
     notify(
         "invoice.sent",
         zev=invoice.zev,
         recipients=participant_recipient(invoice.participant),
-        payload={
-            "invoice_number": invoice.invoice_number,
-            "period_start": invoice.period_start.isoformat(),
-            "period_end": invoice.period_end.isoformat(),
-        },
+        payload=payload,
         target_id=invoice.pk,
         dedupe_key=f"invoice.sent:{invoice.pk}",
     )
+
+
+@best_effort
+def notify_documents_delivered(documents) -> None:
+    """One notification per delivered document whose participant has a login.
+
+    An invoice is announced by ``invoice.sent`` instead, so it is skipped here.
+    The title is what the operator typed or the generated report name, never an amount.
+    """
+    for document in documents:
+        participant = document.participant
+        if participant is None or document.kind == "invoice":
+            continue
+        notify(
+            "document.delivered",
+            zev=document.zev,
+            recipients=participant_recipient(participant),
+            payload={"document_id": str(document.pk), "kind": document.kind, "title": document.title},
+            target_id=document.pk,
+            dedupe_key=f"document.delivered:{document.pk}",
+        )
 
 
 @best_effort

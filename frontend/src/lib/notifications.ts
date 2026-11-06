@@ -3,6 +3,7 @@ import type { Notification, NotificationType } from '../types/api'
 
 const KNOWN_TYPES: ReadonlySet<string> = new Set<NotificationType>([
     'invoice.sent',
+    'document.delivered',
     'invoice.paid',
     'metering.data',
     'import.finished',
@@ -27,7 +28,11 @@ export function notificationLink(notification: Notification): string | null {
     if (!isKnownNotificationType(notification.type)) return null
     switch (notification.target_type) {
         case 'invoice':
-            return notification.audience === 'participant' ? '/me/invoices' : `/billing/invoices/${notification.target_id}`
+            if (notification.audience !== 'participant') return `/billing/invoices/${notification.target_id}`
+            // The invoice is in the inbox once it was delivered; an older notification still points at the list.
+            return notification.payload.document_id ? '/me/documents' : '/me/invoices'
+        case 'document':
+            return '/me/documents'
         case 'metering_point':
             return '/me/metering-points'
         case 'import_log':

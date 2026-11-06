@@ -8,10 +8,10 @@ Notifications are events, not warnings. The things that are wrong right now (a m
 
 | You are | You are told when |
 |---|---|
-| Participant | an invoice is sent to you, an invoice of yours is paid, new data arrived for one of your metering points |
+| Participant | an invoice is sent to you, a document is delivered to you (an annual statement, a notice, your contract…), an invoice of yours is paid, new data arrived for one of your metering points |
 | Manager | an import finished or failed (not the one you started yourself), invoices were generated for a period or the generation failed |
 
-A participant is only notified when they have an OpenZEV account linked to their participation. New data is combined: if several imports arrive for the same metering point on one day, you see one line, with the days it covers.
+A participant is only notified when they have an OpenZEV account linked to their participation. Opening an *invoice sent* or *document delivered* notification takes you to **My documents**. The notification is for current participants: a former participant finds what was delivered to them under **My documents**, not in the bell. New data is combined: if several imports arrive for the same metering point on one day, you see one line, with the days it covers.
 
 ## Using the bell
 

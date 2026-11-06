@@ -71,9 +71,10 @@ Consequences:
   their own participant row, and not the other way round.
 - **Recipients are resolved when the event happens**, not when it is read: an account added later gets no
   backlog, and a participant without an account gets no notification and none retroactively once linked.
-- **Document inbox (#862).** Not built. When it lands, a notification about a delivered document may stay
-  visible after the participant link ends only if the document itself stays available; until then the
-  live-access rule above applies to every type.
+- **Document inbox (#862).** Built (SPEC-2026-11-participant-document-inbox). The inbox is the durable record
+  and survives the end of the link; a notification stays an event for current members, so **this rule is
+  unchanged for every type**, `document.delivered` included. A former participant finds the document in
+  *My documents*, not in the bell.
 
 Frontend: the bell renders for every signed-in account in a scoped shell; no `ProtectedRoute` change.
 
@@ -115,7 +116,8 @@ the target.
 
 | Type | Audience | Target | Payload keys | Dedupe |
 |---|---|---|---|---|
-| `invoice.sent` | participant | `invoice` | `invoice_number`, `period_start`, `period_end` | once per invoice: `invoice.sent:<invoice id>` |
+| `invoice.sent` | participant | `invoice` | `invoice_number`, `period_start`, `period_end`, `document_id` (the inbox entry; absent when the invoice could not be delivered into the inbox) | once per invoice: `invoice.sent:<invoice id>` |
+| `document.delivered` | participant | `document` | `document_id`, `kind`, `title` | once per delivered document: `document.delivered:<document id>` |
 | `invoice.paid` | participant | `invoice` | `invoice_number` | once per invoice: `invoice.paid:<invoice id>` |
 | `metering.data` | participant | `metering_point` | `meter_id`, `first_day`, `last_day` | coalesced per metering point per local day: `metering.data:<metering point id>:<YYYY-MM-DD>` |
 | `import.finished` | manager | `import_log` | `import_log_id`, `source`, `rows_imported`, `rows_skipped`, `issues` | none |
@@ -155,7 +157,8 @@ A `dedupe_key` has two meanings, chosen by the registry's `coalesce` flag:
 
 | Event | Where | Rule |
 |---|---|---|
-| `invoice.sent` | `invoices.workflow.record_email_delivery` | only when `sent_at` was empty before (first delivery, not a resend), and the invoice status is `sent` afterwards; recipient is the invoice's participant account |
+| `invoice.sent` | `invoices.workflow.record_email_delivery` and `mark_invoice_sent` | only when `sent_at` was empty before (first delivery, not a resend), and the invoice status is `sent` afterwards; recipient is the invoice's participant account. Raised after the inbox delivery so the payload can carry `document_id` |
+| `document.delivered` | `inbox.views.delivery_response`, through `notifications.producers.notify_documents_delivered(delivery.fresh)` | every route that delivers (upload, the three issue endpoints, deliver-contract), for the rows that call wrote (a repeat of an idempotent delivery writes none); an invoice is announced by `invoice.sent` and skipped here; recipients are the participants with a login |
 | `invoice.paid` | `workflow.record_payment` and `workflow.mark_invoice_paid` | when the status becomes `paid` |
 | `metering.data` | `metering.views.ImportView._do_import`, through `notifications.producers.notify_metering_data(log)` | per metering point that received readings of the batch (`MeterReading.import_batch == log.batch_id`); recipients are accounts of participants with an assignment on that point that overlaps the covered days |
 | `import.finished` / `import.failed` | the same place | `import.failed` when no row was imported and the log has errors or `result_status == "rejected"`; otherwise `import.finished` (its `rows_skipped` and `issues` tell a partial failure). The importing account is excluded |
@@ -213,7 +216,8 @@ several communities can tell them apart.
 
 | `target_type` | Link |
 |---|---|
-| `invoice` | `/billing/invoices/<id>` for the manager audience, `/me/invoices` for the participant audience |
+| `invoice` | `/billing/invoices/<id>` for the manager audience; for the participant audience `/me/documents` when the payload has a `document_id`, else `/me/invoices` (a notification raised before the invoice reached the inbox) |
+| `document` | `/me/documents` |
 | `metering_point` | `/me/metering-points` |
 | `import_log` | `/metering/imports` |
 | `period` | `/billing/invoices` |

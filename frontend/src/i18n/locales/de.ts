@@ -500,6 +500,7 @@ export const de = {
                 dueDate: 'Fälligkeitsdatum (formatiertes Datum)',
                 totalChf: 'Gesamtbetrag der Rechnung in CHF',
                 amountDueChf: 'Zu zahlender Betrag in CHF, nach Verrechnung von Gutschriften',
+                inboxUrl: 'Link auf die Seite «Meine Dokumente» der Teilnehmenden; leer, wenn kein Login besteht',
                 inviterName: 'Name der Person, die den Teilnehmer hinzugefügt hat',
                 verifyUrl: 'URL des E-Mail-Verifizierungslinks',
                 linkUrl: 'URL des einmaligen Anmeldelinks',
@@ -4844,6 +4845,7 @@ export const de = {
         unreadMarker: 'Ungelesen:',
         types: {
             'invoice.sent': 'Die Rechnung {{invoice_number}} für {{period_start}} bis {{period_end}} liegt vor.',
+            'document.delivered': 'Ein Dokument wurde Ihnen zugestellt: {{title}}.',
             'invoice.paid': 'Zahlung eingegangen: Die Rechnung {{invoice_number}} ist bezahlt.',
             'metering.data': 'Neue Daten für den Messpunkt {{meter_id}} ({{first_day}} bis {{last_day}}).',
             'import.finished': 'Import abgeschlossen: {{rows_imported}} Zeilen importiert, {{rows_skipped}} übersprungen, {{issues}} Hinweise.',

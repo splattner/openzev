@@ -217,6 +217,45 @@ class PublicInvoicePdfTests(PublicInvoiceTestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp["Content-Type"], "application/pdf")
 
+    def test_serves_the_delivered_snapshot_rather_than_the_current_file(self):
+        """The invoice's own file is replaced when it is generated again; the inbox copy is what was sent."""
+        from django.core.files.base import ContentFile
+
+        from inbox.producers import deliver_invoice_document
+
+        deliver_invoice_document(self.invoice, b"%PDF-1.7 sent\n")
+        self.invoice.pdf_file.save("later.pdf", ContentFile(b"%PDF-1.7 rendered again\n"), save=True)
+
+        response = self._get(url=PUBLIC_PDF_URL)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(b"".join(response.streaming_content), b"%PDF-1.7 sent\n")
+
+    def test_serves_the_delivered_snapshot_when_the_invoice_file_is_gone(self):
+        """An approved invoice has its file cleared; the participant's link must keep working."""
+        from inbox.producers import deliver_invoice_document
+
+        deliver_invoice_document(self.invoice, b"%PDF-1.7 sent\n")
+
+        response = self._get(url=PUBLIC_PDF_URL)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(b"".join(response.streaming_content), b"%PDF-1.7 sent\n")
+
+    def test_a_missing_snapshot_file_falls_back_to_the_invoice_file(self):
+        from django.core.files.base import ContentFile
+        from django.core.files.storage import default_storage
+
+        from inbox.producers import deliver_invoice_document
+
+        document, _ = deliver_invoice_document(self.invoice, b"%PDF-1.7 sent\n")
+        default_storage.delete(document.file.name)
+        self.invoice.pdf_file.save("x.pdf", ContentFile(b"%PDF-1.7 current\n"), save=True)
+
+        response = self._get(url=PUBLIC_PDF_URL)
+
+        self.assertEqual(b"".join(response.streaming_content), b"%PDF-1.7 current\n")
+
     def test_pdf_downloads_sanitize_legacy_invoice_numbers(self):
         from django.core.files.base import ContentFile
 

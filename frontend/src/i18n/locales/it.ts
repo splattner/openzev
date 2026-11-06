@@ -500,6 +500,7 @@ export const it = {
                 dueDate: 'Data di scadenza (data formattata)',
                 totalChf: 'Importo totale della fattura in CHF',
                 amountDueChf: 'Importo dovuto in CHF, dopo l\'imputazione delle note di credito',
+                inboxUrl: 'Link alla pagina «I miei documenti» del partecipante; vuoto se non ha un account',
                 inviterName: 'Nome della persona che ha aggiunto il partecipante',
                 verifyUrl: 'URL del link di verifica e-mail',
                 linkUrl: 'URL del link di accesso monouso',
@@ -4844,6 +4845,7 @@ export const it = {
         unreadMarker: 'Non letta:',
         types: {
             'invoice.sent': 'La fattura {{invoice_number}} per il periodo dal {{period_start}} al {{period_end}} è disponibile.',
+            'document.delivered': 'Le è stato consegnato un documento: {{title}}.',
             'invoice.paid': 'Pagamento ricevuto: la fattura {{invoice_number}} è pagata.',
             'metering.data': 'Nuovi dati per il punto di misura {{meter_id}} (dal {{first_day}} al {{last_day}}).',
             'import.finished': 'Importazione terminata: {{rows_imported}} righe importate, {{rows_skipped}} saltate, {{issues}} note.',
