@@ -553,7 +553,7 @@ test.describe('User Guide Screenshots', () => {
   test('08l-my-documents', async ({ page }) => {
     await impersonateDemoParticipant(page, { requireSentInvoice: true })
     await navigateTo(page, '/me/documents')
-    await page.waitForSelector('.inbox-row', { timeout: 10_000 })
+    await page.waitForSelector('.table-card tbody tr', { timeout: 10_000 })
     await page.waitForTimeout(400)
     await screenshotFull(page, '08l-my-documents')
   })

@@ -6,8 +6,8 @@ import { downloadInboxDocument } from '../../lib/api/inbox'
 import { downloadBlob } from '../../lib/downloadBlob'
 import { useToast } from '../../lib/toast'
 import type { DeliveredDocument } from '../../types/api'
-import { documentStanding, formatFileSize, KIND_ICON, type YearGroup } from './documentPresentation'
-import './DocumentsList.css'
+import { documentStanding, documentYear, formatFileSize, KIND_ICON } from './documentPresentation'
+import './InvoiceDocuments.css'
 
 export function StandingBadge({ document }: { document: DeliveredDocument }) {
   const { t } = useTranslation()
@@ -30,49 +30,75 @@ export function useDownloadDocument() {
       .catch(() => pushToast(t('inbox.downloadError'), 'error'))
 }
 
-export function DocumentsList({ groups, showCommunity }: { groups: YearGroup[]; showCommunity: boolean }) {
+/**
+ * What was delivered to the account: a sheet like the other lists (the same table and header as the
+ * manager's *Delivered documents*), newest first; a small card per document on a phone.
+ */
+export function DocumentsList({ documents, showCommunity }: { documents: readonly DeliveredDocument[]; showCommunity: boolean }) {
   const { t } = useTranslation()
   const { settings } = useAppSettings()
   const download = useDownloadDocument()
 
+  const meta = (document: DeliveredDocument) =>
+    [t(`inbox.kind.${document.kind}`), documentYear(document), document.size_bytes ? formatFileSize(document.size_bytes) : null]
+      .filter(Boolean).join(' · ')
+  const downloadButton = (document: DeliveredDocument, compact: boolean) => (
+    <button
+      type="button"
+      className={`button button-secondary${compact ? ' button-compact' : ''}`}
+      aria-label={t('inbox.downloadLabel', { title: document.title })}
+      onClick={() => void download(document)}
+    >
+      <FontAwesomeIcon icon={faDownload} fixedWidth />
+      {t('inbox.download')}
+    </button>
+  )
+
   return (
-    <div className="inbox-years">
-      {groups.map((group) => (
-        <section key={group.year} aria-labelledby={`inbox-year-${group.year}`} className="card inbox-year">
-          <h2 id={`inbox-year-${group.year}`} className="inbox-year-title">{group.year}</h2>
-          <ul className="inbox-list">
-            {group.documents.map((document) => (
-              <li key={document.id} className="inbox-row">
-                <span className="inbox-row-icon" aria-hidden="true">
-                  <FontAwesomeIcon icon={KIND_ICON[document.kind]} fixedWidth />
-                </span>
-                <div className="inbox-row-main">
-                  <p className="inbox-row-title">
-                    {document.title}
-                    <StandingBadge document={document} />
-                  </p>
-                  <p className="muted inbox-row-meta">
-                    {t(`inbox.kind.${document.kind}`)}
-                    {' · '}
-                    {t('inbox.deliveredOn', { date: formatShortDate(document.delivered_at.slice(0, 10), settings) })}
-                    {showCommunity ? ` · ${document.zev_name}` : ''}
-                    {document.size_bytes ? ` · ${formatFileSize(document.size_bytes)}` : ''}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="button button-secondary inbox-row-action"
-                  aria-label={t('inbox.downloadLabel', { title: document.title })}
-                  onClick={() => void download(document)}
-                >
-                  <FontAwesomeIcon icon={faDownload} fixedWidth />
-                  {t('inbox.download')}
-                </button>
-              </li>
+    <section className="table-card" aria-label={t('inbox.title')}>
+      <div className="table-scroll doc-wide">
+        <table className="billing-workflow-table">
+          <thead>
+            <tr>
+              <th scope="col">{t('inbox.outbox.col.document')}</th>
+              {showCommunity && <th scope="col">{t('pages.myInvoices.col.community')}</th>}
+              <th scope="col">{t('inbox.outbox.col.delivered')}</th>
+              <th scope="col">{t('inbox.outbox.col.status')}</th>
+              <th scope="col">{t('inbox.outbox.col.actions')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {documents.map((document) => (
+              <tr key={document.id}>
+                <td>
+                  <FontAwesomeIcon icon={KIND_ICON[document.kind]} fixedWidth aria-hidden="true" />{' '}
+                  {document.title}
+                  <small className="muted doc-note">{meta(document)}</small>
+                </td>
+                {showCommunity && <td>{document.zev_name}</td>}
+                <td>{formatShortDate(document.delivered_at.slice(0, 10), settings)}</td>
+                <td><StandingBadge document={document} /></td>
+                <td>{downloadButton(document, true)}</td>
+              </tr>
             ))}
-          </ul>
-        </section>
-      ))}
-    </div>
+          </tbody>
+        </table>
+      </div>
+      <ul className="doc-cards">
+        {documents.map((document) => (
+          <li key={document.id} className="doc-card">
+            <div className="doc-card-head">
+              <strong><FontAwesomeIcon icon={KIND_ICON[document.kind]} fixedWidth aria-hidden="true" /> {document.title}</strong>
+              <StandingBadge document={document} />
+            </div>
+            <p className="muted doc-card-meta">
+              {meta(document)} · {t('inbox.deliveredOn', { date: formatShortDate(document.delivered_at.slice(0, 10), settings) })}
+              {showCommunity ? ` · ${document.zev_name}` : ''}
+            </p>
+            {downloadButton(document, false)}
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }

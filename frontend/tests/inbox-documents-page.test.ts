@@ -76,20 +76,44 @@ describe('DocumentsPage', () => {
         page.unmount()
     })
 
-    it('groups by year, marks a superseded document and lists only the account\'s own rows', async () => {
+    it('lists the documents in one table like the other lists, marks a superseded one and keeps only the account\'s own rows', async () => {
         vi.mocked(inboxApi.listInboxDocuments).mockResolvedValue([
-            doc({ id: 'a', title: 'Statement 2025', kind: 'annual_statement', period_start: '2025-01-01', superseded_at: '2026-04-01T00:00:00Z' }),
             doc({ id: 'b', title: 'House rules' }),
+            doc({ id: 'a', title: 'Statement 2025', kind: 'annual_statement', period_start: '2025-01-01', superseded_at: '2026-04-01T00:00:00Z' }),
             doc({ id: 'c', title: 'Someone else', participant: 'other' }),
         ])
         const page = render()
         await settled(page, 'Statement 2025')
 
-        const years = [...page.container.querySelectorAll('h2')].map((heading) => heading.textContent)
-        expect(years).toEqual(['2026', '2025'])
-        expect(page.container.textContent).toContain('Statement 2025')
-        expect(page.container.textContent).toContain('inbox.standing.superseded')
+        expect(page.container.querySelectorAll('h2')).toHaveLength(0)
+        expect(page.container.querySelectorAll('.table-card thead th')).toHaveLength(4)
+        const rows = [...page.container.querySelectorAll('tbody tr')].map((row) => row.textContent)
+        expect(rows).toHaveLength(2)
+        expect(rows[0]).toContain('House rules')
+        expect(rows[1]).toContain('Statement 2025')
+        expect(rows[1]).toContain('inbox.standing.superseded')
         expect(page.container.textContent).not.toContain('Someone else')
+        page.unmount()
+    })
+
+    it('narrows to one year when there is more than one', async () => {
+        vi.mocked(inboxApi.listInboxDocuments).mockResolvedValue([
+            doc({ id: 'b', title: 'House rules' }),
+            doc({ id: 'a', title: 'Statement 2025', kind: 'annual_statement', period_start: '2025-01-01' }),
+        ])
+        const page = render()
+        await settled(page, 'Statement 2025')
+        const select = page.container.querySelector('select') as HTMLSelectElement
+        expect([...select.options].map((option) => option.value)).toEqual(['', '2026', '2025'])
+
+        await act(async () => {
+            select.value = '2025'
+            select.dispatchEvent(new Event('change', { bubbles: true }))
+        })
+        await flush()
+        expect([...page.container.querySelectorAll('tbody tr')].map((row) => row.textContent)).toEqual([
+            expect.stringContaining('Statement 2025'),
+        ])
         page.unmount()
     })
 
@@ -103,7 +127,7 @@ describe('DocumentsPage', () => {
         // A participant has no live invoice to open (#862): the row is not a link.
         expect(page.container.querySelector('a[href^="/billing/invoices/"]')).toBeNull()
         expect(page.container.textContent).toContain('inbox.standing.cancelled')
-        const button = page.container.querySelector('button.inbox-row-action') as HTMLButtonElement
+        const button = page.container.querySelector('tbody button') as HTMLButtonElement
         await act(async () => { button.click() })
         await flush()
         expect(inboxApi.downloadInboxDocument).toHaveBeenCalledWith('inv')

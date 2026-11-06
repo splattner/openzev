@@ -97,11 +97,14 @@ the details, and an old link to `/billing/invoices/{id}` takes a participant to
 ## Participant View: My Documents
 
 **My documents** (`/me/documents`) is the participant's mailbox: everything the
-community has delivered to them, grouped by year and newest first — sent
+community has delivered to them, newest first, in the same table as the other
+lists — sent
 invoices, credit notes, annual statements, financial summaries, tariff
 overviews, the participation contract, and notices from the operator. Each row shows the type,
-the delivery date and a **Download** button; use the type filter to narrow the
-list, and the community filter when you take part in more than one.
+the year, the delivery date and a **Download** button; use the type filter to
+narrow the list, the year filter when documents span several years, and the
+community filter when you take part in more than one. On a phone each document
+is a small card.
 
 ![Participant My documents](screenshots/08l-my-documents.png)
 
