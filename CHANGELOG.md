@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.31.1](https://github.com/splattner/openzev/compare/v1.31.0...v1.31.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **zev-settings:** export tab — one truthful reactivation text, quiet deactivate, clearer card ([#1229](https://github.com/splattner/openzev/issues/1229)) ([#1234](https://github.com/splattner/openzev/issues/1234)) ([e576e0a](https://github.com/splattner/openzev/commit/e576e0a7173d20cf694abf2c6646111721da3313))
+* **zev-settings:** hub shell — tab titles, save bar, scrolling tabs, forced colours, read-only fields ([#1222](https://github.com/splattner/openzev/issues/1222)) ([#1233](https://github.com/splattner/openzev/issues/1233)) ([835cebc](https://github.com/splattner/openzev/commit/835cebc2a43c2ed6018b1295bfce17572cf12391))
+* **zev-settings:** people tab — field errors, stale text, list design aligned with the app ([#1224](https://github.com/splattner/openzev/issues/1224)) ([#1230](https://github.com/splattner/openzev/issues/1230)) ([f3ce908](https://github.com/splattner/openzev/commit/f3ce908681d2b37b37b3c6a1b65ea8174436700e))
+
 ## [1.31.0](https://github.com/splattner/openzev/compare/v1.30.0...v1.31.0) (2026-11-06)
 
 
