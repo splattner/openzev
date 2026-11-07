@@ -1,10 +1,15 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useId, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faKey, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faEllipsis, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { CivilDateInput } from '../../components/CivilDateInput'
+import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
 import { ConfirmDialog, consumeReportedError, useConfirmDialog } from '../../components/ConfirmDialog'
+import { Disclosure } from '../../components/Disclosure'
+import { EmptyState } from '../../components/EmptyState'
+import { IssueText } from '../../components/IssueText'
+import { PageState } from '../../components/PageState'
 import {
     assignPartyRole,
     createParty,
@@ -23,7 +28,7 @@ import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { todayBusinessIso } from '../../lib/dates'
 import { useToast } from '../../lib/toast'
 import type { Building, Party, PartyInput, PartyRoleName, ZevPartyRole } from '../../types/api'
-import { AccessControls, GiveAccessForm, useAccessActions } from './PartyAccess'
+import { describeAccess, GiveAccessForm, useAccessActions, type AccessDescription } from './PartyAccess'
 import { PartyFormModal } from './PartyFormModal'
 
 interface Props {
@@ -33,6 +38,11 @@ interface Props {
 }
 
 const NEW_CONTACT = '__new__'
+/** The give-access form opened from the header, for someone who is not on the page yet. */
+const FREE_ACCESS_FORM = '__free__'
+
+/** `context` names the row (a person can be issuer and landowner), so the give-access form opens under that row only. */
+type AccessFor = (partyId: string, context: string, managingRole?: boolean) => AccessDescription
 
 /** A role row is current on ``day`` when its window covers it. */
 function activeOn(row: ZevPartyRole, day: string): boolean {
@@ -51,13 +61,15 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
     const { t } = useTranslation()
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
+    const { settings } = useAppSettings()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
 
     const [editingParty, setEditingParty] = useState<Party | null>(null)
     const [partyModalOpen, setPartyModalOpen] = useState(false)
     // Where a contact created from a role picker should be selected afterwards.
     const [pickAfterCreate, setPickAfterCreate] = useState<((id: string) => void) | null>(null)
-    const [givingAccess, setGivingAccess] = useState(false)
+    // Where the give-access form is open: the header's, or under one person's row.
+    const [givingAccessTo, setGivingAccessTo] = useState<string | null>(null)
     const accessActions = useAccessActions(zevId)
 
     const partiesQuery = useQuery({
@@ -164,6 +176,21 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
         })
     }
 
+    /** Ending a landowner takes effect at once and changes who later documents name: say so before applying it. */
+    function confirmEnd(row: ZevPartyRole, lastDay: string): Promise<unknown> {
+        return new Promise((resolve, reject) => {
+            confirm({
+                title: t('pages.zevSettings.parties.endLandownerTitle'),
+                message: t('pages.zevSettings.parties.endLandownerMessage', {
+                    name: row.party_display_name,
+                    date: formatShortDate(lastDay, settings),
+                }),
+                confirmText: t('pages.zevSettings.parties.end'),
+                onConfirm: () => end.mutateAsync({ row, lastDay }).then(resolve, reject),
+            })
+        })
+    }
+
     function openNewContact(onCreated?: (id: string) => void) {
         setEditingParty(null)
         setPickAfterCreate(() => onCreated ?? null)
@@ -191,14 +218,24 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
         return entries.filter((entry) => ids.has(entry.user.id))
     }
     const partyById = new Map(parties.map((party) => [party.id, party]))
-    /** Access, on the row of the party it belongs to (#761: one place for a person and its login). */
-    const renderAccess = (partyId: string, managingRole = false) => (
-        <AccessControls
-            entries={entriesOf(partyById.get(partyId))}
-            party={partyById.get(partyId)}
-            canManage={canManage}
+    /** Access, split for the row of the party it belongs to (#761: one place for a person and its login). */
+    const accessFor: AccessFor = (partyId, context, managingRole = false) => describeAccess({
+        t,
+        settings,
+        entries: entriesOf(partyById.get(partyId)),
+        party: partyById.get(partyId),
+        canManage,
+        actions: accessActions,
+        managingRole,
+        onGive: (id) => setGivingAccessTo(`${context}:${id}`),
+    })
+    const renderGiveForm = (where: string) => givingAccessTo === where && (
+        <GiveAccessForm
+            key={where}
+            parties={parties}
             actions={accessActions}
-            managingRole={managingRole}
+            initialPartyId={where === FREE_ACCESS_FORM ? undefined : where.slice(where.indexOf(':') + 1)}
+            onDone={() => setGivingAccessTo(null)}
         />
     )
     // Everyone with access who is not on the page yet: participants given
@@ -215,159 +252,227 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
     const bareLogins = [...new Map(
         entries.filter((entry) => !shownAccountIds.has(entry.user.id)).map((entry) => [entry.user.id, entry]),
     ).values()]
+    const listedParties = [...contacts, ...otherParties]
+    const nobodyElse = listedParties.length + bareLogins.length === 0
 
     return (
-        <>
+        <PageState
+            isLoading={partiesQuery.isLoading || rolesQuery.isLoading}
+            isError={partiesQuery.isError || rolesQuery.isError}
+            onRetry={() => { void partiesQuery.refetch(); void rolesQuery.refetch() }}
+        >
         <section className="card page-stack">
             <div>
                 <h3 className="mt-0">{t('pages.zevSettings.parties.title')}</h3>
                 <p className="muted m-0">{t('pages.zevSettings.parties.description')}</p>
             </div>
 
-            {(partiesQuery.isLoading || rolesQuery.isLoading) && <p className="muted">{t('common.loading')}</p>}
-            {(partiesQuery.isError || rolesQuery.isError) && <p className="error-banner">{t('common.error')}</p>}
+            {(['issuer', 'representative'] as const).map((role) => (
+                <SingleHolderRole
+                    key={role}
+                    role={role}
+                    rows={roles.filter((row) => row.role === role)}
+                    parties={parties}
+                    canManage={canManage}
+                    busy={busy}
+                    onAssign={(party, validFrom) => assignManagingRole(role, party, validFrom)}
+                    onNewContact={openNewContact}
+                    accessFor={accessFor}
+                    renderGiveForm={renderGiveForm}
+                />
+            ))}
 
-            {partiesQuery.isSuccess && rolesQuery.isSuccess && (
-                <>
-                    {(['issuer', 'representative'] as const).map((role) => (
-                        <SingleHolderRole
-                            key={role}
-                            role={role}
-                            rows={roles.filter((row) => row.role === role)}
-                            parties={parties}
-                            canManage={canManage}
-                            busy={busy}
-                            onAssign={(party, validFrom) => assignManagingRole(role, party, validFrom)}
-                            onNewContact={openNewContact}
-                            renderAccess={renderAccess}
-                        />
-                    ))}
-
-                    <Landowners
-                        rows={roles.filter((row) => row.role === 'landowner')}
-                        parties={parties}
-                        canManage={canManage}
-                        busy={busy}
-                        buildings={buildingsQuery.data ?? []}
-                        onAssign={(party, validFrom, building) => assign.mutateAsync({ party, role: 'landowner', valid_from: validFrom, building })}
-                        onSetBuilding={(row, building) => setBuilding.mutateAsync({ row, building })}
-                        onEnd={(row, lastDay) => end.mutateAsync({ row, lastDay })}
-                        onNewContact={openNewContact}
-                        renderAccess={renderAccess}
-                    />
-                </>
-            )}
+            <Landowners
+                rows={roles.filter((row) => row.role === 'landowner')}
+                parties={parties}
+                canManage={canManage}
+                busy={busy}
+                buildings={buildingsQuery.data ?? []}
+                onAssign={(party, validFrom, building) => assign.mutateAsync({ party, role: 'landowner', valid_from: validFrom, building })}
+                onSetBuilding={(row, building) => setBuilding.mutateAsync({ row, building })}
+                onEnd={confirmEnd}
+                onNewContact={openNewContact}
+                accessFor={accessFor}
+                renderGiveForm={renderGiveForm}
+            />
         </section>
 
-        <section className="card page-stack">
-            {partiesQuery.isSuccess && rolesQuery.isSuccess && (
-                <div className="zev-parties-block zev-parties-block-first">
-                    <div className="zev-parties-block-header">
-                        <div>
-                            <h3 className="m-0">{t('pages.zevSettings.parties.contacts')}</h3>
-                            <p className="muted">{t('pages.zevSettings.parties.contactsHint')}</p>
-                        </div>
-                        {canManage && (
-                            <div className="actions-row actions-row-wrap">
-                                <button type="button" className="button button-secondary button-compact" onClick={() => openNewContact()}>
-                                    <FontAwesomeIcon icon={faPlus} fixedWidth />
-                                    {t('pages.zevSettings.parties.addContact')}
-                                </button>
-                                {!givingAccess && (
-                                    <button type="button" className="button button-secondary button-compact" onClick={() => setGivingAccess(true)}>
-                                        <FontAwesomeIcon icon={faKey} fixedWidth />
-                                        {t('pages.zevSettings.access.add')}
-                                    </button>
-                                )}
-                            </div>
-                        )}
+        {nobodyElse ? (
+            <>
+                {renderGiveForm(FREE_ACCESS_FORM) && <section className="card">{renderGiveForm(FREE_ACCESS_FORM)}</section>}
+                <EmptyState
+                    titleKey="pages.zevSettings.parties.noContacts"
+                    descriptionKey="pages.zevSettings.parties.contactsHint"
+                    actions={canManage ? [
+                        { labelKey: 'pages.zevSettings.parties.addContact', variant: 'primary', icon: faPlus, onClick: () => openNewContact() },
+                        { labelKey: 'pages.zevSettings.access.add', variant: 'secondary', onClick: () => setGivingAccessTo(FREE_ACCESS_FORM) },
+                    ] : undefined}
+                />
+            </>
+        ) : (
+            <section className="table-card people-rows">
+                <div className="people-rows-header">
+                    <div>
+                        <h3>{t('pages.zevSettings.parties.contacts')}</h3>
+                        <p className="muted">{t('pages.zevSettings.parties.contactsHint')}</p>
                     </div>
-                    {givingAccess && (
-                        <GiveAccessForm parties={parties} actions={accessActions} onDone={() => setGivingAccess(false)} />
-                    )}
-                    {contacts.length + otherParties.length + bareLogins.length === 0 && (
-                        <p className="muted">{t('pages.zevSettings.parties.noContacts')}</p>
-                    )}
-                    {contacts.length + otherParties.length + bareLogins.length > 0 && (
-                        <ul className="zev-access-list">
-                            {[...contacts, ...otherParties].map((party) => (
-                                <li key={party.id} className="zev-access-row">
-                                    <div className="zev-access-who">
-                                        <strong>{party.display_name}</strong>
-                                        {party.name_addition && <span className="muted">{party.name_addition}</span>}
-                                        <span className="zev-access-badges">
-                                            {party.participations.length > 0 && (
-                                                <span className="badge badge-tag">{t('pages.zevSettings.parties.participant')}</span>
-                                            )}
-                                            {[...new Set(party.roles.map((row) => row.role))].map((role) => (
-                                                <span key={role} className="badge badge-tag">{t(`pages.participants.roles.${role}`)}</span>
-                                            ))}
-                                        </span>
-                                    </div>
-                                    <div className="zev-access-meta muted">
-                                        {party.email && <span>{party.email}</span>}
-                                        {(party.address_line1 || party.city) && (
-                                            <span>{[party.address_line1, [party.postal_code, party.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')}</span>
-                                        )}
-                                    </div>
-                                    {canManage && party.participations.length === 0 && (
-                                        <div className="zev-access-actions actions-row actions-row-wrap">
-                                            <button
-                                                type="button"
-                                                className="button button-secondary button-compact"
-                                                onClick={() => { setEditingParty(party); setPartyModalOpen(true) }}
-                                            >
-                                                <FontAwesomeIcon icon={faPen} fixedWidth />
-                                                {t('common.edit')}
-                                            </button>
-                                            {party.roles.length === 0 && entriesOf(party).length === 0 && (
-                                                <button
-                                                    type="button"
-                                                    className="button button-danger button-compact"
-                                                    disabled={removeParty.isPending}
-                                                    onClick={() => confirmDelete(party)}
-                                                >
-                                                    <FontAwesomeIcon icon={faTrash} fixedWidth />
-                                                    {t('common.delete')}
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-                                    <AccessControls entries={entriesOf(party)} party={party} canManage={canManage} actions={accessActions} />
-                                </li>
-                            ))}
-                            {bareLogins.map((entry) => (
-                                <li key={`login-${entry.user.id}`} className="zev-access-row">
-                                    <div className="zev-access-who">
-                                        <strong>{`${entry.user.first_name} ${entry.user.last_name}`.trim() || entry.user.email}</strong>
-                                        <span className="zev-access-badges">
-                                            <span className="badge badge-tag">{t('pages.zevSettings.parties.loginOnly')}</span>
-                                        </span>
-                                    </div>
-                                    <AccessControls
-                                        entries={entries.filter((item) => item.user.id === entry.user.id)}
-                                        canManage={canManage}
-                                        actions={accessActions}
-                                    />
-                                </li>
-                            ))}
-                        </ul>
+                    {canManage && (
+                        <div className="actions-row actions-row-wrap">
+                            <button type="button" className="button button-secondary" onClick={() => setGivingAccessTo(FREE_ACCESS_FORM)}>
+                                {t('pages.zevSettings.access.add')}
+                            </button>
+                            <button type="button" className="button button-primary" onClick={() => openNewContact()}>
+                                <FontAwesomeIcon icon={faPlus} fixedWidth />
+                                {t('pages.zevSettings.parties.addContact')}
+                            </button>
+                        </div>
                     )}
                 </div>
-            )}
+                {renderGiveForm(FREE_ACCESS_FORM)}
+                <table role="table">
+                    <thead role="rowgroup">
+                        <tr role="row">
+                            <th role="columnheader" scope="col">{t('pages.zevSettings.parties.col.person')}</th>
+                            <th role="columnheader" scope="col">{t('pages.zevSettings.parties.col.access')}</th>
+                            <th role="columnheader" scope="col" className="people-actions-cell">
+                                <span className="visually-hidden">{t('pages.zevSettings.parties.col.actions')}</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody role="rowgroup">
+                        {listedParties.map((party) => {
+                            const editable = canManage && party.participations.length === 0
+                            const described = describeAccess({
+                                t, settings, entries: entriesOf(party), party, canManage, actions: accessActions,
+                                shownEmail: party.email, onGive: (id) => setGivingAccessTo(`contact:${id}`),
+                            })
+                            const menuItems = [...described.menuItems]
+                            if (editable && party.roles.length === 0 && entriesOf(party).length === 0) {
+                                menuItems.push({
+                                    key: 'delete',
+                                    label: t('common.delete'),
+                                    icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
+                                    danger: true,
+                                    disabled: removeParty.isPending,
+                                    onClick: () => confirmDelete(party),
+                                })
+                            }
+                            return (
+                                <PersonRows
+                                    key={party.id}
+                                    cells={{
+                                        who: (
+                                            <>
+                                                <span className="people-row-name">
+                                                    <strong>{party.display_name}</strong>
+                                                    {party.name_addition && <span className="muted">{party.name_addition}</span>}
+                                                    <span className="people-row-tags">
+                                                        {party.participations.length > 0 && (
+                                                            <span className="badge badge-tag">{t('pages.zevSettings.parties.participant')}</span>
+                                                        )}
+                                                        {[...new Set(party.roles.map((row) => row.role))].map((role) => (
+                                                            <span key={role} className="badge badge-tag">{t(`pages.participants.roles.${role}`)}</span>
+                                                        ))}
+                                                    </span>
+                                                </span>
+                                                <span className="people-row-meta muted">
+                                                    {party.email && <span>{party.email}</span>}
+                                                    {(party.address_line1 || party.city) && (
+                                                        <span>{[party.address_line1, [party.postal_code, party.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')}</span>
+                                                    )}
+                                                </span>
+                                            </>
+                                        ),
+                                        access: described.status,
+                                        actions: (
+                                            <>
+                                                {editable && (
+                                                    <button
+                                                        type="button"
+                                                        className="button button-secondary button-compact"
+                                                        aria-label={t('common.edit')}
+                                                        title={t('common.edit')}
+                                                        onClick={() => { setEditingParty(party); setPartyModalOpen(true) }}
+                                                    >
+                                                        <FontAwesomeIcon icon={faPen} fixedWidth />
+                                                    </button>
+                                                )}
+                                                {described.primary}
+                                                <RowMenu items={menuItems} />
+                                            </>
+                                        ),
+                                    }}
+                                    form={renderGiveForm(`contact:${party.id}`)}
+                                />
+                            )
+                        })}
+                        {bareLogins.map((entry) => {
+                            const loginName = `${entry.user.first_name} ${entry.user.last_name}`.trim()
+                            const described = describeAccess({
+                                t, settings, entries: entries.filter((item) => item.user.id === entry.user.id), canManage,
+                                actions: accessActions, shownEmail: loginName ? undefined : entry.user.email, onGive: () => undefined,
+                            })
+                            return (
+                                <PersonRows
+                                    key={`login-${entry.user.id}`}
+                                    cells={{
+                                        who: <span className="people-row-name"><strong>{loginName || entry.user.email}</strong></span>,
+                                        access: described.status,
+                                        actions: <RowMenu items={described.menuItems} />,
+                                    }}
+                                />
+                            )
+                        })}
+                    </tbody>
+                </table>
+            </section>
+        )}
 
-            <PartyFormModal
-                isOpen={partyModalOpen}
-                party={editingParty}
-                isPending={saveParty.isPending}
-                onClose={() => { setPartyModalOpen(false); setEditingParty(null); setPickAfterCreate(null) }}
-                onSubmit={(input) => saveParty.mutate(input)}
-            />
-            {dialog && (
-                <ConfirmDialog {...dialog} isLoading={dialogLoading} onConfirm={handleConfirm} onCancel={handleCancel} />
-            )}
-            {accessActions.dialog}
-        </section>
+        <PartyFormModal
+            isOpen={partyModalOpen}
+            party={editingParty}
+            isPending={saveParty.isPending}
+            onClose={() => { setPartyModalOpen(false); setEditingParty(null); setPickAfterCreate(null) }}
+            onSubmit={(input) => saveParty.mutate(input)}
+        />
+        {dialog && (
+            <ConfirmDialog {...dialog} isLoading={dialogLoading} onConfirm={handleConfirm} onCancel={handleCancel} />
+        )}
+        {accessActions.dialog}
+        </PageState>
+    )
+}
+
+/** The row's "…" menu; nothing when no item applies (a viewer, or nothing left to do). */
+function RowMenu({ items }: { items: ActionMenuItem[] }) {
+    const { t } = useTranslation()
+    if (items.length === 0) return null
+    return (
+        <ActionMenu
+            label={t('pages.zevSettings.parties.moreActions')}
+            iconOnly
+            icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
+            items={items}
+        />
+    )
+}
+
+/** One person of the contacts table (and the form that opened under it). */
+function PersonRows({ cells, form }: { cells: { who: ReactNode; access: ReactNode; actions: ReactNode }; form?: ReactNode }) {
+    return (
+        <>
+            <tr role="row" className="people-row">
+                <td role="cell" className="people-row-who">{cells.who}</td>
+                <td role="cell" className="people-row-access">{cells.access}</td>
+                <td role="cell" className="people-actions-cell">
+                    <div className="people-row-actions">{cells.actions}</div>
+                </td>
+            </tr>
+            {form ? (
+                <tr role="row" className="people-form-row">
+                    <td role="cell" colSpan={3}>{form}</td>
+                </tr>
+            ) : null}
         </>
     )
 }
@@ -377,18 +482,23 @@ interface PickerProps {
     value: string
     onChange: (id: string) => void
     onNewContact: (onCreated: (id: string) => void) => void
+    error?: string | null
+    pickerRef?: RefObject<HTMLSelectElement | null>
 }
 
-/** Every party of the ZEV, plus "New contact…" which opens the contact form. */
-function PartyPicker({ parties, value, onChange, onNewContact }: PickerProps) {
+/** Every person of the ZEV, plus "New contact…" which opens the contact form. */
+function PartyPicker({ parties, value, onChange, onNewContact, error, pickerRef }: PickerProps) {
     const { t } = useTranslation()
+    const errorId = useId()
     return (
         <label>
             <span>{t('pages.zevSettings.parties.party')}</span>
             <select
+                ref={pickerRef}
                 value={value}
                 onChange={(event) => (event.target.value === NEW_CONTACT ? onNewContact(onChange) : onChange(event.target.value))}
-                required
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? errorId : undefined}
             >
                 <option value="">{t('pages.zevSettings.parties.selectParty')}</option>
                 {parties.map((party) => (
@@ -396,6 +506,7 @@ function PartyPicker({ parties, value, onChange, onNewContact }: PickerProps) {
                 ))}
                 <option value={NEW_CONTACT}>{t('pages.zevSettings.parties.newContactOption')}</option>
             </select>
+            {error && <small className="field-error" id={errorId} role="alert">{error}</small>}
         </label>
     )
 }
@@ -403,6 +514,7 @@ function PartyPicker({ parties, value, onChange, onNewContact }: PickerProps) {
 interface AssignFormProps {
     parties: Party[]
     busy: boolean
+    title: string
     submitLabel: string
     onAssign: (party: string, validFrom: string, building?: string | null) => Promise<unknown>
     onNewContact: (onCreated: (id: string) => void) => void
@@ -411,21 +523,36 @@ interface AssignFormProps {
     buildings?: Building[]
 }
 
-function AssignForm({ parties, busy, submitLabel, onAssign, onNewContact, onDone, buildings }: AssignFormProps) {
+function AssignForm({ parties, busy, title, submitLabel, onAssign, onNewContact, onDone, buildings }: AssignFormProps) {
     const { t } = useTranslation()
     const [party, setParty] = useState('')
     const [validFrom, setValidFrom] = useState(todayBusinessIso())
     const [building, setBuilding] = useState('')
+    const [error, setError] = useState<string | null>(null)
+    const pickerRef = useRef<HTMLSelectElement>(null)
 
     function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
-        if (!party || !validFrom) return
+        if (!party) {
+            setError(t('pages.zevSettings.access.partyRequired'))
+            pickerRef.current?.focus()
+            return
+        }
+        if (!validFrom) return
         void onAssign(party, validFrom, buildings ? building || null : undefined).then(onDone, () => undefined)
     }
 
     return (
-        <form className="form-grid zev-access-form" onSubmit={submit}>
-            <PartyPicker parties={parties} value={party} onChange={setParty} onNewContact={onNewContact} />
+        <form className="form-grid zev-access-form" noValidate onSubmit={submit}>
+            <h4 className="zev-access-form-title grid-span-full">{title}</h4>
+            <PartyPicker
+                parties={parties}
+                value={party}
+                onChange={(id) => { setParty(id); setError(null) }}
+                onNewContact={onNewContact}
+                error={error}
+                pickerRef={pickerRef}
+            />
             <label>
                 <span>{t('pages.zevSettings.parties.validFrom')}</span>
                 <CivilDateInput value={validFrom || null} onChange={(iso) => setValidFrom(iso ?? '')} clearable={false} />
@@ -442,7 +569,7 @@ function AssignForm({ parties, busy, submitLabel, onAssign, onNewContact, onDone
                 </label>
             )}
             <div className="actions-row actions-row-wrap">
-                <button type="submit" className="button button-primary" disabled={busy || !party || !validFrom}>{submitLabel}</button>
+                <button type="submit" className="button button-primary" disabled={busy}>{submitLabel}</button>
                 <button type="button" className="button button-secondary" onClick={onDone}>{t('common.cancel')}</button>
             </div>
         </form>
@@ -458,15 +585,15 @@ interface SingleHolderRoleProps {
     onAssign: (party: string, validFrom: string) => Promise<unknown>
     onNewContact: (onCreated: (id: string) => void) => void
     /** The holder's access in OpenZEV, shown on its row. */
-    renderAccess: (partyId: string, managingRole?: boolean) => ReactNode
+    accessFor: AccessFor
+    renderGiveForm: (where: string) => ReactNode
 }
 
-/** The issuer or the representative: today's holder, what is scheduled, the history, and "Change from…". */
-function SingleHolderRole({ role, rows, parties, canManage, busy, onAssign, onNewContact, renderAccess }: SingleHolderRoleProps) {
+/** The issuer or the representative: today's holder, what is scheduled, the history, and the change action. */
+function SingleHolderRole({ role, rows, parties, canManage, busy, onAssign, onNewContact, accessFor, renderGiveForm }: SingleHolderRoleProps) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
     const [changing, setChanging] = useState(false)
-    const [showHistory, setShowHistory] = useState(false)
     const today = todayBusinessIso()
     const current = rows.find((row) => activeOn(row, today))
     const upcoming = rows.filter((row) => row.valid_from > today).sort((a, b) => a.valid_from.localeCompare(b.valid_from))
@@ -475,6 +602,8 @@ function SingleHolderRole({ role, rows, parties, canManage, busy, onAssign, onNe
         t('pages.zevSettings.access.since', { date: formatShortDate(row.valid_from, settings) }),
         row.valid_to ? t('pages.zevSettings.access.until', { date: formatShortDate(row.valid_to, settings) }) : null,
     ].filter(Boolean).join(' · ')
+    const changeKey = `pages.zevSettings.parties.${current || upcoming.length ? 'change' : 'set'}.${role}`
+    const access = current ? accessFor(current.party, role, true) : null
 
     return (
         <div className="zev-parties-block">
@@ -485,22 +614,27 @@ function SingleHolderRole({ role, rows, parties, canManage, busy, onAssign, onNe
                 </div>
                 {canManage && !changing && (
                     <button type="button" className="button button-secondary button-compact" onClick={() => setChanging(true)}>
-                        {t(current || upcoming.length ? 'pages.zevSettings.parties.changeFrom' : 'pages.zevSettings.parties.set')}
+                        {t(changeKey)}
                     </button>
                 )}
             </div>
-            {current ? (
-                <div className="zev-access-row">
-                    <p className="zev-parties-holder">
-                        <strong>{current.party_display_name}</strong>
-                        <span className="muted">{windowText(current)}</span>
-                    </p>
-                    {renderAccess(current.party, true)}
-                </div>
+            {current && access ? (
+                <>
+                    <RoleRow
+                        name={current.party_display_name}
+                        windowText={windowText(current)}
+                        status={access.status}
+                        actions={<>{access.primary}<RowMenu items={access.menuItems} /></>}
+                    />
+                    {renderGiveForm(`${role}:${current.party}`)}
+                </>
+            ) : role === 'issuer' ? (
+                // Documents carry only the community's name until someone issues them: a problem with its fix beside it.
+                <IssueText tone="warning" onClick={canManage ? () => setChanging(true) : undefined}>
+                    {t('pages.zevSettings.parties.issuerNone')}
+                </IssueText>
             ) : (
-                <p className={role === 'issuer' ? 'warning-banner' : 'muted'}>
-                    {t(`pages.zevSettings.parties.${role}None`)}
-                </p>
+                <p className="muted">{t('pages.zevSettings.parties.representativeNone')}</p>
             )}
             {upcoming.map((row) => (
                 <p key={row.id} className="zev-parties-holder">
@@ -513,6 +647,7 @@ function SingleHolderRole({ role, rows, parties, canManage, busy, onAssign, onNe
                 <AssignForm
                     parties={parties}
                     busy={busy}
+                    title={t(changeKey)}
                     submitLabel={t('pages.zevSettings.parties.apply')}
                     onAssign={onAssign}
                     onNewContact={onNewContact}
@@ -521,23 +656,38 @@ function SingleHolderRole({ role, rows, parties, canManage, busy, onAssign, onNe
             )}
             {changing && <p className="muted zev-access-form-hint">{t('pages.zevSettings.parties.changeHint')}</p>}
             {past.length > 0 && (
-                <>
-                    <label className="zev-access-toggle">
-                        <input type="checkbox" checked={showHistory} onChange={(event) => setShowHistory(event.target.checked)} />
-                        <span>{t('pages.zevSettings.parties.showHistory')}</span>
-                    </label>
-                    {showHistory && (
-                        <ul className="zev-parties-history">
-                            {past.map((row) => (
-                                <li key={row.id}>
-                                    <span>{row.party_display_name}</span>
-                                    <span className="muted">{windowText(row)}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </>
+                <Disclosure summary={t('pages.zevSettings.parties.showHistory')}>
+                    <ul className="zev-parties-history">
+                        {past.map((row) => (
+                            <li key={row.id}>
+                                <span>{row.party_display_name}</span>
+                                <span className="muted">{windowText(row)}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </Disclosure>
             )}
+        </div>
+    )
+}
+
+/** A holder of a role: name and dates, the login's status, and the row's actions. No box of its own: the sheet is the container. */
+function RoleRow({ name, windowText, tags, status, actions }: {
+    name: string
+    windowText: string
+    tags?: ReactNode
+    status: ReactNode
+    actions: ReactNode
+}) {
+    return (
+        <div className="zev-role-row">
+            <div className="zev-role-who">
+                <strong>{name}</strong>
+                {tags}
+                <span className="muted">{windowText}</span>
+            </div>
+            <div className="zev-role-actions">{actions}</div>
+            <div className="zev-role-access">{status}</div>
         </div>
     )
 }
@@ -553,15 +703,17 @@ interface LandownersProps {
     onEnd: (row: ZevPartyRole, lastDay: string) => Promise<unknown>
     onNewContact: (onCreated: (id: string) => void) => void
     /** The landowner's access in OpenZEV, shown on its row (a landowner gets none by its role). */
-    renderAccess: (partyId: string) => ReactNode
+    accessFor: AccessFor
+    renderGiveForm: (where: string) => ReactNode
 }
 
-function Landowners({ rows, parties, canManage, busy, buildings, onAssign, onSetBuilding, onEnd, onNewContact, renderAccess }: LandownersProps) {
+function Landowners({ rows, parties, canManage, busy, buildings, onAssign, onSetBuilding, onEnd, onNewContact, accessFor, renderGiveForm }: LandownersProps) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
     const [adding, setAdding] = useState(false)
     const [ending, setEnding] = useState<string | null>(null)
     const [settingBuilding, setSettingBuilding] = useState<string | null>(null)
+    const [pickedBuilding, setPickedBuilding] = useState('')
     const [lastDay, setLastDay] = useState(todayBusinessIso())
     const today = todayBusinessIso()
     const listed = rows
@@ -586,7 +738,8 @@ function Landowners({ rows, parties, canManage, busy, buildings, onAssign, onSet
                 <AssignForm
                     parties={parties}
                     busy={busy}
-                    submitLabel={t('pages.zevSettings.parties.addLandowner')}
+                    title={t('pages.zevSettings.parties.addLandowner')}
+                    submitLabel={t('pages.zevSettings.parties.add')}
                     buildings={buildings}
                     onAssign={onAssign}
                     onNewContact={onNewContact}
@@ -595,79 +748,97 @@ function Landowners({ rows, parties, canManage, busy, buildings, onAssign, onSet
             )}
             {listed.length === 0 && <p className="muted">{t('pages.zevSettings.parties.noLandowners')}</p>}
             {listed.length > 0 && (
-                <ul className="zev-access-list">
-                    {listed.map((row) => (
-                        <li key={row.id} className="zev-access-row">
-                            <div className="zev-access-who">
-                                <strong>{row.party_display_name}</strong>
-                                {row.building_name && (
-                                    <span className="zev-access-badges">
-                                        <span className="badge badge-tag">{row.building_name}</span>
-                                    </span>
-                                )}
-                            </div>
-                            <div className="zev-access-meta muted">
-                                <span>
-                                    {t('pages.zevSettings.access.since', { date: formatShortDate(row.valid_from, settings) })}
-                                    {row.valid_to && ` · ${t('pages.zevSettings.access.until', { date: formatShortDate(row.valid_to, settings) })}`}
-                                </span>
-                            </div>
-                            {/* One actions cell: the row's grid places every actions block in the same column. */}
-                            {canManage && row.valid_to === null && (
-                                <div className="zev-access-actions actions-row actions-row-wrap">
-                                    {buildings.length > 0 && (settingBuilding === row.id ? (
+                <ul className="zev-role-list">
+                    {listed.map((row) => {
+                        const access = accessFor(row.party, 'landowner')
+                        const open = canManage && row.valid_to === null
+                        const menuItems: ActionMenuItem[] = [...access.menuItems]
+                        if (open) {
+                            // Rare, and it changes who later documents name: in the menu, confirmed.
+                            menuItems.unshift({
+                                key: 'end',
+                                label: t('pages.zevSettings.parties.end'),
+                                onClick: () => { setLastDay(today); setEnding(row.id) },
+                            })
+                        }
+                        return (
+                            <li key={row.id}>
+                                <RoleRow
+                                    name={row.party_display_name}
+                                    tags={row.building_name ? <span className="badge badge-tag">{row.building_name}</span> : undefined}
+                                    windowText={[
+                                        t('pages.zevSettings.access.since', { date: formatShortDate(row.valid_from, settings) }),
+                                        row.valid_to ? t('pages.zevSettings.access.until', { date: formatShortDate(row.valid_to, settings) }) : null,
+                                    ].filter(Boolean).join(' · ')}
+                                    status={access.status}
+                                    actions={
+                                        <>
+                                            {open && buildings.length > 0 && settingBuilding !== row.id && (
+                                                <button
+                                                    type="button"
+                                                    className="button button-secondary button-compact"
+                                                    onClick={() => { setPickedBuilding(row.building ?? ''); setSettingBuilding(row.id) }}
+                                                >
+                                                    {t(row.building ? 'pages.zevSettings.parties.changeBuilding' : 'pages.zevSettings.parties.setBuilding')}
+                                                </button>
+                                            )}
+                                            {access.primary}
+                                            <RowMenu items={menuItems} />
+                                        </>
+                                    }
+                                />
+                                {open && settingBuilding === row.id && (
+                                    <form
+                                        className="zev-role-inline-form"
+                                        onSubmit={(event) => {
+                                            event.preventDefault()
+                                            void onSetBuilding(row, pickedBuilding || null).then(
+                                                () => setSettingBuilding(null),
+                                                () => undefined,
+                                            )
+                                        }}
+                                    >
                                         <label className="zev-parties-inline-date">
                                             <span>{t('pages.zevSettings.parties.landownerBuilding')}</span>
-                                            <select
-                                                value={row.building ?? ''}
-                                                disabled={busy}
-                                                onChange={(event) => {
-                                                    void onSetBuilding(row, event.target.value || null).then(
-                                                        () => setSettingBuilding(null),
-                                                        () => undefined,
-                                                    )
-                                                }}
-                                            >
+                                            <select className="select-compact" value={pickedBuilding} disabled={busy} onChange={(event) => setPickedBuilding(event.target.value)}>
                                                 <option value="">{t('pages.zevSettings.parties.buildingNotSpecified')}</option>
                                                 {buildings.map((candidate) => (
                                                     <option key={candidate.id} value={candidate.id}>{candidate.name}</option>
                                                 ))}
                                             </select>
                                         </label>
-                                    ) : (
-                                        <button type="button" className="button button-secondary button-compact" onClick={() => setSettingBuilding(row.id)}>
-                                            {t(row.building ? 'pages.zevSettings.parties.changeBuilding' : 'pages.zevSettings.parties.setBuilding')}
+                                        <button type="submit" className="button button-primary button-compact" disabled={busy}>
+                                            {t('common.save')}
                                         </button>
-                                    ))}
-                                    {ending === row.id ? (
-                                        <form
-                                            className="actions-row actions-row-wrap"
-                                            onSubmit={(event) => {
-                                                event.preventDefault()
-                                                void onEnd(row, lastDay).then(() => setEnding(null), () => undefined)
-                                            }}
-                                        >
-                                            <label className="zev-parties-inline-date">
-                                                <span>{t('pages.zevSettings.parties.lastDay')}</span>
-                                                <CivilDateInput value={lastDay || null} onChange={(iso) => setLastDay(iso ?? '')} clearable={false} />
-                                            </label>
-                                            <button type="submit" className="button button-danger button-compact" disabled={busy}>
-                                                {t('pages.zevSettings.parties.end')}
-                                            </button>
-                                            <button type="button" className="button button-secondary button-compact" onClick={() => setEnding(null)}>
-                                                {t('common.cancel')}
-                                            </button>
-                                        </form>
-                                    ) : (
-                                        <button type="button" className="button button-secondary button-compact" onClick={() => { setLastDay(today); setEnding(row.id) }}>
+                                        <button type="button" className="button button-secondary button-compact" onClick={() => setSettingBuilding(null)}>
+                                            {t('common.cancel')}
+                                        </button>
+                                    </form>
+                                )}
+                                {open && ending === row.id && (
+                                    <form
+                                        className="zev-role-inline-form"
+                                        onSubmit={(event) => {
+                                            event.preventDefault()
+                                            void onEnd(row, lastDay).then(() => setEnding(null), () => undefined)
+                                        }}
+                                    >
+                                        <label className="zev-parties-inline-date">
+                                            <span>{t('pages.zevSettings.parties.lastDay')}</span>
+                                            <CivilDateInput value={lastDay || null} onChange={(iso) => setLastDay(iso ?? '')} clearable={false} />
+                                        </label>
+                                        <button type="submit" className="button button-secondary button-compact" disabled={busy || !lastDay}>
                                             {t('pages.zevSettings.parties.end')}
                                         </button>
-                                    )}
-                                </div>
-                            )}
-                            {renderAccess(row.party)}
-                        </li>
-                    ))}
+                                        <button type="button" className="button button-secondary button-compact" onClick={() => setEnding(null)}>
+                                            {t('common.cancel')}
+                                        </button>
+                                    </form>
+                                )}
+                                {renderGiveForm(`landowner:${row.party}`)}
+                            </li>
+                        )
+                    })}
                 </ul>
             )}
         </div>

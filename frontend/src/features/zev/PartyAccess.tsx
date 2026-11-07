@@ -1,13 +1,16 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useRef, useState, type FormEvent, type ReactNode } from 'react'
+import type { TFunction } from 'i18next'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faEnvelope, faKey, faUserMinus } from '@fortawesome/free-solid-svg-icons'
+import { faEnvelope, faUserMinus } from '@fortawesome/free-solid-svg-icons'
 import { CivilDateInput } from '../../components/CivilDateInput'
+import { IssueText } from '../../components/IssueText'
+import type { ActionMenuItem } from '../../components/ActionMenu'
 import { ConfirmDialog, consumeReportedError, useConfirmDialog } from '../../components/ConfirmDialog'
 import { createZevAccess, resendZevInvitation, revokeZevAccess, updateZevAccess } from '../../lib/api/zev'
 import { formatApiError } from '../../lib/api/errors'
-import { formatShortDate, useAppSettings } from '../../lib/appSettings'
+import { formatShortDate } from '../../lib/appSettings'
 import { useAuth } from '../../lib/auth'
 import { todayBusinessIso } from '../../lib/dates'
 import { useToast } from '../../lib/toast'
@@ -113,7 +116,18 @@ export function useAccessActions(zevId: string) {
 
 export type AccessActions = ReturnType<typeof useAccessActions>
 
-interface AccessControlsProps {
+export interface AccessDescription {
+    /** What the person may do in OpenZEV, as quiet text: no controls. */
+    status: ReactNode
+    /** The one visible action, when there is access to give or an invitation to send. */
+    primary: ReactNode
+    /** Everything else, for the row's "…" menu. */
+    menuItems: ActionMenuItem[]
+}
+
+interface DescribeAccessParams {
+    t: TFunction
+    settings: Parameters<typeof formatShortDate>[1]
     /** The access list rows of this person's logins (grants and role-derived entries). */
     entries: ZevAccessGrant[]
     /** The party the row shows, so access can be given to it; absent for a bare login. */
@@ -122,59 +136,44 @@ interface AccessControlsProps {
     actions: AccessActions
     /** The row is the holder of the issuer or representative role, which makes its login a manager. */
     managingRole?: boolean
+    /** An address the row already shows (the contact's email, or a login used as the name), so a login with the same address is not repeated. */
+    shownEmail?: string
+    /** Open the give-access form for this party (the form decides the level). */
+    onGive: (partyId: string) => void
 }
 
 /**
- * What a person on the People & access tab may do in OpenZEV, and the controls
- * to change it, on that person's own row: the manager access a role gives,
- * a grant with its actions, or — without access — "Give access" as manager
- * or read-only.
+ * What a person on the People & access tab may do in OpenZEV, split for the
+ * row it belongs to: the status as text, the one action that matters (give
+ * access / invite) and the rest for the "…" menu — manager access a role
+ * gives, a grant with its actions, or no access.
  */
-export function AccessControls({ entries, party = null, canManage, actions, managingRole = false }: AccessControlsProps) {
-    const { t } = useTranslation()
-    const { settings } = useAppSettings()
-    const [role, setRole] = useState<ZevAccessRole>('viewer')
+export function describeAccess({
+    t, settings, entries, party = null, canManage, actions, managingRole = false, shownEmail, onGive,
+}: DescribeAccessParams): AccessDescription {
     const active = entries.filter((entry) => entry.is_active || entry.valid_from > todayBusinessIso())
     const byRole = active.filter((entry) => entry.source === 'role')
     const grants = active.filter((entry) => entry.source !== 'role')
     const login = active[0]?.user.email ?? party?.accounts[0]?.email
     const canInvite = Boolean(party && (party.accounts.length > 0 || party.email))
 
-    return (
+    const status = (
         <div className="party-access">
             {byRole.length > 0 && (
                 <span className="party-access-line">
-                    <span className="badge badge-tag">{t('pages.zevSettings.access.managesByRole')}</span>
-                    {login && <span className="muted">{login}</span>}
+                    {/* On the issuer's and representative's own rows the heading already says the login manages. */}
+                    {!managingRole && <span className="badge badge-tag">{t('pages.zevSettings.access.managesByRole')}</span>}
+                    {login && login !== shownEmail && <span className="muted">{login}</span>}
                 </span>
             )}
             {grants.map((grant) => (
                 <span key={grant.id} className="party-access-line">
-                    <span className={`badge ${grant.role === 'manager' ? 'badge-info' : 'badge-neutral'}`}>
-                        {t(`pages.zevSettings.access.level.${grant.role}`)}
-                    </span>
-                    {grant.user.pending_invitation && <span className="badge badge-warning">{t('pages.zevSettings.access.pending')}</span>}
+                    <span className="badge badge-tag">{t(`pages.zevSettings.access.level.${grant.role}`)}</span>
+                    {grant.user.pending_invitation && <IssueText tone="warning">{t('pages.zevSettings.access.pending')}</IssueText>}
                     <span className="muted">
-                        {grant.user.email}
-                        {grant.valid_to && ` · ${t('pages.zevSettings.access.until', { date: formatShortDate(grant.valid_to, settings) })}`}
+                        {grant.user.email !== shownEmail && grant.user.email}
+                        {grant.valid_to && `${grant.user.email !== shownEmail ? ' · ' : ''}${t('pages.zevSettings.access.until', { date: formatShortDate(grant.valid_to, settings) })}`}
                     </span>
-                    {canManage && (
-                        <span className="actions-row actions-row-wrap">
-                            <button type="button" className="button button-secondary button-compact" disabled={actions.busy} onClick={() => actions.toggleRole(grant)}>
-                                {t(grant.role === 'manager' ? 'pages.zevSettings.access.makeViewer' : 'pages.zevSettings.access.makeManager')}
-                            </button>
-                            {grant.user.pending_invitation && (
-                                <button type="button" className="button button-secondary button-compact" disabled={actions.busy} onClick={() => actions.resend.mutate(grant)}>
-                                    <FontAwesomeIcon icon={faEnvelope} fixedWidth />
-                                    {t('pages.zevSettings.access.resend')}
-                                </button>
-                            )}
-                            <button type="button" className="button button-danger button-compact" disabled={actions.busy} onClick={() => actions.confirmRevoke(grant)}>
-                                <FontAwesomeIcon icon={faUserMinus} fixedWidth />
-                                {t('pages.zevSettings.access.revoke')}
-                            </button>
-                        </span>
-                    )}
                 </span>
             ))}
             {active.length === 0 && (
@@ -186,71 +185,95 @@ export function AccessControls({ entries, party = null, canManage, actions, mana
                                 ? t('pages.zevSettings.access.noLoginRole')
                                 : t('pages.zevSettings.access.none')}
                     </span>
-                    {canManage && canInvite && party && managingRole && (
-                        <button
-                            type="button"
-                            className="button button-secondary button-compact"
-                            disabled={actions.busy}
-                            onClick={() => actions.give.mutate({ party: party.id, role: 'manager' })}
-                        >
-                            <FontAwesomeIcon icon={faKey} fixedWidth />
-                            {t('pages.zevSettings.access.invite')}
-                        </button>
-                    )}
-                    {canManage && canInvite && party && !managingRole && (
-                        <span className="actions-row actions-row-wrap">
-                            <select
-                                aria-label={t('pages.zevSettings.access.roleLabel')}
-                                value={role}
-                                onChange={(event) => setRole(event.target.value as ZevAccessRole)}
-                            >
-                                {ROLES.map((value) => (
-                                    <option key={value} value={value}>{t(`pages.zevSettings.access.level.${value}`)}</option>
-                                ))}
-                            </select>
-                            <button
-                                type="button"
-                                className="button button-secondary button-compact"
-                                disabled={actions.busy}
-                                onClick={() => actions.give.mutate({ party: party.id, role })}
-                            >
-                                <FontAwesomeIcon icon={faKey} fixedWidth />
-                                {party.accounts.length > 0 ? t('pages.zevSettings.access.add') : t('pages.zevSettings.access.invite')}
-                            </button>
-                        </span>
-                    )}
                 </span>
             )}
         </div>
     )
+
+    const menuItems: ActionMenuItem[] = []
+    if (canManage) {
+        for (const grant of grants) {
+            // With several logins on one person, the menu says which one an item is about.
+            const section = grants.length > 1 ? grant.user.email : undefined
+            menuItems.push({
+                key: `level-${grant.id}`,
+                label: t(grant.role === 'manager' ? 'pages.zevSettings.access.makeViewer' : 'pages.zevSettings.access.makeManager'),
+                disabled: actions.busy,
+                onClick: () => actions.toggleRole(grant),
+                section,
+            })
+            if (grant.user.pending_invitation) {
+                menuItems.push({
+                    key: `resend-${grant.id}`,
+                    label: t('pages.zevSettings.access.resend'),
+                    icon: <FontAwesomeIcon icon={faEnvelope} fixedWidth />,
+                    disabled: actions.busy,
+                    onClick: () => actions.resend.mutate(grant),
+                    section,
+                })
+            }
+            menuItems.push({
+                key: `revoke-${grant.id}`,
+                label: t('pages.zevSettings.access.revoke'),
+                icon: <FontAwesomeIcon icon={faUserMinus} fixedWidth />,
+                danger: true,
+                disabled: actions.busy,
+                onClick: () => actions.confirmRevoke(grant),
+                section,
+            })
+        }
+    }
+
+    let primary: ReactNode = null
+    if (canManage && active.length === 0 && canInvite && party) {
+        primary = (
+            <button
+                type="button"
+                className="button button-secondary button-compact"
+                disabled={actions.busy}
+                onClick={() => (managingRole ? actions.give.mutate({ party: party.id, role: 'manager' }) : onGive(party.id))}
+            >
+                {t(managingRole || party.accounts.length === 0 ? 'pages.zevSettings.access.invite' : 'pages.zevSettings.access.add')}
+            </button>
+        )
+    }
+
+    return { status, primary, menuItems }
 }
 
 interface GiveAccessFormProps {
     parties: Party[]
     actions: AccessActions
     onDone: () => void
+    /** A person whose row opened the form: access goes to them, only the level is left to choose. */
+    initialPartyId?: string
 }
 
 /** Access for someone not on the page yet: a party of the ZEV or any email address. */
-export function GiveAccessForm({ parties, actions, onDone }: GiveAccessFormProps) {
+export function GiveAccessForm({ parties, actions, onDone, initialPartyId }: GiveAccessFormProps) {
     const { t } = useTranslation()
-    const { pushToast } = useToast()
-    const [target, setTarget] = useState<'party' | 'email'>('email')
-    const [partyId, setPartyId] = useState('')
+    const [target, setTarget] = useState<'party' | 'email'>(initialPartyId ? 'party' : 'email')
+    const [partyId, setPartyId] = useState(initialPartyId ?? '')
     const [email, setEmail] = useState('')
     const [role, setRole] = useState<ZevAccessRole>('viewer')
     const [validTo, setValidTo] = useState('')
+    const [errors, setErrors] = useState<{ email?: string; party?: string }>({})
+    const emailRef = useRef<HTMLInputElement>(null)
+    const partyRef = useRef<HTMLSelectElement>(null)
 
     function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
         if (target === 'email' && !email.trim()) {
-            pushToast(t('pages.zevSettings.access.emailRequired'), 'error')
+            setErrors({ email: t('pages.zevSettings.access.emailRequired') })
+            emailRef.current?.focus()
             return
         }
         if (target === 'party' && !partyId) {
-            pushToast(t('pages.zevSettings.access.partyRequired'), 'error')
+            setErrors({ party: t('pages.zevSettings.access.partyRequired') })
+            partyRef.current?.focus()
             return
         }
+        setErrors({})
         actions.give.mutate(
             { ...(target === 'party' ? { party: partyId } : { email: email.trim() }), role, valid_to: validTo || null },
             { onSuccess: onDone },
@@ -258,10 +281,11 @@ export function GiveAccessForm({ parties, actions, onDone }: GiveAccessFormProps
     }
 
     return (
-        <form className="form-grid zev-access-form" onSubmit={submit}>
+        <form className="form-grid zev-access-form" noValidate onSubmit={submit}>
+            <h4 className="zev-access-form-title grid-span-full">{t('pages.zevSettings.access.formTitle')}</h4>
             <label>
                 <span>{t('pages.zevSettings.access.targetLabel')}</span>
-                <select value={target} onChange={(event) => setTarget(event.target.value as 'party' | 'email')}>
+                <select value={target} onChange={(event) => { setTarget(event.target.value as 'party' | 'email'); setErrors({}) }}>
                     <option value="email">{t('pages.zevSettings.access.targetEmail')}</option>
                     <option value="party">{t('pages.zevSettings.access.targetParty')}</option>
                 </select>
@@ -269,7 +293,13 @@ export function GiveAccessForm({ parties, actions, onDone }: GiveAccessFormProps
             {target === 'party' ? (
                 <label>
                     <span>{t('pages.zevSettings.access.partyLabel')}</span>
-                    <select value={partyId} onChange={(event) => setPartyId(event.target.value)}>
+                    <select
+                        ref={partyRef}
+                        value={partyId}
+                        onChange={(event) => { setPartyId(event.target.value); setErrors({}) }}
+                        aria-invalid={Boolean(errors.party)}
+                        aria-describedby={errors.party ? 'zev-access-party-error' : undefined}
+                    >
                         <option value="">{t('pages.zevSettings.parties.selectParty')}</option>
                         {parties.map((party) => (
                             <option key={party.id} value={party.id} disabled={party.accounts.length === 0 && !party.email}>
@@ -282,11 +312,21 @@ export function GiveAccessForm({ parties, actions, onDone }: GiveAccessFormProps
                             </option>
                         ))}
                     </select>
+                    {errors.party && <small className="field-error" id="zev-access-party-error" role="alert">{errors.party}</small>}
                 </label>
             ) : (
                 <label>
                     <span>{t('pages.zevSettings.access.emailLabel')}</span>
-                    <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="off" />
+                    <input
+                        ref={emailRef}
+                        type="email"
+                        value={email}
+                        onChange={(event) => { setEmail(event.target.value); setErrors({}) }}
+                        autoComplete="off"
+                        aria-invalid={Boolean(errors.email)}
+                        aria-describedby={errors.email ? 'zev-access-email-error' : undefined}
+                    />
+                    {errors.email && <small className="field-error" id="zev-access-email-error" role="alert">{errors.email}</small>}
                 </label>
             )}
             <label>
@@ -302,8 +342,8 @@ export function GiveAccessForm({ parties, actions, onDone }: GiveAccessFormProps
                 <CivilDateInput value={validTo || null} onChange={(iso) => setValidTo(iso ?? '')} minDate={todayBusinessIso()} />
                 <small className="muted">{t('pages.zevSettings.access.validToHint')}</small>
             </label>
-            <p className="muted zev-access-form-hint">{t('pages.zevSettings.access.inviteHint')}</p>
-            <div className="actions-row actions-row-wrap">
+            <p className="muted zev-access-form-hint grid-span-full">{t('pages.zevSettings.access.inviteHint')}</p>
+            <div className="actions-row actions-row-wrap grid-span-full">
                 <button type="submit" className="button button-primary" disabled={actions.give.isPending}>
                     {actions.give.isPending ? t('common.saving') : t('pages.zevSettings.access.give')}
                 </button>

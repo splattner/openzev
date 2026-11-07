@@ -1,54 +1,10 @@
-/* ZEV settings → Access (#761): who may manage or view the community. */
-
-.zev-access-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.6rem;
-}
-
-.zev-access-row {
-  display: grid;
-  gap: 0.4rem;
-  padding: 0.75rem 0.85rem;
-  border: 1px solid var(--border-default);
-  border-radius: 0.6rem;
-  background: var(--white);
-}
-
-.zev-access-who {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.25rem 0.6rem;
-  min-width: 0;
-}
-
-.zev-access-who .muted {
-  overflow-wrap: anywhere;
-}
-
-.zev-access-badges {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-}
-
-.zev-access-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.15rem 1rem;
-  font-size: 0.9rem;
-}
-
-.zev-access-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
+/* ZEV settings → People & access (#761, #1224): roles as plain rows in one sheet, other people as a table sheet. */
 
 .zev-access-form-hint {
+  margin: 0;
+}
+
+.zev-access-form-title {
   margin: 0;
 }
 
@@ -74,8 +30,22 @@
   gap: 0.5rem 1rem;
 }
 
+.zev-parties-block-header > :first-child {
+  flex: 1 1 24rem;
+  min-width: 0;
+}
+
+.zev-parties-block-header > button,
+.zev-parties-block-header > .actions-row {
+  flex: none;
+  margin-left: auto;
+}
+
 .zev-parties-block-header h4 {
   margin: 0;
+  /* Quieter than the sheet title above it (1rem / 650). */
+  font-size: 0.9375rem;
+  font-weight: 600;
 }
 
 .zev-parties-block-header p {
@@ -111,19 +81,214 @@
   gap: 0.4rem;
 }
 
-@media (min-width: 48rem) {
-  .zev-access-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
+/* A holder of a role: no box, the sheet is the container; landowners are separated by hairlines. */
+
+.zev-role-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.25rem 1rem;
+  font-size: 0.875rem;
+}
+
+.zev-role-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.6rem;
+  min-width: 0;
+}
+
+.zev-role-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.zev-role-access {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 40rem) {
+  .zev-role-row {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .zev-access-meta {
-    grid-column: 1;
-  }
-
-  .zev-access-actions {
-    grid-column: 2;
-    grid-row: 1 / span 2;
+  .zev-role-actions {
+    order: 3;
+    justify-content: flex-start;
   }
 }
 
+.zev-role-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.zev-role-list > li {
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--border-default);
+}
+
+.zev-role-list > li:first-child {
+  padding-top: 0.25rem;
+  border-top: 0;
+}
+
+.zev-role-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.5rem;
+}
+
+/* Other people: a table on wide containers, a card per person on narrow ones (as the participants). */
+
+.people-rows {
+  container-type: inline-size;
+}
+
+.people-rows-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.875rem;
+}
+
+.people-rows-header > div:first-child {
+  flex: 1 1 24rem;
+  min-width: 0;
+}
+
+.people-rows-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.people-rows-header p {
+  margin: 0.15rem 0 0;
+  font-size: 0.875rem;
+}
+
+.people-rows-header .actions-row {
+  flex: none;
+  margin-left: auto;
+}
+
+.people-rows th {
+  white-space: nowrap;
+}
+
+.people-rows td {
+  vertical-align: middle;
+}
+
+.people-row-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.6rem;
+}
+
+.people-row-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.people-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 1rem;
+  margin-top: 0.15rem;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.people-rows .people-actions-cell {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.people-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.people-rows > .zev-access-form {
+  margin-bottom: 1rem;
+}
+
+.people-rows .people-form-row td {
+  padding-inline: var(--sheet-pad-inline);
+}
+
+@container (max-width: 46rem) {
+  .people-rows table,
+  .people-rows tbody,
+  .people-rows td {
+    display: block;
+  }
+
+  /* Out of sight, not out of the accessibility tree. */
+  .people-rows thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .people-rows tbody tr.people-row {
+    display: grid;
+    grid-template:
+      'who actions' auto
+      'access access' auto / minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    height: auto;
+    padding: 0.9rem var(--sheet-pad-inline);
+    border-bottom: 1px solid var(--border-default);
+  }
+
+  .people-rows tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .people-rows tbody td,
+  .people-rows tbody tr:hover > td {
+    width: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .people-rows tbody .people-form-row td {
+    padding-inline: var(--sheet-pad-inline);
+  }
+
+  .people-row-who {
+    grid-area: who;
+  }
+
+  .people-row-access {
+    grid-area: access;
+  }
+
+  .people-rows .people-actions-cell {
+    grid-area: actions;
+    width: auto;
+  }
+}
