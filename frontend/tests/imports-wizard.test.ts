@@ -771,7 +771,7 @@ describe('ImportsPage wizard gating', () => {
     it('sorts history by raw values', () => {
         twoLogs()
         const headerButton = Array.from(container.querySelectorAll('th button')).find(
-            (button) => button.getAttribute('aria-label') === 'pages.imports.columns.created',
+            (button) => button.textContent?.startsWith('pages.imports.columns.created'),
         ) as HTMLButtonElement
         expect(container.textContent.indexOf('beta.xml')).toBeLessThan(
             container.textContent.indexOf('alpha.csv'),

@@ -56,6 +56,13 @@ const TANSTACK_DEFAULT_SIZE = 150
  *  footer offers only prev/next, never a rows-per-page choice. */
 const PAGE_SIZE = 100
 
+function preserveHeaderFocus(button: HTMLButtonElement | null) {
+    if (!button) return
+    return () => {
+        if (document.activeElement === button) button.closest('th')?.focus()
+    }
+}
+
 interface DataTableProps<T extends Record<string, any>> {
     data: T[]
     columns: ColumnDef<T, unknown>[]
@@ -112,6 +119,8 @@ export function DataTable<T extends Record<string, any>>({
     })
 
     const rows = table.getRowModel().rows
+    const filteredRowCount = table.getFilteredRowModel().rows.length
+    const showSortControls = enableSorting && filteredRowCount > 1
 
     return (
         <div className="data-table">
@@ -121,18 +130,18 @@ export function DataTable<T extends Record<string, any>>({
                         {table.getHeaderGroups().map((headerGroup) => (
                             <tr key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => {
-                                    const canSort = enableSorting && header.column.getCanSort()
+                                    const canSort = showSortControls && header.column.getCanSort()
                                     const dir = header.column.getIsSorted()
-                                    const ariaSort: 'ascending' | 'descending' | 'none' | undefined =
-                                        canSort ? (dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none') : undefined
+                                    const ariaSort = canSort && header.column.getSortIndex() === 0 && dir
+                                        ? (dir === 'asc' ? 'ascending' : 'descending') : undefined
                                     return (
-                                        <th key={header.id} aria-sort={ariaSort} style={{ width: header.getSize() !== TANSTACK_DEFAULT_SIZE ? header.getSize() : undefined }}>
+                                        <th key={header.id} tabIndex={-1} aria-sort={ariaSort} style={{ width: header.getSize() !== TANSTACK_DEFAULT_SIZE ? header.getSize() : undefined }}>
                                             {header.isPlaceholder ? null : canSort ? (
                                                 <button
                                                     type="button"
+                                                    ref={preserveHeaderFocus}
                                                     className="data-table-sort"
                                                     onClick={header.column.getToggleSortingHandler()}
-                                                    aria-label={typeof header.column.columnDef.header === 'string' ? header.column.columnDef.header : undefined}
                                                 >
                                                     {flexRender(header.column.columnDef.header, header.getContext())}
                                                     <span aria-hidden="true">{dir === 'asc' ? '▲' : dir === 'desc' ? '▼' : ''}</span>
@@ -173,8 +182,8 @@ export function DataTable<T extends Record<string, any>>({
                     <span aria-live="polite">
                         {t('common.pagination.range', {
                             from: table.state.pagination.pageIndex * table.state.pagination.pageSize + 1,
-                            to: Math.min((table.state.pagination.pageIndex + 1) * table.state.pagination.pageSize, table.getFilteredRowModel().rows.length),
-                            total: table.getFilteredRowModel().rows.length,
+                            to: Math.min((table.state.pagination.pageIndex + 1) * table.state.pagination.pageSize, filteredRowCount),
+                            total: filteredRowCount,
                         })}
                     </span>
                     <span className="flex-1" />
