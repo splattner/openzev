@@ -1251,6 +1251,10 @@ tab controls and content. An empty filtered result links permitted readers
 to `/metering/points`; only admins and managers can add points. Points without
 readings appear as Missing.
 
+The Missing Days header sorts by the sum of `gaps[].duration_days` (zero for
+no gaps), descending on the first click. `frontend/tests/metering-default-selection.test.ts`
+covers total days versus gap count and points without gaps.
+
 **Gap details:** the Missing Days column shows **Complete** for points without
 gaps and, for every point with gaps (including a single range), a button whose
 text is the pluralized total of `duration_days` (`gapDays`, e.g. "7 days") and

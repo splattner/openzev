@@ -172,6 +172,36 @@ describe('metering gap selection', () => {
     }
     const drawer = () => document.querySelector('[role="dialog"]')
 
+    it('sorts Missing Days by total duration, including points without gaps', async () => {
+        state.meters = [meter('long'), meter('short'), meter('complete')]
+        const gap = (duration_days: number) => ({ start_date: '2026-10-02', end_date: '2026-10-04', duration_days })
+        state.qualityPoints = [
+            { ...point, id: 'short', meter_id: 'CH-short', gaps: [gap(1), gap(1)] },
+            { ...point, id: 'complete', meter_id: 'CH-complete', severity: 'green', gaps: [] },
+            { ...point, id: 'long', meter_id: 'CH-long', severity: 'red', gaps: [gap(3)] },
+        ]
+        const view = await renderChart('/metering/quality', 'quality')
+        const button = Array.from(view.container.querySelectorAll<HTMLButtonElement>('th button'))
+            .find(button => button.textContent === 'meteringDataQuality.gaps')!
+        const header = button.closest('th')!
+        const meters = () => Array.from(view.container.querySelectorAll('tbody tr')).map(row => row.children[0].textContent)
+        await act(async () => button.click())
+        expect(meters()).toEqual(['CH-long', 'CH-short', 'CH-complete'])
+        button.focus()
+        const partial = Array.from(view.container.querySelectorAll<HTMLButtonElement>('button[aria-pressed]'))
+            .find(button => button.textContent?.includes('meteringDataQuality.severityYellow'))!
+        await act(async () => partial.click())
+        await view.settle()
+        expect(meters()).toEqual(['CH-short'])
+        expect(view.container.querySelector('th button, th[aria-sort]')).toBeNull()
+        expect(document.activeElement).toBe(header)
+        await act(async () => partial.click())
+        await view.settle()
+        expect(meters()).toEqual(['CH-long', 'CH-short', 'CH-complete'])
+        await act(async () => header.querySelector('button')!.click())
+        expect(meters()).toEqual(['CH-complete', 'CH-short', 'CH-long'])
+    })
+
     async function openGaps() {
         state.meters = [meter('mp1'), meter('mp2'), meter('mp3', 'z2')]
         state.qualityPoints = [point]

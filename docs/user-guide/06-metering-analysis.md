@@ -184,9 +184,11 @@ add them. A point with no readings appears in the **Missing** group.
 
 ### Status Table
 
-Below the summary cards, a table shows per-metering-point details. Click a
-column header to sort, except for Missing Days (the Status column sorts worst
-severity first).
+Below the summary cards, a table shows per-metering-point details. With at
+least two rows in the filtered result, click a column header to sort. Status
+sorts worst severity first; Missing Days sorts by total missing days, largest
+first. Filtering down to one row hides the sort controls and preserves the
+order for when the filter is cleared.
 
 | Column | Shows |
 | --- | --- |
