@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { isAxiosError } from 'axios'
 import { useQuery } from '@tanstack/react-query'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faRotate } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
 import { fetchAuditEvents, fetchAuditFilterOptions } from '../lib/api/audit'
 import { formatApiError } from '../lib/api/errors'
@@ -12,6 +14,9 @@ import { useCommunityAccess, useScopeNote } from '../lib/communityAccess'
 import { CivilDateInput } from '../components/CivilDateInput'
 import { AuditEventPane } from '../features/audit/AuditEventPane'
 import type { AuditActionCategory, AuditEventFilters, AuditEventStatus } from '../types/api'
+import { auditActionLabel, auditActorLabel, auditTargetLabel } from '../features/audit/auditEventText'
+import { Disclosure } from '../components/Disclosure'
+import { EmptyState } from '../components/EmptyState'
 import { PageHeader } from '../components/PageHeader'
 import { usePageNavigation } from '../lib/usePageNavigation'
 import { useMinWidth } from '../lib/useMinWidth'
@@ -39,6 +44,9 @@ const AUDIT_ACTION_CATEGORIES: AuditActionCategory[] = [
     'template',
     'system',
 ]
+
+/** Typing in the search applies itself once the user pauses; Enter or leaving the field applies it at once. */
+const SEARCH_DEBOUNCE_MS = 400
 
 const AUDIT_STATUSES: AuditEventStatus[] = ['started', 'queued', 'success', 'failed', 'denied']
 
@@ -282,6 +290,16 @@ export function AuditLogsPage({ scope, embedded = false }: AuditLogsPageProps & 
         if (search !== filters.search) updateFilter('search', search)
     }
 
+    useEffect(() => {
+        if (!canReadAudit || searchTooLong) return
+        const search = searchDraft.trim()
+        if (search === localFilters.search) return
+        const timer = window.setTimeout(() => {
+            setFilters(previous => ({ ...previous, search, page: 1 }))
+        }, SEARCH_DEBOUNCE_MS)
+        return () => window.clearTimeout(timer)
+    }, [canReadAudit, searchTooLong, searchDraft, localFilters.search])
+
     function commitTextFilters() {
         if (Object.entries(textFilters).every(([key, value]) => value === urlTextFilters[key as keyof typeof textFilters])) return
         updateParams(params => {
@@ -293,9 +311,13 @@ export function AuditLogsPage({ scope, embedded = false }: AuditLogsPageProps & 
         })
     }
 
-    const scopeDescription = isAdminView
-        ? t('pages.auditLogs.platformDescription')
-        : selectedZev ? t('pages.auditLogs.communityDescription', { name: selectedZev.name }) : undefined
+    const scopeDescription = isAdminView ? t('pages.auditLogs.platformDescription') : undefined
+    const hasUrlTextFilters = Object.values(urlTextFilters).some(Boolean)
+    const [technicalOpen, setTechnicalOpen] = useState(false)
+    const filtersActive = Boolean(
+        filters.actionCategory || filters.status || filters.actorUser || filters.dateFrom || filters.dateTo
+        || filters.search || searchDraft.trim() || (isAdminView && filters.zev) || hasUrlTextFilters,
+    )
 
     return (
         <div className="page-stack">
@@ -309,127 +331,150 @@ export function AuditLogsPage({ scope, embedded = false }: AuditLogsPageProps & 
                 />
             )}
 
-            {embedded && !isAdminView && scopeDescription && <p className="muted">{scopeDescription}</p>}
-
-            <section className="card page-stack">
-                <div className="form-grid">
-                    <label>
-                        {t('pages.auditLogs.filters.actionCategory')}
-                        <select value={filters.actionCategory} onChange={(event) => updateFilter('actionCategory', event.target.value)}>
-                            <option value="">{t('pages.auditLogs.filters.all')}</option>
-                            {AUDIT_ACTION_CATEGORIES.map((category) => (
-                                <option key={category} value={category}>
-                                    {t(`pages.auditLogs.categories.${category}`)}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-                    {isAdminView && (
-                        <label>
-                            {t('pages.auditLogs.filters.zev')}
-                            <select value={filters.zev} onChange={(event) => updateFilter('zev', event.target.value)}>
-                                <option value="">{t('pages.auditLogs.filters.all')}</option>
-                                {(optionsQuery.data?.zevs ?? []).map((zev) => (
-                                    <option key={zev.id} value={zev.id}>
-                                        {zev.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                    )}
-                    <label>
-                        {t('pages.auditLogs.filters.actor')}
-                        <select value={filters.actorUser} onChange={(event) => updateFilter('actorUser', event.target.value)}>
-                            <option value="">{t('pages.auditLogs.filters.all')}</option>
-                            {actorOptions.map((actor) => (
-                                <option key={actor.id} value={String(actor.id)}>
-                                    {actor.username}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-                    <label>
-                        {t('pages.auditLogs.filters.status')}
-                        <select value={filters.status} onChange={(event) => updateFilter('status', event.target.value)}>
-                            <option value="">{t('pages.auditLogs.filters.all')}</option>
-                            {AUDIT_STATUSES.map((status) => (
-                                <option key={status} value={status}>
-                                    {t(`pages.auditLogs.statuses.${status}`)}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-                    <label>
-                        {t('pages.auditLogs.filters.actionType')}
-                        <input
-                            value={textFilters.actionType}
-                            onChange={(event) => setTextFilters(previous => ({ ...previous, actionType: event.target.value }))}
-                            onBlur={commitTextFilters}
-                            onKeyDown={event => { if (event.key === 'Enter') commitTextFilters() }}
-                            placeholder={t('pages.auditLogs.filters.actionTypePlaceholder')}
-                        />
-                    </label>
-                    <label>
-                        {t('pages.auditLogs.filters.targetType')}
-                        <input
-                            value={textFilters.targetType}
-                            onChange={(event) => setTextFilters(previous => ({ ...previous, targetType: event.target.value }))}
-                            onBlur={commitTextFilters}
-                            onKeyDown={event => { if (event.key === 'Enter') commitTextFilters() }}
-                            placeholder={t('pages.auditLogs.filters.targetTypePlaceholder')}
-                        />
-                    </label>
-                    <label>
-                        {t('pages.auditLogs.filters.targetId')}
-                        <input
-                            value={textFilters.targetId}
-                            onChange={(event) => setTextFilters(previous => ({ ...previous, targetId: event.target.value }))}
-                            onBlur={commitTextFilters}
-                            onKeyDown={event => { if (event.key === 'Enter') commitTextFilters() }}
-                        />
-                    </label>
-                    <label>
-                        {t('pages.auditLogs.filters.dateFrom')}
-                        <CivilDateInput value={filters.dateFrom || null} onChange={(iso) => updateFilter('dateFrom', iso ?? '')} />
-                    </label>
-                    <label>
-                        {t('pages.auditLogs.filters.dateTo')}
-                        <CivilDateInput value={filters.dateTo || null} onChange={(iso) => updateFilter('dateTo', iso ?? '')} />
-                    </label>
-                </div>
-                <p className="muted">{t('pages.auditLogs.filters.textApplyHint')}</p>
-
-                <label>
-                    {t('pages.auditLogs.filters.search')}
+            <section className="card audit-filters">
+                <div className="list-filters">
                     <input
+                        type="search"
                         value={searchDraft}
                         onChange={(event) => setSearchDraft(event.target.value)}
                         onBlur={commitSearch}
                         onKeyDown={event => { if (event.key === 'Enter') commitSearch() }}
+                        aria-label={t('pages.auditLogs.filters.search')}
                         aria-invalid={searchTooLong}
-                        aria-describedby={canReadAudit ? 'audit-search-hint' : undefined}
+                        aria-describedby={searchTooLong ? 'audit-search-hint' : undefined}
                         placeholder={t('pages.auditLogs.filters.searchPlaceholder')}
                         disabled={!canReadAudit}
                     />
-                </label>
-                {canReadAudit && <p id="audit-search-hint" className={searchTooLong ? 'text-error' : 'muted'}>
-                    {t(searchTooLong ? 'pages.auditLogs.filters.searchTooLong' : 'pages.auditLogs.filters.searchHint')}
-                </p>}
-
-                <div className="actions-row actions-row-wrap actions-row-end">
-                    {/* Keep a pointer click on Clear from applying the focused draft on blur. */}
-                    <button
-                        type="button"
-                        className="button button-secondary"
-                        onPointerDown={event => event.preventDefault()}
-                        onClick={clearFilters}
+                    <select
+                        aria-label={t('pages.auditLogs.filters.actionCategory')}
+                        value={filters.actionCategory}
+                        onChange={(event) => updateFilter('actionCategory', event.target.value)}
                     >
-                        {t('pages.auditLogs.actions.clearFilters')}
-                    </button>
-                    <button type="button" className="button button-secondary" disabled={!canFetchAudit} onClick={refreshEvents}>
-                        {t('pages.auditLogs.actions.refresh')}
-                    </button>
+                        <option value="">{t('pages.auditLogs.filters.allCategories')}</option>
+                        {AUDIT_ACTION_CATEGORIES.map((category) => (
+                            <option key={category} value={category}>
+                                {t(`pages.auditLogs.categories.${category}`)}
+                            </option>
+                        ))}
+                    </select>
+                    {isAdminView && (
+                        <select
+                            aria-label={t('pages.auditLogs.filters.zev')}
+                            value={filters.zev}
+                            onChange={(event) => updateFilter('zev', event.target.value)}
+                        >
+                            <option value="">{t('pages.auditLogs.filters.allZevs')}</option>
+                            {(optionsQuery.data?.zevs ?? []).map((zev) => (
+                                <option key={zev.id} value={zev.id}>
+                                    {zev.name}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+                    <select
+                        aria-label={t('pages.auditLogs.filters.actor')}
+                        value={filters.actorUser}
+                        onChange={(event) => updateFilter('actorUser', event.target.value)}
+                    >
+                        <option value="">{t('pages.auditLogs.filters.allActors')}</option>
+                        {actorOptions.map((actor) => (
+                            <option key={actor.id} value={String(actor.id)}>
+                                {actor.username}
+                            </option>
+                        ))}
+                    </select>
+                    <select
+                        aria-label={t('pages.auditLogs.filters.status')}
+                        value={filters.status}
+                        onChange={(event) => updateFilter('status', event.target.value)}
+                    >
+                        <option value="">{t('pages.auditLogs.filters.allStatuses')}</option>
+                        {AUDIT_STATUSES.map((status) => (
+                            <option key={status} value={status}>
+                                {t(`pages.auditLogs.statuses.${status}`)}
+                            </option>
+                        ))}
+                    </select>
+                    <div className="audit-filters-dates">
+                        <CivilDateInput
+                            value={filters.dateFrom || null}
+                            onChange={(iso) => updateFilter('dateFrom', iso ?? '')}
+                            ariaLabel={t('pages.auditLogs.filters.dateFrom')}
+                            placeholder={t('pages.auditLogs.filters.dateFromPlaceholder')}
+                        />
+                        <CivilDateInput
+                            value={filters.dateTo || null}
+                            onChange={(iso) => updateFilter('dateTo', iso ?? '')}
+                            ariaLabel={t('pages.auditLogs.filters.dateTo')}
+                            placeholder={t('pages.auditLogs.filters.dateToPlaceholder')}
+                        />
+                    </div>
+                    <div className="audit-filters-actions">
+                        {filtersActive && (
+                            <button
+                                type="button"
+                                className="button button-secondary"
+                                // Keep a pointer click on Clear from applying the focused draft on blur.
+                                onPointerDown={event => event.preventDefault()}
+                                onClick={clearFilters}
+                            >
+                                {t('pages.auditLogs.actions.clearFilters')}
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            className="button button-secondary button-icon"
+                            disabled={!canFetchAudit}
+                            onClick={refreshEvents}
+                            aria-label={t('pages.auditLogs.actions.refresh')}
+                            title={t('pages.auditLogs.actions.refresh')}
+                        >
+                            <FontAwesomeIcon icon={faRotate} fixedWidth />
+                        </button>
+                    </div>
                 </div>
+                {searchTooLong && <p id="audit-search-hint" className="text-error">{t('pages.auditLogs.filters.searchTooLong')}</p>}
+
+                {/* Codes for support work on the platform log; a community manager has no use for them. */}
+                {isAdminView && (
+                    <Disclosure
+                        summary={t('pages.auditLogs.filters.technical')}
+                        open={technicalOpen || hasUrlTextFilters}
+                        onOpenChange={setTechnicalOpen}
+                    >
+                        <div className="form-grid">
+                            <label>
+                                {t('pages.auditLogs.filters.actionType')}
+                                <input
+                                    value={textFilters.actionType}
+                                    onChange={(event) => setTextFilters(previous => ({ ...previous, actionType: event.target.value }))}
+                                    onBlur={commitTextFilters}
+                                    onKeyDown={event => { if (event.key === 'Enter') commitTextFilters() }}
+                                    placeholder={t('pages.auditLogs.filters.actionTypePlaceholder')}
+                                />
+                            </label>
+                            <label>
+                                {t('pages.auditLogs.filters.targetType')}
+                                <input
+                                    value={textFilters.targetType}
+                                    onChange={(event) => setTextFilters(previous => ({ ...previous, targetType: event.target.value }))}
+                                    onBlur={commitTextFilters}
+                                    onKeyDown={event => { if (event.key === 'Enter') commitTextFilters() }}
+                                    placeholder={t('pages.auditLogs.filters.targetTypePlaceholder')}
+                                />
+                            </label>
+                            <label>
+                                {t('pages.auditLogs.filters.targetId')}
+                                <input
+                                    value={textFilters.targetId}
+                                    onChange={(event) => setTextFilters(previous => ({ ...previous, targetId: event.target.value }))}
+                                    onBlur={commitTextFilters}
+                                    onKeyDown={event => { if (event.key === 'Enter') commitTextFilters() }}
+                                />
+                            </label>
+                        </div>
+                    </Disclosure>
+                )}
             </section>
 
             <div
@@ -439,40 +484,45 @@ export function AuditLogsPage({ scope, embedded = false }: AuditLogsPageProps & 
                 data-pane={paneOpen ? 'open' : 'closed'}
             >
                 <div className="detail-split-list" hidden={listHidden}>
-                    <section className="table-card">
-                        {eventsQuery.isLoading && <PageSkeleton variant="tableRows" />}
-                        {eventsQuery.isError && (
+                    {eventsQuery.isLoading && <section className="table-card"><PageSkeleton variant="tableRows" /></section>}
+                    {eventsQuery.isError && (
+                        <section className="table-card">
                             <Notice tone="error" onRetry={refreshEvents} isRetrying={eventsQuery.isFetching}>
                                 {formatApiError(eventsQuery.error, t('pages.auditLogs.loadError'))}
                             </Notice>
-                        )}
-                        {!eventsQuery.isLoading && !eventsQuery.isError && events.length === 0 && <p className="muted">{t('pages.auditLogs.empty')}</p>}
+                        </section>
+                    )}
+                    {!eventsQuery.isLoading && !eventsQuery.isError && events.length === 0 && (
+                        <EmptyState
+                            titleKey="pages.auditLogs.emptyTitle"
+                            descriptionKey={filtersActive ? 'pages.auditLogs.empty' : 'pages.auditLogs.emptyNone'}
+                            actions={filtersActive ? [{ labelKey: 'pages.auditLogs.actions.clearFilters', variant: 'secondary', onClick: clearFilters }] : undefined}
+                        />
+                    )}
 
-                        {events.length > 0 && (
-                            <>
-                                <div className="table-scroll">
-                                    <table>
-                                        <thead>
-                                            <tr>
-                                                <th>{t('pages.auditLogs.columns.createdAt')}</th>
-                                                <th>{t('pages.auditLogs.columns.summary')}</th>
-                                                <th className="audit-col-secondary">{t('pages.auditLogs.columns.zev')}</th>
-                                                <th className="audit-col-secondary">{t('pages.auditLogs.columns.category')}</th>
-                                                <th className="audit-col-secondary">{t('pages.auditLogs.columns.action')}</th>
-                                                <th>{t('pages.auditLogs.columns.target')}</th>
-                                                <th>{t('pages.auditLogs.columns.actor')}</th>
-                                                <th>{t('pages.auditLogs.columns.status')}</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {events.map((event) => (
-                                                <tr
-                                                    key={event.id}
-                                                    className={selectedEventId === event.id ? 'audit-event-row is-selected' : 'audit-event-row'}
-                                                    onClick={() => selectEvent(event.id)}
-                                                >
-                                                    <td>{formatDateTime(event.created_at, settings)}</td>
-                                                    <td>
+                    {events.length > 0 && (
+                        <section className="table-card audit-rows">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>{t('pages.auditLogs.columns.createdAt')}</th>
+                                        <th>{t('pages.auditLogs.columns.event')}</th>
+                                        <th>{t('pages.auditLogs.columns.actor')}</th>
+                                        {isAdminView && <th>{t('pages.auditLogs.columns.zev')}</th>}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {events.map((event) => {
+                                        const target = auditTargetLabel(event, settings)
+                                        return (
+                                            <tr
+                                                key={event.id}
+                                                className={selectedEventId === event.id ? 'audit-event-row is-selected' : 'audit-event-row'}
+                                                onClick={() => selectEvent(event.id)}
+                                            >
+                                                <td className="audit-row-when">{formatDateTime(event.created_at, settings)}</td>
+                                                <td className="audit-row-event">
+                                                    <div className="audit-row-title">
                                                         <button
                                                             type="button"
                                                             className="audit-event-select"
@@ -480,47 +530,50 @@ export function AuditLogsPage({ scope, embedded = false }: AuditLogsPageProps & 
                                                             aria-current={selectedEventId === event.id || undefined}
                                                             onClick={click => { click.stopPropagation(); selectEvent(event.id) }}
                                                         >
-                                                            {event.summary}
+                                                            {auditActionLabel(t, event)}
                                                         </button>
-                                                    </td>
-                                                    <td className="audit-col-secondary">{event.zev ? zevNameById.get(event.zev) ?? event.zev : '—'}</td>
-                                                    <td className="audit-col-secondary">{t(`pages.auditLogs.categories.${event.action_category}`)}</td>
-                                                    <td className="audit-col-secondary"><code>{event.action_type}</code></td>
-                                                    <td>{event.target_display || `${event.target_type}:${event.target_id || '-'}`}</td>
-                                                    <td>{event.actor_display || '—'}</td>
-                                                    <td><span className={statusBadgeClass(event.status)}>{t(`pages.auditLogs.statuses.${event.status}`)}</span></td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                                        {/* Only what went wrong is flagged; a log of successes needs no badge per row. */}
+                                                        {event.status !== 'success' && (
+                                                            <span className={statusBadgeClass(event.status)}>{t(`pages.auditLogs.statuses.${event.status}`)}</span>
+                                                        )}
+                                                    </div>
+                                                    {target && <span className="audit-row-target">{target}</span>}
+                                                </td>
+                                                <td className="audit-row-actor">{auditActorLabel(t, event)}</td>
+                                                {isAdminView && (
+                                                    <td className="audit-row-zev">{event.zev ? zevNameById.get(event.zev) ?? event.zev : '—'}</td>
+                                                )}
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
 
-                                {/* Only rendered when the result spans more than one page:
-                                    DRF returns next = previous = null exactly when count <= page size. */}
-                                {(eventsQuery.data?.next || eventsQuery.data?.previous) && (
-                                    <div className="actions-row actions-row-wrap actions-row-end mt-1">
-                                        <span className="muted">{t('pages.auditLogs.pagination.pageLabel', { page: filters.page, total: eventsQuery.data?.count ?? 0 })}</span>
-                                        <button
-                                            type="button"
-                                            className="button button-secondary"
-                                            onClick={() => updateFilter('page', Math.max(1, filters.page - 1))}
-                                            disabled={!eventsQuery.data?.previous}
-                                        >
-                                            {t('pages.auditLogs.pagination.previous')}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="button button-secondary"
-                                            onClick={() => updateFilter('page', filters.page + 1)}
-                                            disabled={!eventsQuery.data?.next}
-                                        >
-                                            {t('pages.auditLogs.pagination.next')}
-                                        </button>
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </section>
+                            {/* Only rendered when the result spans more than one page:
+                                DRF returns next = previous = null exactly when count <= page size. */}
+                            {(eventsQuery.data?.next || eventsQuery.data?.previous) && (
+                                <div className="actions-row actions-row-wrap actions-row-end mt-1">
+                                    <span className="muted">{t('pages.auditLogs.pagination.pageLabel', { page: filters.page, total: eventsQuery.data?.count ?? 0 })}</span>
+                                    <button
+                                        type="button"
+                                        className="button button-secondary"
+                                        onClick={() => updateFilter('page', Math.max(1, filters.page - 1))}
+                                        disabled={!eventsQuery.data?.previous}
+                                    >
+                                        {t('pages.auditLogs.pagination.previous')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="button button-secondary"
+                                        onClick={() => updateFilter('page', filters.page + 1)}
+                                        disabled={!eventsQuery.data?.next}
+                                    >
+                                        {t('pages.auditLogs.pagination.next')}
+                                    </button>
+                                </div>
+                            )}
+                        </section>
+                    )}
                 </div>
 
                 {selectedEventId && (
