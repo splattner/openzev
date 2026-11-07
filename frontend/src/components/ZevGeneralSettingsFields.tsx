@@ -387,27 +387,14 @@ export function ZevGeneralSettingsFields({ form, onChange, group, zevId, readOnl
 
             )}
 
-            {/* Notes (documents tab) */}
+            {/* Contract PDF and internal notes (documents tab) */}
             {(!group || group === 'documents') && (
             <>
             <div className="form-section">
-                <p className="form-section-header">{t('pages.zevSettings.sections.notes')}</p>
-                <label data-zev-field="notes">
-                    <textarea
-                        value={form.notes ?? ''}
-                        disabled={readOnly}
-                        {...describeInvalid('notes')}
-                        onChange={(event) => onChange({ notes: event.target.value })}
-                        rows={4}
-                    />
-                    {inlineError('notes')}
-                </label>
-            </div>
-
-            {/* Local tariff notes (contract PDF) */}
-            <div className="form-section">
-                <p className="form-section-header">{t('pages.zevSettings.sections.localTariffNotes')}</p>
+                <p className="form-section-header">{t('pages.zevSettings.sections.contractPdf')}</p>
+                <p className="muted form-section-note">{t('pages.zevSettings.fields.contractPdfNote')}</p>
                 <label data-zev-field="local_tariff_notes">
+                    <span>{t('pages.zevSettings.fields.localTariffNotes')}</span>
                     <textarea
                         value={form.local_tariff_notes ?? ''}
                         disabled={readOnly}
@@ -418,12 +405,8 @@ export function ZevGeneralSettingsFields({ form, onChange, group, zevId, readOnl
                     />
                     {inlineError('local_tariff_notes')}
                 </label>
-            </div>
-
-            {/* Additional contract notes (contract PDF) */}
-            <div className="form-section">
-                <p className="form-section-header">{t('pages.zevSettings.sections.additionalContractNotes')}</p>
                 <label data-zev-field="additional_contract_notes">
+                    <span>{t('pages.zevSettings.fields.additionalContractNotes')}</span>
                     <textarea
                         value={form.additional_contract_notes ?? ''}
                         disabled={readOnly}
@@ -433,6 +416,22 @@ export function ZevGeneralSettingsFields({ form, onChange, group, zevId, readOnl
                         placeholder={t('pages.zevSettings.fields.additionalContractNotesPlaceholder')}
                     />
                     {inlineError('additional_contract_notes')}
+                </label>
+            </div>
+
+            <div className="form-section">
+                <p className="form-section-header">{t('pages.zevSettings.sections.notes')}</p>
+                <p className="muted form-section-note">{t('pages.zevSettings.fields.notesHint')}</p>
+                <label data-zev-field="notes">
+                    <textarea
+                        aria-label={t('pages.zevSettings.sections.notes')}
+                        value={form.notes ?? ''}
+                        disabled={readOnly}
+                        {...describeInvalid('notes')}
+                        onChange={(event) => onChange({ notes: event.target.value })}
+                        rows={4}
+                    />
+                    {inlineError('notes')}
                 </label>
             </div>
             </>

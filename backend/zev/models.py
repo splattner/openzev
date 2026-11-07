@@ -10,16 +10,6 @@ from django.utils import timezone
 from allocation.validity import active_during
 from .iban import INVALID_IBAN_MESSAGE, is_valid_iban, normalize_iban
 
-DEFAULT_EMAIL_SUBJECT_TEMPLATE = "Invoice {invoice_number} \u2013 {zev_name}"
-DEFAULT_EMAIL_BODY_TEMPLATE = (
-    "Dear {participant_name},\n\n"
-    "Please find your energy invoice for the period "
-    "{period_start} to {period_end} attached.\n\n"
-    "Amount due: CHF {amount_due_chf}\n\n"
-    "Kind regards,\n{zev_name}"
-)
-
-
 
 class BillingInterval(models.TextChoices):
     MONTHLY = "monthly", "Monthly"

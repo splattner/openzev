@@ -617,6 +617,53 @@ DEFAULT_INVOICE_EMAIL_BODY = (
     "Kind regards,\n{zev_name}"
 )
 
+# Sent to one participant of one ZEV, so the shipped text follows that ZEV's
+# ``invoice_language`` like the sign-in and document mails. A per-ZEV or global
+# override replaces every language (one text), and the platform editor shows
+# the English default.
+INVOICE_EMAIL_DEFAULTS_BY_LANGUAGE = {
+    "en": {
+        "subject": DEFAULT_INVOICE_EMAIL_SUBJECT,
+        "body": DEFAULT_INVOICE_EMAIL_BODY,
+    },
+    "de": {
+        "subject": "Rechnung {invoice_number} – {zev_name}",
+        "body": (
+            "Guten Tag {participant_name}\n\n"
+            "Im Anhang finden Sie Ihre Energierechnung für den Zeitraum "
+            "{period_start} bis {period_end}.\n\n"
+            "Zu zahlender Betrag: CHF {amount_due_chf}\n\n"
+            "Freundliche Grüsse\n{zev_name}"
+        ),
+    },
+    "fr": {
+        "subject": "Facture {invoice_number} – {zev_name}",
+        "body": (
+            "Bonjour {participant_name},\n\n"
+            "Veuillez trouver ci-joint votre facture d'énergie pour la "
+            "période du {period_start} au {period_end}.\n\n"
+            "Montant à payer : CHF {amount_due_chf}\n\n"
+            "Cordialement,\n{zev_name}"
+        ),
+    },
+    "it": {
+        "subject": "Fattura {invoice_number} – {zev_name}",
+        "body": (
+            "Buongiorno {participant_name},\n\n"
+            "In allegato trova la sua fattura energetica per il periodo "
+            "dal {period_start} al {period_end}.\n\n"
+            "Importo da pagare: CHF {amount_due_chf}\n\n"
+            "Cordiali saluti,\n{zev_name}"
+        ),
+    },
+}
+
+
+def invoice_email_defaults(language: str | None) -> dict[str, str]:
+    """The shipped invoice email for an invoice language (English if unknown)."""
+    return INVOICE_EMAIL_DEFAULTS_BY_LANGUAGE.get(language or "", INVOICE_EMAIL_DEFAULTS_BY_LANGUAGE["en"])
+
+
 DEFAULT_DOCUMENT_EMAIL_SUBJECT = "New document from {zev_name}: {title}"
 DEFAULT_DOCUMENT_EMAIL_BODY = (
     "Hello {participant_name},\n\n"

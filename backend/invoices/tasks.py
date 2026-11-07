@@ -87,8 +87,7 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
     formatted_period_end = _format_date_value(invoice.period_end, app_settings.date_format_short)
     formatted_due_date = _format_date_value(invoice.due_date, app_settings.date_format_short) if invoice.due_date else ""
 
-    from zev.models import DEFAULT_EMAIL_SUBJECT_TEMPLATE, DEFAULT_EMAIL_BODY_TEMPLATE
-    from .models import EmailTemplate
+    from .models import EmailTemplate, invoice_email_defaults
 
     template_ctx = build_invoice_email_context(
         invoice_number=invoice.invoice_number,
@@ -102,10 +101,12 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
         inbox_url=inbox_url(invoice.participant),
     )
 
-    # Resolution order: per-ZEV override → admin global override → hardcoded default
+    # Resolution order: per-ZEV override → admin global override → shipped default
+    # in the ZEV's invoice language (an override applies to every language).
+    defaults = invoice_email_defaults(invoice.zev.invoice_language)
     global_override = EmailTemplate.objects.filter(template_key="invoice_email").first()
-    global_subject = global_override.subject if global_override else DEFAULT_EMAIL_SUBJECT_TEMPLATE
-    global_body = global_override.body if global_override else DEFAULT_EMAIL_BODY_TEMPLATE
+    global_subject = global_override.subject if global_override else defaults["subject"]
+    global_body = global_override.body if global_override else defaults["body"]
 
     subject_tpl = invoice.zev.email_subject_template or global_subject
     body_tpl = invoice.zev.email_body_template or global_body
@@ -116,8 +117,8 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
             invoice.zev.name, invoice.zev_id, exc,
         )
 
-    subject = render_with_fallback(subject_tpl, DEFAULT_EMAIL_SUBJECT_TEMPLATE, template_ctx, on_error=_log_fallback)
-    body = render_with_fallback(body_tpl, DEFAULT_EMAIL_BODY_TEMPLATE, template_ctx, on_error=_log_fallback)
+    subject = render_with_fallback(subject_tpl, defaults["subject"], template_ctx, on_error=_log_fallback)
+    body = render_with_fallback(body_tpl, defaults["body"], template_ctx, on_error=_log_fallback)
 
     log = EmailLog.objects.create(
         invoice=invoice,

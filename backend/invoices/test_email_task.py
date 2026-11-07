@@ -14,7 +14,7 @@ import pytest
 from django.core.files.base import ContentFile
 
 from audit.models import AuditEvent, AuditEventSource, AuditEventStatus
-from invoices.models import EmailLog, Invoice, InvoiceStatus
+from invoices.models import EmailLog, EmailTemplate, Invoice, InvoiceStatus
 from invoices.pdf import InvoicePdfSupersededError
 from invoices.tasks import send_invoice_email_task
 from testing import factories
@@ -209,3 +209,45 @@ def test_draft_invoice_stays_draft_after_send(mailoutbox):
     invoice.refresh_from_db()
     assert invoice.status == InvoiceStatus.DRAFT
     assert invoice.sent_at is not None
+
+
+@pytest.mark.parametrize(
+    ("language", "subject_start", "body_start"),
+    [("de", "Rechnung ", "Guten Tag"), ("fr", "Facture ", "Bonjour"), ("it", "Fattura ", "Buongiorno"), ("en", "Invoice ", "Dear")],
+)
+def test_shipped_default_follows_the_zev_invoice_language(mailoutbox, language, subject_start, body_start):
+    invoice = _approved_invoice_with_pdf()
+    invoice.zev.invoice_language = language
+    invoice.zev.save(update_fields=["invoice_language"])
+
+    send_invoice_email_task.run(str(invoice.pk), "recipient@example.com")
+
+    assert mailoutbox[0].subject.startswith(subject_start)
+    assert mailoutbox[0].body.startswith(body_start)
+    assert "{" not in mailoutbox[0].subject + mailoutbox[0].body
+
+
+def test_overrides_apply_to_every_language(mailoutbox):
+    invoice = _approved_invoice_with_pdf()
+    invoice.zev.invoice_language = "de"
+    invoice.zev.save(update_fields=["invoice_language"])
+    EmailTemplate.objects.create(template_key="invoice_email", subject="Global {invoice_number}", body="Global body")
+
+    send_invoice_email_task.run(str(invoice.pk), "recipient@example.com")
+    assert mailoutbox[0].subject.startswith("Global ")
+
+    invoice.zev.email_subject_template = "Mine {invoice_number}"
+    invoice.zev.save(update_fields=["email_subject_template"])
+    send_invoice_email_task.run(str(invoice.pk), "recipient@example.com")
+    assert mailoutbox[1].subject.startswith("Mine ")
+
+
+def test_a_broken_template_falls_back_to_the_default_in_the_invoice_language(mailoutbox):
+    invoice = _approved_invoice_with_pdf()
+    invoice.zev.invoice_language = "fr"
+    invoice.zev.email_subject_template = "{unknown_field}"
+    invoice.zev.save(update_fields=["invoice_language", "email_subject_template"])
+
+    send_invoice_email_task.run(str(invoice.pk), "recipient@example.com")
+
+    assert mailoutbox[0].subject.startswith("Facture ")

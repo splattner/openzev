@@ -17,6 +17,8 @@ class InvoiceEmailFormattingTests(TestCase):
     def test_email_uses_configured_short_date_format(self):
         owner = make_user("email_owner", UserRole.USER)
         zev = make_zev(owner, "Email ZEV")
+        zev.invoice_language = "en"
+        zev.save(update_fields=["invoice_language"])
         participant = make_participant(zev, first="Ema", last="Il")
         invoice = make_invoice(zev, participant, InvoiceStatus.APPROVED)
         invoice.pdf_file.save("invoice_test.pdf", ContentFile(b"PDF"), save=True)

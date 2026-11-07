@@ -90,7 +90,7 @@ describe('ZEV email template field insertion', () => {
         }
     })
 
-    it('shows a pending inheritance change for only the cleared field', () => {
+    it('says what saving will do for only the cleared field, without repeating the unsaved state', () => {
         const { container, root } = renderHarness({ initialSubject: 'Custom subject', initialBody: 'Custom body' })
         try {
             act(() => {
@@ -101,10 +101,11 @@ describe('ZEV email template field insertion', () => {
             const subject = container.querySelector('[data-zev-field="email_subject_template"]')!
             const body = container.querySelector('[data-zev-field="email_body_template"]')!
             expect(subject.textContent).toContain('templates.source.zev')
-            expect(subject.textContent).toContain('templates.source.unsavedChanges')
+            // The save bar already carries "unsaved changes"; the field only adds what saving does.
+            expect(subject.textContent).not.toContain('templates.source.unsavedChanges')
             expect(subject.textContent).toContain('pages.zevSettings.emailInheritanceOnSave')
             expect(body.textContent).toContain('templates.source.zev')
-            expect(body.textContent).not.toContain('templates.source.unsavedChanges')
+            expect(body.textContent).not.toContain('pages.zevSettings.emailInheritanceOnSave')
             expect(container.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe('Custom body')
         } finally {
             act(() => root.unmount())

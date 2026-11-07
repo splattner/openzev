@@ -13,8 +13,22 @@
   flex-wrap: wrap;
 }
 
-.zev-email-label-row > button {
+.zev-email-label-row .template-source-main > button {
   margin-left: auto;
+}
+
+/* The status badge sits beside the label; the action is a quiet link-button at the row's end. */
+.zev-email-label-row .template-source {
+  display: contents;
+}
+
+.zev-email-label-row .template-source-main {
+  display: contents;
+}
+
+.zev-email-label-row .template-source p {
+  flex-basis: 100%;
+  order: 3;
 }
 
 .zev-email-default-preview {

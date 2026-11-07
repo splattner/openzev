@@ -146,23 +146,13 @@ The two-factor policy fields `mfa_required`, `mfa_grace_period_days` and `mfa_po
 | `invoice_rounding` | CharField(20) | `none` | Choices `none`, `five_rappen` (`InvoiceRounding` TextChoices). `five_rappen` rounds the invoice total, the amount due after credit and each credit note to the nearest CHF 0.05; see `2026-03-tariffs-and-billing-engine.md` §5.1. Writable settings field; changes only affect documents generated afterwards. |
 | `vat_number` | CharField(50) | blank | Swiss UID. `Zev.clean()` requires it when `vat_mode = registered` and forbids it otherwise. Shown on invoice/contract PDFs only when set. |
 | `itemize_tariff_bands` | BooleanField | `False` | Bill each price band of a multi-band tariff as its own invoice line at its own rate, instead of one line at the blended average — see `2026-03-tariffs-and-billing-engine.md` §4.7a. Applies to invoices generated after the change. |
-| `email_subject_template` | CharField(500) | `""` (blank) | Per-ZEV bare-placeholder template, rendered with `config.safe_format.safe_format`. Resolution is ZEV value → global `EmailTemplate(template_key="invoice_email")` override → `DEFAULT_EMAIL_SUBJECT_TEMPLATE`. |
-| `email_body_template` | TextField | `""` (blank) | Per-ZEV bare-placeholder template, rendered with `config.safe_format.safe_format`. Resolution is ZEV value → global `EmailTemplate(template_key="invoice_email")` override → `DEFAULT_EMAIL_BODY_TEMPLATE`. |
+| `email_subject_template` | CharField(500) | `""` (blank) | Per-ZEV bare-placeholder template, rendered with `config.safe_format.safe_format`. Resolution is ZEV value → global `EmailTemplate(template_key="invoice_email")` override → shipped default in the ZEV's `invoice_language` (`invoices.models.INVOICE_EMAIL_DEFAULTS_BY_LANGUAGE`). |
+| `email_body_template` | TextField | `""` (blank) | Per-ZEV bare-placeholder template, rendered with `config.safe_format.safe_format`. Resolution is ZEV value → global `EmailTemplate(template_key="invoice_email")` override → shipped default in the ZEV's `invoice_language`. |
 | `local_tariff_notes` | TextField | blank | Free-text shown on contract PDF |
 | `additional_contract_notes` | TextField | blank | Additional agreements on contract PDF |
 | `notes` | TextField | blank | General notes |
 
-**Module-level defaults (`zev.models`):**
-```python
-DEFAULT_EMAIL_SUBJECT_TEMPLATE = "Invoice {invoice_number} – {zev_name}"
-DEFAULT_EMAIL_BODY_TEMPLATE = (
-    "Dear {participant_name},\n\n"
-    "Please find your energy invoice for the period "
-    "{period_start} to {period_end} attached.\n\n"
-    "Total: CHF {total_chf}\n\n"
-    "Kind regards,\n{zev_name}"
-)
-```
+**Shipped invoice email (`invoices.models`):** `INVOICE_EMAIL_DEFAULTS_BY_LANGUAGE` holds subject and body for `de`, `fr`, `it` and `en`; `invoice_email_defaults(language)` returns the English text for an unknown language. The former `zev.models.DEFAULT_EMAIL_*` constants are gone. A per-ZEV or global override is one text for every language.
 
 **Invoice numbering:**
 - `next_invoice_number()` generates `"{prefix}-{counter:05d}"` (e.g. `INV-00001`).
@@ -627,8 +617,15 @@ Every validated control carries a `data-zev-field` anchor for focus jumps.
   payment term, `itemize_tariff_bands`, `participant_invoice_access`, invoice
   prefix, VAT treatment (`vat_mode`), VAT number (only when registered), bank
   name and IBAN.
-- **Documents & emails** (`documents`): email template fields below, notes,
-  local tariff notes and additional contract notes.
+- **Documents & emails** (`documents`): three `.form-section`s — *Invoice email*
+  (`ZevEmailTemplateFields`, which asks for the shipped default in the draft's
+  invoice language, `GET …/email-template/invoice_email/?language=`; the source
+  badge sits beside the label, the reset/customise action is a quiet button at
+  the row's end, and only what saving will do is stated — the save bar carries
+  "unsaved changes"), *Contract PDF* (`local_tariff_notes`,
+  `additional_contract_notes`, labelled fields, one note saying where they
+  print) and *Notes* (`notes`, internal, with a note saying it appears on no
+  document).
 - **Audit log** (`audit`): embedded `AuditLogsPage scope="owner"`, locked to
   the selected ZEV with a community description;
   no platform-wide log or free-text search.
