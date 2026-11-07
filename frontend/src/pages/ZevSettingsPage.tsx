@@ -460,6 +460,7 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                                 savedSubjectTemplate={baseline.email_subject_template ?? ''}
                                 savedBodyTemplate={baseline.email_body_template ?? ''}
                                 resetRevision={emailEditorRevision}
+                                language={form.invoice_language ?? 'de'}
                                 fieldErrors={fieldErrors}
                                 readOnly={controlsReadOnly}
                                 onSubjectTemplateChange={(value) =>

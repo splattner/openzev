@@ -78,13 +78,13 @@ including their placeholders.
 
 | Field | Purpose | Default |
 | --- | --- | --- |
-| **Subject** | Email subject line | `Invoice {invoice_number} – {zev_name}` |
+| **Subject** | Email subject line | `Rechnung {invoice_number} – {zev_name}` (in the community's invoice language, see below) |
 | **Body** | Email message body | See default template below |
 
 Subject and body can be customized independently. **Customize** starts from the
 platform text; **Use platform default** stages a reset of that field. The badge
-shows its saved source, while **Unsaved changes** marks a staged edit. Click
-**Save** to apply it. Later platform edits reach inherited fields; a
+shows its saved source; what saving will do is stated under the field, and the
+save bar marks the unsaved edit. Click **Save** to apply it. Later platform edits reach inherited fields; a
 saved ZEV override takes precedence even when its text matches the platform text.
 You can clear the editor and type replacement text without reopening it.
 **Discard changes** restores the saved text or inherited preview.
@@ -106,6 +106,12 @@ Use placeholders to personalize emails:
 | `{inbox_url}` | Link to the participant's **My documents** page; empty when the participant has no account | `https://app.example.com/me/documents` |
 
 ### Default Template
+
+The shipped text follows the community's **invoice language** (Billing &
+payment tab): German, French, Italian or English. **Use platform default**
+shows it in that language. A text you or the platform administrator saved is
+used as written for every language, so it opts out of translation. The English
+text is shown below.
 
 **Subject:**
 ```

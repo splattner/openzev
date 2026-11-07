@@ -270,14 +270,19 @@ counters cannot be reset through settings or the standard API.
 
 ### Documents & emails tab
 
-The invoice email template (see [Email Templates](#email-templates) below)
-and these free-text fields:
+Three sections:
 
-| Setting | Purpose |
-| --- | --- |
-| **Notes** | General notes about the ZEV |
-| **Local Tariff Notes** | Free-text conditions for local tariff (appears on contract PDF) |
-| **Additional Contract Notes** | Extra text for participation contract PDF |
+- **Invoice email** — the subject and text of the email that carries each invoice
+  (see [Email Templates](#email-templates) below). Until you customise it, the
+  shipped text is used in the community's invoice language.
+- **Contract PDF** — free-text fields printed in the contract participants receive:
+
+  | Setting | Purpose |
+  | --- | --- |
+  | **Local tariff notes** | Free-text conditions for the local tariff |
+  | **Additional contract notes** | Extra text for the participation contract |
+
+- **Notes** — your own notes about the community. They appear on no document.
 
 ### Billing Interval
 

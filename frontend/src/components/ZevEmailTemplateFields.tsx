@@ -20,6 +20,8 @@ type ZevEmailTemplateFieldsProps = {
     fieldErrors?: Record<string, string>
     /** Disabled-ZEV owner view: values stay visible but nothing is editable. */
     readOnly?: boolean
+    /** The community's invoice language: the shipped default is shown, and sent, in it. */
+    language?: string
 }
 
 export function ZevEmailTemplateFields({
@@ -32,6 +34,7 @@ export function ZevEmailTemplateFields({
     onBodyTemplateChange,
     fieldErrors = {},
     readOnly = false,
+    language,
 }: ZevEmailTemplateFieldsProps) {
     const { t } = useTranslation()
     const subjectRef = useRef<HTMLInputElement>(null)
@@ -48,8 +51,8 @@ export function ZevEmailTemplateFields({
 
     // Owner-readable fallback; a failed fetch never blocks editing or saving.
     const globalTemplateQuery = useQuery({
-        queryKey: queryKeys.admin.emailTemplate('invoice_email'),
-        queryFn: () => fetchEmailTemplate('invoice_email'),
+        queryKey: queryKeys.admin.emailTemplate('invoice_email', language),
+        queryFn: () => fetchEmailTemplate('invoice_email', language),
     })
 
     const globalSubject = globalTemplateQuery.data?.subject ?? ''
@@ -97,12 +100,12 @@ export function ZevEmailTemplateFields({
                     <span id={labelId}>{t(isSubject ? 'admin.emailTemplates.subject' : 'admin.emailTemplates.body')}</span>
                     <TemplateSourceStatus
                         source={savedValue === '' ? 'platform' : 'zev'}
-                        changed={changed}
+                        // The save bar already says the draft is unsaved; only what saving will do is news here.
                         description={changed && inheritsDefault ? t('pages.zevSettings.emailInheritanceOnSave') : undefined}
                         action={!readOnly && (
                         <button
                             type="button"
-                            className="button button-secondary button-compact"
+                            className="button button-ghost button-compact"
                             onClick={() => {
                                 setEditing(usesDefault)
                                 change(usesDefault ? globalValue : '')
@@ -149,10 +152,8 @@ export function ZevEmailTemplateFields({
     }
 
     return (
-        <>
-            <header>
-                <h3>{t('pages.zevSettings.emailTemplateTitle')}</h3>
-            </header>
+        <div className="form-section">
+            <p className="form-section-header">{t('pages.zevSettings.sections.invoiceEmail')}</p>
 
             <div className="inline-form page-stack">
                 {renderField('subject')}
@@ -183,6 +184,6 @@ export function ZevEmailTemplateFields({
                     <p className="muted" role="status">{t('common.loading')}</p>
                 )}
             </div>
-        </>
+        </div>
     )
 }

@@ -365,8 +365,11 @@ export async function resetCreditNotePdfTemplate(): Promise<PdfTemplateMutationR
   return data
 }
 
-export async function fetchEmailTemplate(templateKey: string): Promise<EmailTemplateResponse> {
-  const { data } = await api.get<EmailTemplateResponse>(`/invoices/invoices/email-template/${templateKey}/`)
+/** `language` asks for the shipped default in that invoice language (invoice email only). */
+export async function fetchEmailTemplate(templateKey: string, language?: string): Promise<EmailTemplateResponse> {
+  const { data } = await api.get<EmailTemplateResponse>(`/invoices/invoices/email-template/${templateKey}/`, {
+    params: language ? { language } : undefined,
+  })
   return data
 }
 

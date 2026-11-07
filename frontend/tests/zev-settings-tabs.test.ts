@@ -515,9 +515,25 @@ describe('ZEV settings routed form', () => {
         expect(container.querySelector('button[aria-label="pages.zevSettings.emailCustomizeSubject"]')).not.toBeNull()
     })
 
+    it('groups the documents tab into invoice email, contract PDF and internal notes', async () => {
+        const { container } = await renderAt('/zev-settings/documents')
+        const captions = Array.from(container.querySelectorAll('.form-section-header')).map(node => node.textContent)
+        expect(captions).toEqual([
+            'pages.zevSettings.sections.invoiceEmail',
+            'pages.zevSettings.sections.contractPdf',
+            'pages.zevSettings.sections.notes',
+        ])
+        expect(container.querySelector('h3')).toBeNull()
+        // The notes say where they show; the two contract fields are labelled, not captioned.
+        expect(container.textContent).toContain('pages.zevSettings.fields.notesHint')
+        expect(container.querySelector('[data-zev-field="local_tariff_notes"] > span')?.textContent)
+            .toBe('pages.zevSettings.fields.localTariffNotes')
+    })
+
     it('loads the platform fallback for owners and stays editable when it fails', async () => {
         const { container } = await renderAt('/zev-settings/documents')
-        expect(emailSpy).toHaveBeenCalledWith('invoice_email')
+        // The default is asked for in the community's invoice language.
+        expect(emailSpy).toHaveBeenCalledWith('invoice_email', 'de')
         await waitForCondition(
             () => container.textContent?.includes('Global body') ?? false,
             'owner fallback preview',

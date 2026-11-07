@@ -119,6 +119,29 @@ class TemplateAdminPermissionTests(TestCase):
         self.assertIn("fields", resp.data)
         self.assertFalse(AuditEvent.objects.exists())
 
+    def test_invoice_email_default_follows_the_requested_language(self):
+        auth(self.client, self.owner)
+        url = "/api/v1/invoices/invoices/email-template/invoice_email/"
+
+        german = self.client.get(url, {"language": "de"}).data
+        unknown = self.client.get(url, {"language": "xx"}).data
+
+        self.assertEqual(german["subject"], "Rechnung {invoice_number} – {zev_name}")
+        self.assertTrue(german["body"].startswith("Guten Tag"))
+        self.assertEqual(unknown["subject"], EMAIL_TEMPLATE_DEFAULTS["invoice_email"]["subject"])
+        self.assertEqual(self.client.get(url).data["subject"], unknown["subject"])
+
+    def test_global_override_wins_over_the_requested_language(self):
+        EmailTemplate.objects.create(template_key="invoice_email", subject="Custom {zev_name}", body="Body")
+        auth(self.client, self.owner)
+
+        data = self.client.get(
+            "/api/v1/invoices/invoices/email-template/invoice_email/", {"language": "de"}
+        ).data
+
+        self.assertEqual(data["subject"], "Custom {zev_name}")
+        self.assertTrue(data["is_customized"])
+
     def test_zev_owner_cannot_read_other_global_email_templates(self):
         auth(self.client, self.owner)
 

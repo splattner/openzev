@@ -83,7 +83,8 @@ export const queryKeys = {
     annualReport: (zevId: string, year: number) => ['invoices', 'annual-report', zevId, year] as const,
   },
   admin: {
-    emailTemplate: (templateKey: string) => ['admin', 'email-template', templateKey] as const,
+    emailTemplate: (templateKey: string, language?: string) =>
+      (language ? ['admin', 'email-template', templateKey, language] : ['admin', 'email-template', templateKey]) as readonly string[],
     invoicePdfTemplate: () => ['admin', 'pdf-template', 'invoice'] as const,
     contractPdfTemplate: () => ['admin', 'pdf-template', 'contract'] as const,
     annualStatementPdfTemplate: () => ['admin', 'pdf-template', 'annual-statement'] as const,

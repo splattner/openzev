@@ -22,7 +22,7 @@ from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import record_audit_event
 
 from .field_catalog import email_field_catalog, pdf_field_catalog
-from .models import EMAIL_TEMPLATE_DEFAULTS, EmailTemplate, PdfTemplate
+from .models import EMAIL_TEMPLATE_DEFAULTS, INVOICE_EMAIL_DEFAULTS_BY_LANGUAGE, EmailTemplate, PdfTemplate
 from .pdf_render import render_pdf
 from .template_context import (
     build_sample_annual_statement_context,
@@ -381,6 +381,13 @@ class EmailTemplateView(_AdminTemplateView):
         if error:
             return error
         record = EmailTemplate.objects.filter(template_key=template_key).first()
+        # The invoice email ships in four languages; a ZEV owner's editor asks
+        # for the one its community invoices in (``?language=``) so "use the
+        # platform default" never shows or sends another language. An override
+        # is one text for all of them.
+        language = request.query_params.get("language")
+        if template_key == "invoice_email" and language in INVOICE_EMAIL_DEFAULTS_BY_LANGUAGE:
+            defaults = INVOICE_EMAIL_DEFAULTS_BY_LANGUAGE[language]
         return Response({
             "template_key": template_key,
             "subject": record.subject if record else defaults["subject"],
