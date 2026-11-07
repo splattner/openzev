@@ -9,6 +9,7 @@ permissions:
     pull-requests: write
     packages: write
     id-token: write
+    pages: write
 
 jobs:
     release-please:
@@ -37,4 +38,11 @@ jobs:
         needs: release-please
         if: ${{ needs.release-please.outputs.release_created == 'true' }}
         uses: ./.github/workflows/release-charts.yml
+        secrets: inherit
+
+    # A new chart lands on gh-pages; redeploy the site so the Helm repository
+    # served from Pages includes it.
+    publish-site:
+        needs: release-charts
+        uses: ./.github/workflows/publish-site.yml
         secrets: inherit
