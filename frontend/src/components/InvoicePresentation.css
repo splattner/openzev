@@ -1,0 +1,11 @@
+/* Plain status: draft/sent/paid dark gold, approved green. Cancelled uses .error-text. */
+
+.invoice-status-draft,
+.invoice-status-sent,
+.invoice-status-paid {
+  color: var(--warning-800);
+}
+
+.invoice-status-approved {
+  color: var(--success-700);
+}
