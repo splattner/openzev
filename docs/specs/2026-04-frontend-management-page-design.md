@@ -6,7 +6,7 @@
 - Type: Change
 - Owners: Core maintainers
 - Created: 2026-04-05
-- Updated: 2026-11-01
+- Updated: 2026-11-11
 - Target Release: Ongoing baseline
 - Related Issues: n/a
 - Related ADRs: n/a
@@ -449,6 +449,14 @@ when the rows span more than one page (`table.getPageCount() > 1`);
 single-page tables hide it entirely instead of showing permanently disabled
 pagination buttons.
 
+Show sort controls only when the filtered result contains at least two rows,
+regardless of pagination. Otherwise render plain headers without `aria-sort`,
+retaining the sort state for when more rows return. If a focused sort button
+disappears, focus moves to its header; focus outside the button is unchanged.
+Only the primary sorted column has `aria-sort`, including during Shift-click
+multi-sort. Data columns should normally be sortable, using meaningful accessor
+values rather than formatted labels. Disable sorting for action and selection columns.
+
 Current examples:
 
 - `frontend/src/pages/ImportsPage.tsx`
@@ -628,6 +636,10 @@ These pages define the current management-page reference set.
 
 - Build and type checks: `npm run build`
 - Lint: `npm run lint`
+- `frontend/tests/data-table.test.ts`: zero/one-row headers, accessor sorting,
+  action columns, primary-column ARIA state during multi-sort, retained sorting
+  through filtering, pagination-independent controls, table sorting opt-out,
+  and focus when a sort button disappears.
 - `frontend/screenshots/field-geometry.spec.ts`: real-browser geometry, neutral
   border and label/helper spacing parity, native checkbox sizing, VAT and modal
   fields, calendar/autocomplete interaction above modals, keyboard focus,
