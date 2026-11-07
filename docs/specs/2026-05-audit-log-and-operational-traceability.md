@@ -145,7 +145,7 @@ The audit service resolves `zev` in this priority order:
 | `source` | `CharField(20)` | `api` | `api`, `api_key`, `invoice_link`, `onboarding_link`, `celery`, `system`, `management_command`, `mcp` |
 | `ip_address` | `GenericIPAddressField` nullable | `null` | Request-derived; blank for system tasks |
 | `user_agent` | `TextField` | `""` | Request-derived; may be truncated to 500 chars before save |
-| `summary` | `CharField(500)` | required | Human-readable event summary for list UI |
+| `summary` | `CharField(500)` | required | One English sentence per event, stored for search and for reading the log outside the app. The UI does not show it: it names the event from `action_type` (§7.1 *Words*) and keeps the sentence in the pane's technical details |
 | `reason` | `TextField` | `""` | Optional operator-supplied reason for destructive/admin actions |
 | `changes_json` | `JSONField` | `{}` | Structured field diff payload; shape defined in §4.3 |
 | `metadata_json` | `JSONField` | `{}` | Small structured metadata; redacted before persistence |
@@ -511,9 +511,14 @@ avoid noise.
 - Detail query: `useQuery({ queryKey: queryKeys.admin.auditEvent(eventId), queryFn: () => fetchAuditEvent(eventId), enabled: !!eventId })`
 - Options query: `useQuery({ queryKey: queryKeys.admin.auditFilterOptions(), queryFn: fetchAuditFilterOptions })`
 
-UI elements:
+Filters (SPEC-2026-08 §15.3 `.list-filters`, one row, `aria-label`s instead of
+visible labels; every select starts on an "all …" option):
 
-1. Date range filters.
+1. Search input (the first control), then category, ZEV (admin scope only),
+   actor and status selects, then the From/To date range (`CivilDateInput`)
+   and an icon-only Refresh. *Clear filters* appears only while a filter, a
+   search draft or a URL filter is set. The row wraps to a second line at
+   narrow widths.
 2. ZEV select, admin scope only (options from `fetchAuditFilterOptions`/
    `queryKeys.admin.auditFilterOptions`, derived from the audit queryset
    itself, so the options match the visible event scope). The owner scope
@@ -523,18 +528,42 @@ UI elements:
    distinct users who actually acted on visible events, including owners and
    admins; `id` + `username` only, no email or names; unrelated accounts never
    appear).
-4. Category/type/status filters.
+4. Category and status selects. The code filters — action code, object type
+   and object ID — sit in a closed `Disclosure` ("Technische Filter") that
+   exists in the admin scope only; it opens by itself while a URL filter
+   (deep link) is active. The community scope has no use for codes.
 5. Search input for summary/target/action-type lookup in both scopes. Platform
    scope requires an admin; community scope requires `isZevScope`, a resolved
-   selected community and completed selection loading. Draft text applies on
-   Enter or blur, is trimmed and limited to 50 Unicode code points (frontend
+   selected community and completed selection loading. The draft applies on
+   Enter or blur, or by itself after a 400 ms pause (`SEARCH_DEBOUNCE_MS`); it
+   is trimmed and limited to 50 Unicode code points (frontend
    `Array.from`, backend `len`). Oversized drafts show a translated inline error
    and do not apply. Empty search clears `q`. Applying resets page 1; Clear
    clears draft and applied text. Community switches clear both before requesting
    the new scope, so no new-community request carries the old query. Backend
-   validation errors are displayed using `formatApiError`.
-6. Dense table with timestamp, summary, ZEV (name resolved from the options
-   query, raw UUID as fallback), category, action, target, actor, status.
+   validation errors are displayed using `formatApiError`. The stored summary is
+   English, so a search matches target names, numbers and codes rather than the
+   translated event name.
+6. Rows (`.table-card.audit-rows`): *Zeitpunkt*, *Ereignis*, *Akteur* and, in
+   the admin scope only, *ZEV* (name resolved from the options query, raw UUID
+   as fallback). The event cell holds the event's name as the button that opens
+   the pane, a status badge **only when the event did not succeed**, and the
+   target underneath. Below a 46rem container width each row becomes a card
+   (name and time, then actor and ZEV), so a refused event stays visible at
+   400px. No code is shown in the list. An empty result is an `EmptyState`:
+   with filters it offers *Clear filters*, without it says nothing has been
+   logged yet.
+
+   *Words* (`features/audit/auditEventText.ts`): the event is named from
+   `action_type` through `pages.auditLogs.events.<action_type>` (nested by the
+   dots of the type; all four locales). A type without a name falls back to the
+   stored `summary`, never to the code. The target is `target_display`, or the
+   period of a batch run from `metadata_json.period_start/period_end`. The
+   actor is `actor_display`, else *System* for `system`/`celery`/
+   `management_command`, the link kind for `invoice_link`/`onboarding_link`,
+   else *Nicht angemeldet*. A new action type needs its name in all four
+   locales; `frontend/tests/audit-event-text.test.ts` scans the backend's
+   literal `action_type` values and fails when one has none.
 7. Pagination row (page label + Zurück/Weiter buttons) below the table,
    rendered only when the result spans more than one page: DRF
    PageNumberPagination returns `next = previous = null` exactly when
@@ -543,13 +572,15 @@ UI elements:
    Zurück is disabled on the first page and Weiter on the last page
    (`!data.previous` / `!data.next`).
 8. Event detail pane beside the table (`AuditEventPane`, built on the shared
-   `DetailPane`; SPEC-2026-10-ui-patterns §5 rule C, §7.2) showing summary,
-   reason, diff, and metadata. The table and the pane share a `.detail-split`:
+   `DetailPane`; SPEC-2026-10-ui-patterns §5 rule C, §7.2) showing the
+   event's name, time, status, actor, source, category and target, then the
+   reason and the diff; the action code, event ID, request and operation IDs,
+   the stored log text and the metadata are in a lazily rendered
+   *Technische Details* `Disclosure`. The table and the pane share a `.detail-split`:
    from a 72rem content width (`SPLIT_MIN_REM`, measured on the split with
    `useMinWidth`) they sit side by side, the pane in a 28–34rem column that
-   stays in view while the table scrolls, and the table drops its ZEV,
-   category and action columns (`.audit-col-secondary`, all shown in the
-   pane) so Created, Summary, Target, Actor and Status stay readable. Below
+   stays in view while the table scrolls; the narrower table then switches to
+   its card rows by container query. Below
    that width the pane replaces the table (rule E): the table is `hidden`, so
    out of the tab order too, and X returns to it at the scroll position it
    left. The pane is not modal: no scrim, focus trap or scroll lock. Picking
@@ -593,7 +624,7 @@ not exclusively backups).
 Initial event loading uses `PageSkeleton tableRows`; failure uses `Notice`
 with retry. Cached events remain visible on refetch failure, and a failed
 empty result is not also presented as an empty dataset.
-Each event summary is a keyboard-operable button opening its detail pane;
+Each event name is a keyboard-operable button opening its detail pane;
 clicking the row remains available.
 
 **Deep-linking an actor** (`?actor=<id>&actorUsername=<username>`, admin scope
@@ -945,6 +976,8 @@ configuration invariants, including the Helm schema constraint on
   Unicode length limits, participant-only list/options denial, unchanged search
   pagination, pointer Clear without an intermediate request, keyboard blur, HTTP 4xx
   feedback without retries, guarded Refresh/Retry, and escaped markup rendering.
+- `frontend/tests/audit-event-text.test.ts`: every backend action type has a name in de/en/fr/it, the fallback to the stored sentence, actor and target wording.
+  `audit-log-scope.test.ts` additionally checks that no code is in the list, only unsuccessful events carry a badge, the code filters exist in the admin scope only and a paused search applies without Enter.
 - `frontend/tests/zev-settings-tabs.test.ts` checks that a community switch from
   audit page 3 resets the scoped view to page 1 and closes the old event pane.
 - Component/manual validation via `npm run lint`, `npm run build`, and

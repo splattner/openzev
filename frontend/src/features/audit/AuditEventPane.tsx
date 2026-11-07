@@ -6,6 +6,8 @@ import { queryKeys } from '../../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
 import type { AuditEventStatus } from '../../types/api'
 import { DetailPane } from '../../components/DetailPane'
+import { Disclosure } from '../../components/Disclosure'
+import { auditActionLabel, auditActorLabel, auditTargetLabel } from './auditEventText'
 import { ChangesDiff } from './ChangesDiff'
 
 type AuditEventPaneProps = {
@@ -40,6 +42,7 @@ export function AuditEventPane({ eventId, onClose, statusBadgeClass, titleRef }:
     })
 
     const event = eventQuery.data
+    const target = event ? auditTargetLabel(event, settings) : ''
 
     return (
         <DetailPane title={t('pages.auditLogs.detail.title')} onClose={onClose} titleRef={titleRef}>
@@ -49,7 +52,7 @@ export function AuditEventPane({ eventId, onClose, statusBadgeClass, titleRef }:
 
                 {event && (
                     <>
-                        <p className="audit-pane-summary">{event.summary}</p>
+                        <p className="audit-pane-summary">{auditActionLabel(t, event)}</p>
 
                         <div className="audit-detail-grid">
                             <Field label={t('pages.auditLogs.detail.createdAt')}>
@@ -60,30 +63,16 @@ export function AuditEventPane({ eventId, onClose, statusBadgeClass, titleRef }:
                                     {t(`pages.auditLogs.statuses.${event.status}`)}
                                 </span>
                             </Field>
+                            <Field label={t('pages.auditLogs.detail.actor')}>
+                                {auditActorLabel(t, event)}
+                            </Field>
+                            <Field label={t('pages.auditLogs.detail.source')}>
+                                {t(`pages.auditLogs.sources.${event.source}`)}
+                            </Field>
                             <Field label={t('pages.auditLogs.detail.category')}>
                                 {t(`pages.auditLogs.categories.${event.action_category}`)}
                             </Field>
-                            <Field label={t('pages.auditLogs.detail.action')}>
-                                <code>{event.action_type}</code>
-                            </Field>
-                            <Field label={t('pages.auditLogs.detail.actor')}>
-                                {event.actor_display || '—'}
-                            </Field>
-                            <Field label={t('pages.auditLogs.detail.source')}>
-                                <code>{event.source}</code>
-                            </Field>
-                            <Field label={t('pages.auditLogs.detail.target')}>
-                                {event.target_display || `${event.target_type}:${event.target_id || '-'}`}
-                            </Field>
-                            <Field label={t('pages.auditLogs.detail.requestId')}>
-                                <code>{event.request_id || '—'}</code>
-                            </Field>
-                            <Field label={t('pages.auditLogs.detail.correlationId')}>
-                                <code>{event.correlation_id || '—'}</code>
-                            </Field>
-                            <Field label={t('pages.auditLogs.detail.id')}>
-                                <code>{event.id}</code>
-                            </Field>
+                            {target && <Field label={t('pages.auditLogs.detail.target')}>{target}</Field>}
                         </div>
 
                         {event.reason && (
@@ -100,14 +89,35 @@ export function AuditEventPane({ eventId, onClose, statusBadgeClass, titleRef }:
                             </div>
                         </div>
 
-                        <div>
-                            <strong>{t('pages.auditLogs.detail.metadata')}</strong>
-                            <pre className="audit-pane-metadata">
-                                {event.metadata_json && Object.keys(event.metadata_json).length > 0
-                                    ? JSON.stringify(event.metadata_json, null, 2)
-                                    : '—'}
-                            </pre>
-                        </div>
+                        {/* Codes and identifiers for support work; the event reads complete without them. */}
+                        <Disclosure summary={t('pages.auditLogs.detail.technical')} lazy>
+                            <div className="audit-detail-grid">
+                                <Field label={t('pages.auditLogs.detail.action')}>
+                                    <code>{event.action_type}</code>
+                                </Field>
+                                <Field label={t('pages.auditLogs.detail.id')}>
+                                    <code>{event.id}</code>
+                                </Field>
+                                <Field label={t('pages.auditLogs.detail.requestId')}>
+                                    <code>{event.request_id || '—'}</code>
+                                </Field>
+                                <Field label={t('pages.auditLogs.detail.correlationId')}>
+                                    <code>{event.correlation_id || '—'}</code>
+                                </Field>
+                            </div>
+                            <div className="mt-1">
+                                <strong>{t('pages.auditLogs.detail.logText')}</strong>
+                                <p className="mt-05">{event.summary}</p>
+                            </div>
+                            <div className="mt-1">
+                                <strong>{t('pages.auditLogs.detail.metadata')}</strong>
+                                <pre className="audit-pane-metadata">
+                                    {event.metadata_json && Object.keys(event.metadata_json).length > 0
+                                        ? JSON.stringify(event.metadata_json, null, 2)
+                                        : '—'}
+                                </pre>
+                            </div>
+                        </Disclosure>
                     </>
                 )}
             </div>

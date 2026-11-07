@@ -8,11 +8,6 @@
   background: var(--surface-subtle);
 }
 
-/* Beside the pane the log keeps the columns that identify a row; the rest are in the pane. */
-.detail-split[data-layout='wide'][data-pane='open'] .audit-col-secondary {
-  display: none;
-}
-
 .audit-pane-summary {
   margin: 0;
   font-size: 1.05rem;

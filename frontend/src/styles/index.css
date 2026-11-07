@@ -91,6 +91,7 @@
 @import './pages/login-split.css' layer(pages);
 @import '../features/meteringPoints/MeteringGapsModal.css' layer(pages);
 @import '../features/audit/AuditEventPane.css' layer(pages);
+@import '../features/audit/AuditLog.css' layer(pages);
 @import '../features/audit/ChangesDiff.css' layer(pages);
 @import '../features/tariffs/TariffVersionForm.css' layer(pages);
 @import '../features/tariffs/TariffPriceHistoryChart.css' layer(pages);

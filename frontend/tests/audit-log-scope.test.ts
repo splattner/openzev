@@ -10,7 +10,7 @@ import { waitForCondition } from './helpers/waitForCondition'
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
-        t: (k: string) => k,
+        t: (k: string, options?: { defaultValue?: string }) => options?.defaultValue ?? k,
         i18n: { language: 'en', changeLanguage: vi.fn() },
     }),
 }))
@@ -197,6 +197,8 @@ async function waitForButton(container: HTMLElement, text: string) {
 }
 
 function filterInput(container: HTMLElement, name: string) {
+    const named = container.querySelector<HTMLInputElement>(`input[aria-label="pages.auditLogs.filters.${name}"]`)
+    if (named) return named
     const label = Array.from(container.querySelectorAll('label'))
         .find(label => label.textContent?.includes(`pages.auditLogs.filters.${name}`))
     return label!.querySelector('input')!
@@ -343,7 +345,7 @@ describe('audit log community scope', () => {
         if (state === 'stale selection') mockManagedZev.mockReturnValue({ ...mockManagedZev(), selectedZevId: 'z2' })
         const page = renderAuditLogs('owner')
         await page.mount()
-        const refresh = buttonByText(page.container, 'pages.auditLogs.actions.refresh')
+        const refresh = page.container.querySelector<HTMLButtonElement>('button[aria-label="pages.auditLogs.actions.refresh"]')!
         expect(refresh.disabled).toBe(true)
         await click(refresh)
         expect(fetchAuditEvents).not.toHaveBeenCalled()
@@ -643,6 +645,9 @@ describe('audit log community scope', () => {
         fetchAuditEvents.mockResolvedValue({ results: [sampleEvent], count: 2, next: 'page-2', previous: null })
         const page = renderAuditLogs('owner')
         await page.mount()
+        const search = filterInput(page.container, 'search')
+        await typeValue(search, 'invoice')
+        await pressEnter(search)
         await click(await waitForButton(page.container, 'pages.auditLogs.pagination.next'))
         await click(buttonByText(page.container, 'pages.auditLogs.actions.clearFilters'))
         const arg = fetchAuditEvents.mock.calls.at(-1)?.[0] as Record<string, unknown>
@@ -713,6 +718,51 @@ describe('audit log community scope', () => {
         })
         const arg = fetchAuditEvents.mock.calls.at(-1)?.[0] as Record<string, unknown>
         expect(arg.zev).toBe('z2')
+        page.unmount()
+    })
+    it('shows no action code in the list and flags only events that did not succeed', async () => {
+        mockOwner()
+        mockSelection('z1')
+        fetchAuditEvents.mockResolvedValue({
+            results: [
+                sampleEvent,
+                { ...sampleEvent, id: 'e2', action_type: 'invoice.approve', status: 'denied', actor_display: '', source: 'celery', target_display: '' },
+            ],
+            count: 2, next: null, previous: null,
+        })
+        const page = renderAuditLogs('owner')
+        await page.mount()
+        const rows = Array.from(page.container.querySelectorAll('tbody tr'))
+        expect(rows).toHaveLength(2)
+        expect(page.container.querySelector('tbody code')).toBeNull()
+        expect(rows[0].querySelector('.badge')).toBeNull()
+        expect(rows[1].querySelector('.badge')?.textContent).toBe('pages.auditLogs.statuses.denied')
+        expect(rows[1].querySelector('.audit-row-actor')?.textContent).toBe('pages.auditLogs.actorSystem')
+        // One community: the log does not repeat its name on every row.
+        expect(page.container.querySelector('.audit-row-zev')).toBeNull()
+        page.unmount()
+    })
+
+    it('keeps the code filters to the platform log', async () => {
+        mockOwner()
+        mockSelection('z1')
+        const owner = renderAuditLogs('owner')
+        await owner.mount()
+        expect(owner.container.querySelector('details.disclosure')).toBeNull()
+        owner.unmount()
+        mockAdmin()
+        mockSelection(null)
+        const admin = renderAuditLogs('admin')
+        await admin.mount()
+        expect(admin.container.querySelector('details.disclosure input')).not.toBeNull()
+        admin.unmount()
+    })
+
+    it('applies a paused search without Enter', async () => {
+        const page = await mountOwnerAudit()
+        const input = filterInput(page.container, 'search')
+        await typeValue(input, 'OZV-00025')
+        await waitForCondition(() => fetchAuditEvents.mock.calls.at(-1)?.[0].q === 'OZV-00025', 'debounced search')
         page.unmount()
     })
 })

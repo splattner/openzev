@@ -1,0 +1,168 @@
+/* ── Audit log: one filter row, then rows that become cards ──────────────── */
+
+/* The filter row holds search, three selects and the date range; the
+   selects and dates take their content's width, the search the rest. */
+.audit-filters {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.audit-filters .list-filters > input {
+  flex: 1 1 10rem;
+}
+
+.audit-filters-dates {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.audit-filters-dates > * {
+  width: 7.5rem;
+}
+
+.audit-filters-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-inline-start: auto;
+}
+
+@media (max-width: 700px) {
+  .audit-filters .list-filters > select {
+    flex: 1 1 10rem;
+  }
+
+  .audit-filters-dates,
+  .audit-filters-actions {
+    flex: 1 1 100%;
+  }
+
+  .audit-filters-dates > * {
+    flex: 1 1 8rem;
+  }
+
+  .audit-filters-actions {
+    margin-inline-start: 0;
+  }
+}
+
+/* ── Rows ────────────────────────────────────────────────────────────────── */
+
+.audit-rows {
+  container-type: inline-size;
+}
+
+.audit-rows th {
+  white-space: nowrap;
+}
+
+.audit-rows td {
+  vertical-align: top;
+}
+
+.audit-row-when,
+.audit-row-zev {
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.audit-row-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.6rem;
+}
+
+.audit-row-title .audit-event-select {
+  width: auto;
+  font-weight: 600;
+}
+
+.audit-row-target {
+  display: block;
+  margin-top: 0.1rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+/* Too narrow for the columns: each event becomes a card — what it was and
+   when, then who did it. A refused or failed event keeps its badge on the
+   first line. */
+@container (max-width: 46rem) {
+  .audit-rows table,
+  .audit-rows tbody,
+  .audit-rows td {
+    display: block;
+  }
+
+  /* Out of sight, not out of the accessibility tree. */
+  .audit-rows thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .audit-rows tbody tr {
+    display: grid;
+    grid-template:
+      'event when' auto
+      'actor zev' auto / minmax(0, 1fr) auto;
+    gap: 0.25rem 1rem;
+    height: auto;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid var(--border-default);
+  }
+
+  .audit-rows tbody tr:first-child {
+    padding-top: 0.2rem;
+  }
+
+  .audit-rows tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .table-card.audit-rows > table:last-child tbody tr:last-child {
+    padding-bottom: calc(var(--sheet-pad-block) + 0.2rem);
+  }
+
+  .table-card.audit-rows > table:first-child {
+    margin-top: 0;
+  }
+
+  .table-card.audit-rows tbody tr {
+    padding-inline: var(--sheet-pad-inline);
+  }
+
+  .table-card.audit-rows tbody td,
+  .audit-rows tbody td,
+  .audit-rows tbody tr:hover > td {
+    width: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .audit-row-event {
+    grid-area: event;
+  }
+
+  .audit-row-when {
+    grid-area: when;
+    font-size: 0.85rem;
+  }
+
+  .audit-row-actor {
+    grid-area: actor;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .audit-row-zev {
+    grid-area: zev;
+    font-size: 0.85rem;
+  }
+}

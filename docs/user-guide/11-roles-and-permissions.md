@@ -379,6 +379,13 @@ Audit logs are visible to **admins** (all events, **Platform → Overview →
 Audit log**) and to **managers** for their own communities (scoped events,
 **Setup → Settings → Audit log**).
 
+Each event is named in your language ("Rechnung genehmigen", "Dokument zugestellt")
+with what it concerned and who did it; events that were refused or failed carry
+a badge. Search, category, actor, status and a date range narrow the list in one
+row. Click an event to see its details; the technical codes, IDs and the stored
+log text are under **Technical details**. Administrators also have **Technical
+filters** (action code, object type, object ID) on the platform log.
+
 ## Best Practices
 
 **Principle of Least Privilege:**

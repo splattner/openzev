@@ -151,8 +151,8 @@ including how an administrator can revoke it on your behalf.
 Every tool call the assistant makes is recorded in the audit log as an
 `mcp.tool.call` event, naming the tool, the arguments, the key that was used
 (by its prefix), and the ZEV it concerned (when the question named one you can
-see). The event details show source `mcp`. To see exactly what an assistant
-looked at, filter the audit log by action type `mcp.tool.call` — or ask the
+see). The event is named *Abfrage durch KI-Assistent* (*AI assistant query*) and its details show the source *KI-Assistent* (`mcp`). To see exactly what an assistant
+looked at, open the platform audit log's **Technical filters** and enter the action code `mcp.tool.call` — or ask the
 assistant itself, since `audit_query` can answer that question too.
 
 ## Troubleshooting
