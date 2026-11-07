@@ -519,7 +519,15 @@ The Export panel names the selected community. Audit and Export are sibling
 tabs; tab switches retain the shared draft and Save bar.
 Action emphasis follows the workflow-link guidance in
 `2026-04-frontend-management-page-design.md`.
-Admins, managers and viewers can read/export, including disabled communities.
+Admins, managers and viewers can read/export, including disabled communities. Viewers exporting
+personal data is deliberate (a read-only role such as a trustee keeps a copy; every export is audited),
+and the export dialog warns about the personal data before the download (decided in #1229).
+The tab's first card is headed "Transfer archive" (the action is not repeated as a heading) and
+says that an administrator imports an archive in the platform ZEV list, with a link for admins
+(`/admin/zevs`; import is admin-only). The second card deactivates the ZEV with a quiet
+(`button-secondary button-destructive`) action; its text and the confirmation are one composed
+sentence — what happens, who can reactivate (only an admin; the admin's own wording says they can),
+and the advice to download an archive first.
 The route/history policy is described in `2026-03-community-and-access.md` §9.2.
 
 ### `frontend/src/features/zev/ZevExportModal.tsx`

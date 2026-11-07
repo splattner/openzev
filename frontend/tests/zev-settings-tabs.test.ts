@@ -694,6 +694,41 @@ describe('ZEV settings routed form', () => {
         await waitForCondition(() => saveBar(container) === null, 'clean save bar after audit save')
     })
 
+    it('says once what deactivating does and who can undo it, on the card and in the confirmation', async () => {
+        const { container } = await renderAt('/zev-settings/export')
+        const card = Array.from(container.querySelectorAll('section.card'))
+            .find((section) => section.textContent?.includes('pages.zevSettings.lifecycle.disableSectionTitle'))!
+        // A manager cannot reactivate: the card says who can, not "at any time".
+        expect(card.textContent).toContain('pages.zevSettings.lifecycle.disableEffects')
+        expect(card.textContent).toContain('pages.zevSettings.lifecycle.reactivationNote')
+        expect(card.textContent).not.toContain('pages.zevSettings.lifecycle.reactivationAdmin')
+        // Quiet until confirmed: the solid red button is the confirmation's.
+        const disable = card.querySelector('button')!
+        expect(disable.classList.contains('button-destructive')).toBe(true)
+        expect(disable.classList.contains('button-danger')).toBe(false)
+        await act(async () => { disable.click() })
+        const dialog = document.querySelector('[role="dialog"]')!
+        expect(dialog.textContent).toContain('pages.zevSettings.lifecycle.reactivationNote')
+        expect(dialog.textContent).toContain('pages.zevSettings.lifecycle.disableEffects')
+    })
+
+    it('tells an admin they can reactivate, and shows them the way to import', async () => {
+        state.role = 'admin'
+        const { container } = await renderAt('/zev-settings/export')
+        expect(container.textContent).toContain('pages.zevSettings.lifecycle.reactivationAdmin')
+        expect(container.textContent).not.toContain('pages.zevSettings.lifecycle.reactivationNote')
+        expect(container.querySelector('a[href="/admin/zevs"]')?.textContent).toBe('zevTransfer.importLink')
+    })
+
+    it('does not repeat the export action as its heading, and offers no import link to a manager', async () => {
+        const { container } = await renderAt('/zev-settings/export')
+        const headings = Array.from(container.querySelectorAll('h3')).map((heading) => heading.textContent)
+        expect(headings).toContain('zevTransfer.archiveTitle')
+        expect(headings).not.toContain('zevTransfer.exportTitle')
+        expect(container.textContent).toContain('zevTransfer.importNote')
+        expect(container.querySelector('a[href="/admin/zevs"]')).toBeNull()
+    })
+
     it('associates the save action with the active form', async () => {
         const { container } = await renderAt('/zev-settings/general')
         setField(generalInput(container)!, 'Unsaved name')

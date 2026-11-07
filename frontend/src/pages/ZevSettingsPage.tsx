@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faBan, faDownload, faPlay } from '@fortawesome/free-solid-svg-icons'
 import { AppTabs } from '../components/AppTabs'
-import { useBlocker, useParams } from 'react-router-dom'
+import { Link, useBlocker, useParams } from 'react-router-dom'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { Notice } from '../components/Notice'
 import { PageSkeleton } from '../components/PageSkeleton'
@@ -366,6 +366,13 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
         })
     }
 
+    // What deactivating does and who can undo it: said once, shown on the card and in the confirmation.
+    const disableConsequences = [
+        t('pages.zevSettings.lifecycle.disableEffects'),
+        t(isAdmin ? 'pages.zevSettings.lifecycle.reactivationAdmin' : 'pages.zevSettings.lifecycle.reactivationNote'),
+        t('pages.zevSettings.lifecycle.archiveAdvice'),
+    ].join(' ')
+
     const content = !draftIsSelected ? (
         <PageSkeleton variant="card" />
     ) : (
@@ -494,9 +501,17 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                 <AppTabs.Panel value="export">
                     <section className="card page-stack">
                         <div>
-                            <h3 className="mt-0">{t('zevTransfer.exportTitle')}</h3>
+                            <h3 className="mt-0">{t('zevTransfer.archiveTitle')}</h3>
                             <p className="muted m-0">
                                 {t('zevTransfer.exportSectionDescription', { name: selectedZev.name })}
+                                {' '}
+                                {t('zevTransfer.importNote')}
+                                {isAdmin && (
+                                    <>
+                                        {' '}
+                                        <Link className="text-link" to="/admin/zevs">{t('zevTransfer.importLink')}</Link>
+                                    </>
+                                )}
                             </p>
                         </div>
                         <div className="actions-row actions-row-wrap">
@@ -515,18 +530,17 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                         <section className="card page-stack">
                             <div>
                                 <h3 className="mt-0">{t('pages.zevSettings.lifecycle.disableSectionTitle')}</h3>
-                                <p className="muted m-0">
-                                    {t('pages.zevSettings.lifecycle.disableSectionDescription')}
-                                </p>
+                                <p className="muted m-0">{disableConsequences}</p>
                             </div>
                             <div className="actions-row">
+                                {/* Rare and destructive: quiet until hovered, the solid red one is the confirmation. */}
                                 <button
-                                    className="button button-danger"
+                                    className="button button-secondary button-destructive"
                                     type="button"
                                     disabled={disableMutation.isPending || dialogLoading}
                                     onClick={() => confirm({
                                         title: t('pages.zevSettings.lifecycle.disableTitle'),
-                                        message: t('pages.zevSettings.lifecycle.disableMessage', { name: selectedZev.name }),
+                                        message: `${t('pages.zevSettings.lifecycle.disableQuestion', { name: selectedZev.name })} ${disableConsequences}`,
                                         confirmText: t('pages.zevSettings.lifecycle.disableConfirm'),
                                         isDangerous: true,
                                         onConfirm: () => disableMutation.mutate(),
