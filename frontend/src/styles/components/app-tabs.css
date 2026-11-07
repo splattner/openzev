@@ -13,6 +13,19 @@
    active tab's underline the forest accent. */
 .app-tabs-list {
   gap: 1.5rem;
+  /* One row that scrolls, not a strip that wraps into two or three on a narrow screen. */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+/* The hairline sits on the scrolling strip itself: a pseudo-element would end with the visible width. */
+.app-tabs-list::before {
+  display: none;
+}
+
+.app-tabs-list {
+  border-bottom: 1px solid var(--border-default);
 }
 
 .app-tabs-panel {
@@ -27,6 +40,8 @@
 }
 
 .app-tabs-tab {
+  flex: none;
+  white-space: nowrap;
   padding: 0.6rem 0.125rem;
   font-size: 0.9375rem;
   font-weight: 500;
@@ -46,4 +61,33 @@
   color: var(--text-heading);
   font-weight: 650;
   border-bottom-color: var(--accent-rule);
+}
+
+.app-tabs-dot {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-inline-start: 0.4rem;
+  border-radius: 999px;
+  background: var(--accent-rule);
+  vertical-align: middle;
+}
+
+/* Forced colours drop the accent: the current tab keeps a cue that is not a colour. */
+@media (forced-colors: active) {
+  /* An inactive tab's transparent border would be forced to a visible colour. */
+  .app-tabs-tab:not([data-active]) {
+    border-bottom-color: Canvas;
+  }
+
+  .app-tabs-dot {
+    background: ButtonText;
+  }
+
+  .app-tabs-tab[data-active] {
+    border-bottom-color: Highlight;
+    text-decoration: underline;
+    text-decoration-thickness: 0.125rem;
+    text-underline-offset: 0.3em;
+  }
 }

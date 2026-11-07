@@ -12,13 +12,15 @@ export type PageHeaderProps = {
     scopeNote?: string
     /** Plain text: it also names the browser tab. */
     title: string
+    /** The browser tab's page name when it should say more than the `h1` (a tab of a hub: "Billing · Settings"). */
+    documentTitle?: string
     description?: ReactNode
     /** Page-level actions. One primary action per page (SPEC-2026-04 §7.3). */
     actions?: ReactNode
 }
 
-export function PageHeader({ eyebrow, communitySwitch, scopeNote, title, description, actions }: PageHeaderProps) {
-    useDocumentTitle(title, typeof eyebrow === 'string' ? eyebrow : undefined)
+export function PageHeader({ eyebrow, communitySwitch, scopeNote, title, documentTitle, description, actions }: PageHeaderProps) {
+    useDocumentTitle(documentTitle ?? title, typeof eyebrow === 'string' ? eyebrow : undefined)
     // Focus lands on the h1 after navigation; it describes itself by the scope line.
     const eyebrowId = useId()
 

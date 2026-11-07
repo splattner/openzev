@@ -592,7 +592,10 @@ link the invoice breakdown to `/admin/invoices` and email statistics to
 **File:** `frontend/src/pages/ZevSettingsPage.tsx`
 
 Accessible to `admin`, community managers and viewers at `/zev-settings` (General) and
-`/zev-settings/:tab`. `ZevSettingsTabRoute` rejects unknown tabs. Uses the
+`/zev-settings/:tab`. The `h1` is "Settings" on every tab with a description true for every role
+(details, people, billing and documents of the community); the browser tab title adds the tab
+("Billing & payment · Settings · Community – OpenZEV", `PageHeader` `documentTitle`). The disabled-ZEV
+message is a shared `Notice` (warning) with the admin's *Reactivate* action (`actions`). `ZevSettingsTabRoute` rejects unknown tabs. Uses the
 globally selected ZEV from `useManagedZev()`; the three editing tabs share one
 draft and saved baseline tied to a ZEV id and selection epoch, with derived dirty
 state, persisted through a single save bar (one PATCH). Tab switches preserve
@@ -651,9 +654,11 @@ its Customize button, and dates use their date-picker trigger.
 
 **Save bar:** one compact sticky bottom bar (`.zev-settings-save-bar`,
 opaque `var(--surface-card)`, safe-area padding), rendered on every tab only
-while dirty, saving, or showing a save error — `Unsaved changes` plus
-`Discard` / `Save changes` (saving shows the saving label with both actions
-disabled). Returning the draft to its baseline clears a stale save error and
+while dirty, saving, or showing a save error — `Unsaved changes in <tabs>` (`dirtyZevTabs`:
+the General, Billing and Documents tabs holding edits, each also marked with a dot in the tab
+strip) plus `Discard` / `Save` (saving shows the saving label with both actions
+disabled; the two short actions keep the bar to two rows on a phone). Leaving settings and
+switching communities ask with the standard discard dialog (`common.unsavedChanges.*`, danger style). Returning the draft to its baseline clears a stale save error and
 hides the bar. On editing tabs the external Save button submits the active form
 with native constraint validation disabled, so click and Enter use the same
 whole-draft validation. Audit and Export keep the same in-place actions; no

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getDefaultZevForm, mapZevToForm } from '../src/lib/zevForm'
+import { dirtyZevTabs, getDefaultZevForm, mapZevToForm } from '../src/lib/zevForm'
 import type { Zev } from '../src/types/api'
 
 function zev(overrides: Partial<Zev> = {}): Zev {
@@ -47,5 +47,12 @@ describe('zev form mapping', () => {
     expect(mapZevToForm(zev({ invoice_rounding: 'five_rappen' })).invoice_rounding).toBe('five_rappen')
     expect(mapZevToForm(zev()).invoice_rounding).toBe('none')
     expect(getDefaultZevForm().invoice_rounding).toBe('none')
+  })
+
+  it('names the tabs that hold unsaved edits, in tab order', () => {
+    const saved = mapZevToForm(zev())
+    expect(dirtyZevTabs(saved, saved)).toEqual([])
+    expect(dirtyZevTabs({ ...saved, email_subject_template: 'x', name: 'New name' }, saved)).toEqual(['general', 'documents'])
+    expect(dirtyZevTabs({ ...saved, bank_iban: 'CH93', notes: 'n' }, saved)).toEqual(['billing', 'documents'])
   })
 })

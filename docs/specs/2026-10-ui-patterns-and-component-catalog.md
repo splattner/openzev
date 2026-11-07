@@ -357,6 +357,13 @@ app-tabs`, `list: app-tabs-list`, `tab: app-tabs-tab`) and re-exports
 compound components; merge extra classes without dropping the shared ones; all
 panels stay under one root.
 
+The strip is one row that scrolls (`flex-wrap: nowrap`, the hairline on the list itself), not
+a strip that wraps into two or three rows on a narrow screen, and the active tab is scrolled
+into view, also when a tab is added after the first render. Under `forced-colors: active` the
+current tab is underlined (a colour alone must not mark it) and an inactive tab's transparent
+border is set to `Canvas` so it does not turn into a bar. A tab that holds unsaved edits may
+carry `.app-tabs-dot` with a visually hidden text (§8.4).
+
 ### 7.5 What stays direct
 
 `ActionMenu`, `PeriodSelector`, `CommunitySwitcher` and `PageSkeleton` own their
@@ -409,6 +416,33 @@ Keep that dependency order when the layout collapses to one column.
 Cancel is `type="button"`, then the primary `type="submit"`. Use task-oriented
 labels (Save changes, Create tariff, Schedule price change). Destructive
 operations stay out of the footer and use `ConfirmDialog`.
+
+### 8.4 A hub with one shared draft
+
+When several tabs of a hub edit one record through one draft and one save (the ZEV settings:
+General, Billing, Documents), the user must be able to tell where the unsaved edits are and
+what is saved at once (#1222):
+
+- A tab that holds unsaved fields carries a dot (`.app-tabs-dot`, with visually hidden text for
+  screen readers); tabs that save by their own actions (People, Energy) and tabs without a form
+  (Audit, Export) never do.
+- The save bar names the tabs ("Unsaved changes in General, Billing & payment"), on every tab,
+  so it is understood on a tab that does not hold the edits.
+- The bar's actions are short, task-named labels (*Save*, *Discard*), so that the bar is two
+  rows at most on a phone.
+- Leaving the hub or switching the community asks with the standard discard dialog
+  (`common.unsavedChanges.*`: *Discard changes?*, *Keep editing* / *Discard*, danger style).
+- A tab's name is the hub's own navigation: its sheet does not repeat it as a heading, and the
+  browser tab title names it ("Billing & payment · Settings · Community – OpenZEV"). Captions
+  (`.form-section-header`) are for named groups of fields inside a sheet.
+
+### 8.5 Read-only forms
+
+A role that may not change a form reads it. The fields stay as fields but flat and legible
+(`.zev-general-settings-fields`, `.zev-email-field`: sunken background, full-contrast text, no
+opacity, default cursor) — the same for native and Mantine controls — not greyed out. Write
+controls that have no use are absent, not disabled (§9). Where a screen can show a value as
+plain text instead of a field, it should.
 
 ## 9. Actions
 

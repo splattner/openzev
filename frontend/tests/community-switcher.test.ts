@@ -130,14 +130,14 @@ describe('switching with unsaved settings', () => {
         expect(dialog.textContent).toContain('pages.zevSettings.unsavedGuardSwitchMessage')
         // The dialog cannot nest in the scope line's paragraph.
         expect(dialog.closest('p')).toBeNull()
-        const cancel = Array.from(dialog.querySelectorAll('button')).find((button) => button.textContent === 'common.cancel')!
+        const cancel = Array.from(dialog.querySelectorAll('button')).find((button) => button.textContent === 'common.unsavedChanges.keepEditing')!
         await act(async () => cancel.click())
         expect(document.querySelector('[role="dialog"]')).toBeNull()
         expect(state.context!.setSelectedZevId).not.toHaveBeenCalled()
 
         await choose('ZEV Süd')
         const confirm = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button'))
-            .find((button) => button.textContent === 'pages.zevSettings.switchWithoutSaving')!
+            .find((button) => button.textContent === 'common.unsavedChanges.discard')!
         await act(async () => confirm.click())
         expect(state.context!.setSelectedZevId).toHaveBeenCalledExactlyOnceWith('2')
         expect(document.querySelector('[role="dialog"]')).toBeNull()

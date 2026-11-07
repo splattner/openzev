@@ -10,6 +10,8 @@ export type NoticeProps = {
     role?: 'alert' | 'status'
     onRetry?: () => void
     isRetrying?: boolean
+    /** Other actions beside the message (not a retry): an admin's way to undo what the notice reports. */
+    actions?: ReactNode
 }
 
 const NOTICE_CLASS: Record<NoticeTone, string> = {
@@ -17,14 +19,15 @@ const NOTICE_CLASS: Record<NoticeTone, string> = {
     warning: 'warning-banner',
 }
 
-export function Notice({ tone, children, role, onRetry, isRetrying }: NoticeProps) {
+export function Notice({ tone, children, role, onRetry, isRetrying, actions }: NoticeProps) {
     const { t } = useTranslation()
     return (
         <div
-            className={`${NOTICE_CLASS[tone]}${onRetry ? ' notice--retry' : ''}`}
+            className={`${NOTICE_CLASS[tone]}${onRetry || actions ? ' notice--retry' : ''}`}
             role={role ?? (tone === 'error' ? 'alert' : 'status')}
         >
             {children}
+            {actions && <div className="actions-row">{actions}</div>}
             {onRetry && (
                 <div className="actions-row">
                     <button

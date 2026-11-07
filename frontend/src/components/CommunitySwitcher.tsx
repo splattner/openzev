@@ -39,9 +39,11 @@ function CommunityMenu({ name, managedZev }: {
             return
         }
         confirm({
-            title: t('pages.zevSettings.unsavedGuardTitle'),
+            title: t('common.unsavedChanges.title'),
             message: t('pages.zevSettings.unsavedGuardSwitchMessage'),
-            confirmText: t('pages.zevSettings.switchWithoutSaving'),
+            confirmText: t('common.unsavedChanges.discard'),
+            cancelText: t('common.unsavedChanges.keepEditing'),
+            isDangerous: true,
             onConfirm: () => {
                 setSelectedZevId(zevId)
             },

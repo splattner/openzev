@@ -1,5 +1,5 @@
 import { Tabs, type TabsProps } from '@mantine/core'
-import type { Ref } from 'react'
+import { useCallback, useEffect, useRef, type Ref } from 'react'
 
 const APP_TABS_CLASSES: Record<string, string> = {
     root: 'app-tabs',
@@ -29,7 +29,25 @@ export function AppTabs({ classNames, ref, ...props }: TabsProps & { ref?: Ref<H
     const merged = typeof classNames === 'function'
         ? ((...args: Parameters<typeof classNames>) => mergeClassNames(classNames(...args)))
         : mergeClassNames(classNames)
-    return <Tabs ref={ref} classNames={merged} {...props} />
+    const rootRef = useRef<HTMLDivElement | null>(null)
+    const setRef = useCallback((node: HTMLDivElement | null) => {
+        rootRef.current = node
+        if (typeof ref === 'function') ref(node)
+        else if (ref) ref.current = node
+    }, [ref])
+    // The strip scrolls instead of wrapping on a narrow screen: keep the active tab in view, also when a
+    // tab is added after the first render (a feature switched on once its status is known).
+    useEffect(() => {
+        const list = rootRef.current?.querySelector('[role="tablist"]')
+        if (!list) return
+        const reveal = () => list.querySelector<HTMLElement>('[role="tab"][data-active]')?.scrollIntoView?.({ inline: 'nearest', block: 'nearest' })
+        reveal()
+        if (typeof MutationObserver === 'undefined') return
+        const observer = new MutationObserver(reveal)
+        observer.observe(list, { childList: true })
+        return () => observer.disconnect()
+    }, [props.value])
+    return <Tabs ref={setRef} classNames={merged} {...props} />
 }
 
 AppTabs.List = Tabs.List

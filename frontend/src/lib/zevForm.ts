@@ -79,6 +79,17 @@ export function isZevFormDirty(draft: ZevInput, baseline: ZevInput): boolean {
 }
 
 /** Editable draft fields that can fail validation, in tab order. */
+/** The tabs holding at least one changed field, in tab order. */
+export function dirtyZevTabs(draft: ZevInput, baseline: ZevInput): ZevSettingsTab[] {
+    const tabs = new Set<ZevSettingsTab>()
+    for (const key of Object.keys(ZEV_FIELD_TABS) as ZevFormField[]) {
+        if (draft[key] !== baseline[key]) {
+            tabs.add(ZEV_FIELD_TABS[key])
+        }
+    }
+    return (['general', 'billing', 'documents'] as const).filter((tab) => tabs.has(tab))
+}
+
 export type ZevFormField = keyof ZevInput
 
 /**
