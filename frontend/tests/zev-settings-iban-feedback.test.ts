@@ -3,6 +3,7 @@ import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { act } from 'react'
 import { MantineProvider } from '@mantine/core'
+import { MemoryRouter } from 'react-router-dom'
 import { ZevGeneralSettingsFields } from '../src/components/ZevGeneralSettingsFields'
 import type { ZevInput } from '../src/types/api'
 
@@ -17,7 +18,7 @@ vi.mock('react-i18next', () => ({
 const cleanups: (() => void)[] = []
 afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()))
 
-function renderFields(form: Partial<ZevInput>) {
+function renderFields(form: Partial<ZevInput>, zevId?: string) {
     const container = document.createElement('div')
     document.body.append(container)
     const root = createRoot(container)
@@ -27,11 +28,12 @@ function renderFields(form: Partial<ZevInput>) {
             createElement(
                 MantineProvider,
                 null,
-                createElement(ZevGeneralSettingsFields, {
+                createElement(MemoryRouter, null, createElement(ZevGeneralSettingsFields, {
                     form: { name: 'Z', start_date: '2026-01-01', ...form } as ZevInput,
                     onChange: () => {},
                     group: 'billing',
-                }),
+                    zevId,
+                })),
             ),
         )
     })
@@ -53,5 +55,33 @@ describe('ZevGeneralSettingsFields IBAN feedback', () => {
     it('shows no error for a valid IBAN', () => {
         const container = renderFields({ bank_iban: 'CH93 0076 2011 6238 5295 7' })
         expect(container.querySelector('[role="alert"]')).toBeNull()
+    })
+})
+
+describe('ZevGeneralSettingsFields billing layout', () => {
+    it('has three captioned sections and no box inside the sheet', () => {
+        const container = renderFields({})
+        const captions = Array.from(container.querySelectorAll('.form-section-header')).map(node => node.textContent)
+        expect(captions).toEqual([
+            'pages.zevSettings.sections.invoicing',
+            'pages.zevSettings.sections.paymentRecipient',
+            'pages.zevSettings.sections.vatAndRounding',
+        ])
+        expect(container.querySelector('.payment-recipient-section')).toBeNull()
+    })
+
+    it('links the creditor address to the issuer on the People tab, for an existing community only', () => {
+        expect(renderFields({}).querySelector('a')).toBeNull()
+        const link = renderFields({}, 'zev-1').querySelector('a')
+        expect(link?.getAttribute('href')).toBe('/zev-settings/people')
+        expect(link?.textContent).toBe('pages.zevSettings.fields.issuerLink')
+    })
+
+    it('explains the VAT mode that needs it, and asks for the number only when registered', () => {
+        const hint = 'pages.zevSettings.fields.vatModeHint'
+        expect(renderFields({ vat_mode: 'not_registered' }).textContent).not.toContain(hint)
+        expect(renderFields({ vat_mode: 'inclusive' }).textContent).toContain(hint)
+        expect(renderFields({ vat_mode: 'inclusive' }).querySelector('[data-zev-field="vat_number"]')).toBeNull()
+        expect(renderFields({ vat_mode: 'registered' }).querySelector('[data-zev-field="vat_number"]')).not.toBeNull()
     })
 })

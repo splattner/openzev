@@ -1,4 +1,5 @@
 import { TextInput } from '@mantine/core'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { CivilDateInput } from './CivilDateInput'
 import { BILLING_INTERVAL_OPTIONS, ZEV_TYPE_OPTIONS } from '../lib/options'
@@ -100,98 +101,6 @@ export function ZevGeneralSettingsFields({ form, onChange, group, zevId, readOnl
                 </div>
             </div>
             )}
-            {/* Billing & payment */}
-            {(!group || group === 'billing') && (
-            <div className="form-section">
-                <div className="inline-form grid grid-2">
-                    <label data-zev-field="billing_interval">
-                        <span>{t('pages.zevSettings.fields.billingInterval')}</span>
-                        <select
-                            value={form.billing_interval}
-                            disabled={readOnly}
-                            {...describeInvalid('billing_interval')}
-                            onChange={(event) =>
-                                onChange({ billing_interval: event.target.value as ZevInput['billing_interval'] })
-                            }
-                        >
-                            {BILLING_INTERVAL_OPTIONS.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                    {t(option.labelKey)}
-                                </option>
-                            ))}
-                        </select>
-                        {inlineError('billing_interval')}
-                    </label>
-                    <label data-zev-field="invoice_language">
-                        <span>{t('pages.zevSettings.fields.invoiceLanguage')}</span>
-                        <select
-                            value={form.invoice_language ?? 'de'}
-                            disabled={readOnly}
-                            {...describeInvalid('invoice_language')}
-                            onChange={(event) =>
-                                onChange({ invoice_language: event.target.value as ZevInput['invoice_language'] })
-                            }
-                        >
-                            <option value="de">Deutsch</option>
-                            <option value="fr">Français</option>
-                            <option value="it">Italiano</option>
-                            <option value="en">English</option>
-                        </select>
-                        {inlineError('invoice_language')}
-                    </label>
-                    <label data-zev-field="payment_term_days">
-                        <span>{t('pages.zevSettings.fields.paymentTermDays')}</span>
-                        <input
-                            type="number"
-                            min={1}
-                            max={365}
-                            step={1}
-                            value={form.payment_term_days ?? ''}
-                            disabled={readOnly}
-                            onChange={(event) => {
-                                const raw = event.target.value
-                                onChange({ payment_term_days: raw === '' ? undefined : Number(raw) })
-                            }}
-                            {...describeInvalid('payment_term_days')}
-                        />
-                        {inlineError('payment_term_days')}
-                    </label>
-                    <label data-zev-field="itemize_tariff_bands" className="checkbox-row align-start grid-span-full">
-                        <input
-                            type="checkbox"
-                            checked={form.itemize_tariff_bands ?? false}
-                            disabled={readOnly}
-                            {...describeInvalid('itemize_tariff_bands')}
-                            onChange={(event) => onChange({ itemize_tariff_bands: event.target.checked })}
-                        />
-                        <span className="checkbox-row-text">
-                            <span>{t('pages.zevSettings.fields.itemizeTariffBands')}</span>
-                            <small className="muted">{t('pages.zevSettings.fields.itemizeTariffBandsHint')}</small>
-                            {inlineError('itemize_tariff_bands')}
-                        </span>
-                    </label>
-                    <label data-zev-field="participant_invoice_access" className="checkbox-row align-start grid-span-full">
-                        <input
-                            type="checkbox"
-                            checked={form.participant_invoice_access ?? false}
-                            disabled={readOnly}
-                            {...describeInvalid('participant_invoice_access')}
-                            onChange={(event) =>
-                                onChange({ participant_invoice_access: event.target.checked })
-                            }
-                        />
-                        <span className="checkbox-row-text">
-                            <span>{t('pages.zevSettings.fields.participantInvoiceAccess')}</span>
-                            <small className="muted">
-                                {t('pages.zevSettings.fields.participantInvoiceAccessHint')}
-                            </small>
-                            {inlineError('participant_invoice_access')}
-                        </span>
-                    </label>
-                </div>
-            </div>
-            )}
-
             {/* Grid Connection */}
             {(!group || group === 'general') && (
             <div className="form-section">
@@ -261,11 +170,64 @@ export function ZevGeneralSettingsFields({ form, onChange, group, zevId, readOnl
             </div>
             )}
 
-            {/* Payment details (billing & payment tab) */}
+            {/* Billing & payment: three captioned sections, no nested boxes (SPEC-2026-10 §8.1) */}
             {(!group || group === 'billing') && (
+            <>
             <div className="form-section">
-                <p className="form-section-header">{t('pages.zevSettings.sections.paymentDetails')}</p>
+                <p className="form-section-header">{t('pages.zevSettings.sections.invoicing')}</p>
                 <div className="inline-form grid grid-3">
+                    <label data-zev-field="billing_interval">
+                        <span>{t('pages.zevSettings.fields.billingInterval')}</span>
+                        <select
+                            value={form.billing_interval}
+                            disabled={readOnly}
+                            {...describeInvalid('billing_interval')}
+                            onChange={(event) =>
+                                onChange({ billing_interval: event.target.value as ZevInput['billing_interval'] })
+                            }
+                        >
+                            {BILLING_INTERVAL_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {t(option.labelKey)}
+                                </option>
+                            ))}
+                        </select>
+                        {inlineError('billing_interval')}
+                    </label>
+                    <label data-zev-field="invoice_language">
+                        <span>{t('pages.zevSettings.fields.invoiceLanguage')}</span>
+                        <select
+                            value={form.invoice_language ?? 'de'}
+                            disabled={readOnly}
+                            {...describeInvalid('invoice_language')}
+                            onChange={(event) =>
+                                onChange({ invoice_language: event.target.value as ZevInput['invoice_language'] })
+                            }
+                        >
+                            <option value="de">Deutsch</option>
+                            <option value="fr">Français</option>
+                            <option value="it">Italiano</option>
+                            <option value="en">English</option>
+                        </select>
+                        {inlineError('invoice_language')}
+                    </label>
+                    <label data-zev-field="payment_term_days">
+                        <span>{t('pages.zevSettings.fields.paymentTermDays')}</span>
+                        <input
+                            type="number"
+                            min={1}
+                            max={365}
+                            step={1}
+                            value={form.payment_term_days ?? ''}
+                            disabled={readOnly}
+                            onChange={(event) => {
+                                const raw = event.target.value
+                                onChange({ payment_term_days: raw === '' ? undefined : Number(raw) })
+                            }}
+                            {...describeInvalid('payment_term_days')}
+                        />
+                        {inlineError('payment_term_days')}
+                    </label>
                     <label data-zev-field="invoice_prefix">
                         <span>{t('pages.zevSettings.fields.invoicePrefix')}</span>
                         <input
@@ -286,47 +248,94 @@ export function ZevGeneralSettingsFields({ form, onChange, group, zevId, readOnl
                         />
                         {inlineError('credit_note_prefix')}
                     </label>
-                    <div className="grid-span-full payment-recipient-section">
-                        <strong>{t('pages.zevSettings.fields.paymentRecipientHeader')}</strong>
-                        <p className="muted">{t('pages.zevSettings.fields.paymentRecipientHint')}</p>
-                        <div className="payment-fields-grid">
-                            <label data-zev-field="bank_name">
-                                <span>{t('pages.zevSettings.fields.bankName')}</span>
-                                <input
-                                    name="bank_name"
-                                    value={form.bank_name ?? ''}
-                                    disabled={readOnly}
-                                    {...describeInvalid('bank_name')}
-                                    maxLength={200}
-                                    onChange={(event) => onChange({ bank_name: event.target.value })}
-                                />
-                                {inlineError('bank_name')}
-                            </label>
-                            <label data-zev-field="bank_iban">
-                                <span>{t('pages.zevSettings.fields.bankIban')}</span>
-                                <input
-                                    name="bank_iban"
-                                    value={form.bank_iban ?? ''}
-                                    disabled={readOnly}
-                                    maxLength={34}
-                                    onChange={(event) => onChange({ bank_iban: event.target.value })}
-                                    onBlur={(event) => onChange({ bank_iban: normalizeIban(event.target.value) })}
-                                    {...describeInvalid('bank_iban')}
-                                    aria-invalid={fieldErrors.bank_iban || liveIbanInvalid ? true : undefined}
-                                    aria-describedby={fieldErrors.bank_iban || liveIbanInvalid ? 'zev-settings-field-bank_iban-error' : undefined}
-                                />
-                                {fieldErrors['bank_iban'] ? (
-                                    inlineError('bank_iban')
-                                ) : liveIbanInvalid && (
-                                    <small className="field-error" id="zev-settings-field-bank_iban-error" role="alert">
-                                        {t('pages.zevSettings.validation.invalidIban')}
-                                    </small>
-                                )}
-                            </label>
-                        </div>
-                        <small className="muted">{t('pages.zevSettings.fields.bankIbanHint')}</small>
-                    </div>
-                    <label data-zev-field="vat_mode" className="grid-span-full">
+                    <label data-zev-field="itemize_tariff_bands" className="checkbox-row align-start grid-span-full">
+                        <input
+                            type="checkbox"
+                            checked={form.itemize_tariff_bands ?? false}
+                            disabled={readOnly}
+                            {...describeInvalid('itemize_tariff_bands')}
+                            onChange={(event) => onChange({ itemize_tariff_bands: event.target.checked })}
+                        />
+                        <span className="checkbox-row-text">
+                            <span>{t('pages.zevSettings.fields.itemizeTariffBands')}</span>
+                            <small className="muted">{t('pages.zevSettings.fields.itemizeTariffBandsHint')}</small>
+                            {inlineError('itemize_tariff_bands')}
+                        </span>
+                    </label>
+                    <label data-zev-field="participant_invoice_access" className="checkbox-row align-start grid-span-full">
+                        <input
+                            type="checkbox"
+                            checked={form.participant_invoice_access ?? false}
+                            disabled={readOnly}
+                            {...describeInvalid('participant_invoice_access')}
+                            onChange={(event) =>
+                                onChange({ participant_invoice_access: event.target.checked })
+                            }
+                        />
+                        <span className="checkbox-row-text">
+                            <span>{t('pages.zevSettings.fields.participantInvoiceAccess')}</span>
+                            <small className="muted">
+                                {t('pages.zevSettings.fields.participantInvoiceAccessHint')}
+                            </small>
+                            {inlineError('participant_invoice_access')}
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            <div className="form-section">
+                <p className="form-section-header">{t('pages.zevSettings.sections.paymentRecipient')}</p>
+                <p className="muted form-section-note">
+                    {t('pages.zevSettings.fields.paymentRecipientHint')}
+                    {zevId && (
+                        <>
+                            {' '}
+                            <Link className="text-link" to="/zev-settings/people">{t('pages.zevSettings.fields.issuerLink')}</Link>
+                        </>
+                    )}
+                </p>
+                <div className="inline-form grid grid-2 align-start">
+                    <label data-zev-field="bank_name">
+                        <span>{t('pages.zevSettings.fields.bankName')}</span>
+                        <input
+                            name="bank_name"
+                            value={form.bank_name ?? ''}
+                            disabled={readOnly}
+                            {...describeInvalid('bank_name')}
+                            maxLength={200}
+                            onChange={(event) => onChange({ bank_name: event.target.value })}
+                        />
+                        {inlineError('bank_name')}
+                    </label>
+                    <label data-zev-field="bank_iban">
+                        <span>{t('pages.zevSettings.fields.bankIban')}</span>
+                        <input
+                            name="bank_iban"
+                            value={form.bank_iban ?? ''}
+                            disabled={readOnly}
+                            maxLength={34}
+                            onChange={(event) => onChange({ bank_iban: event.target.value })}
+                            onBlur={(event) => onChange({ bank_iban: normalizeIban(event.target.value) })}
+                            {...describeInvalid('bank_iban')}
+                            aria-invalid={fieldErrors.bank_iban || liveIbanInvalid ? true : undefined}
+                            aria-describedby={fieldErrors.bank_iban || liveIbanInvalid ? 'zev-settings-field-bank_iban-error' : undefined}
+                        />
+                        {fieldErrors['bank_iban'] ? (
+                            inlineError('bank_iban')
+                        ) : liveIbanInvalid && (
+                            <small className="field-error" id="zev-settings-field-bank_iban-error" role="alert">
+                                {t('pages.zevSettings.validation.invalidIban')}
+                            </small>
+                        )}
+                    </label>
+                </div>
+                <small className="muted">{t('pages.zevSettings.fields.bankIbanHint')}</small>
+            </div>
+
+            <div className="form-section">
+                <p className="form-section-header">{t('pages.zevSettings.sections.vatAndRounding')}</p>
+                <div className="inline-form grid grid-2 align-start">
+                    <label data-zev-field="vat_mode">
                         <span>{t('pages.zevSettings.fields.vatMode')}</span>
                         <select
                             value={form.vat_mode ?? 'not_registered'}
@@ -349,14 +358,14 @@ export function ZevGeneralSettingsFields({ form, onChange, group, zevId, readOnl
                             <option value="registered">{t('pages.zevSettings.fields.vatModeRegistered')}</option>
                             <option value="inclusive">{t('pages.zevSettings.fields.vatModeInclusive')}</option>
                         </select>
-                        <small className="muted">{t('pages.zevSettings.fields.vatModeHint')}</small>
+                        {form.vat_mode === 'inclusive' && <small className="muted">{t('pages.zevSettings.fields.vatModeHint')}</small>}
                         {inlineError('vat_mode')}
                         {/* A vat_number violation with a hidden number field
                             (mode other than registered) surfaces here so it
                             is always visible next to its fix. */}
                         {form.vat_mode !== 'registered' && inlineError('vat_number')}
                     </label>
-                    <label data-zev-field="invoice_rounding" className="grid-span-full">
+                    <label data-zev-field="invoice_rounding">
                         <span>{t('pages.zevSettings.fields.invoiceRounding')}</span>
                         <select
                             value={form.invoice_rounding ?? 'none'}
@@ -371,7 +380,7 @@ export function ZevGeneralSettingsFields({ form, onChange, group, zevId, readOnl
                         {inlineError('invoice_rounding')}
                     </label>
                     {form.vat_mode === 'registered' && (
-                        <label data-zev-field="vat_number" className="grid-span-full">
+                        <label data-zev-field="vat_number">
                             <span>{t('pages.zevSettings.fields.vatNumber')}</span>
                             <input
                                 value={form.vat_number ?? ''}
@@ -384,7 +393,7 @@ export function ZevGeneralSettingsFields({ form, onChange, group, zevId, readOnl
                     )}
                 </div>
             </div>
-
+            </>
             )}
 
             {/* Notes (documents tab) */}
