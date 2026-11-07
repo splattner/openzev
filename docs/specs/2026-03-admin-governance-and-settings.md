@@ -613,10 +613,17 @@ Every validated control carries a `data-zev-field` anchor for focus jumps.
   shared civil-date picker inherit the same field tokens and neutral border;
   no caller-specific Mantine size prop is required. URL placeholders are
   translated in all four locales.
-- **Billing & payment** (`billing`): billing interval, invoice language,
-  payment term, `itemize_tariff_bands`, `participant_invoice_access`, invoice
-  prefix, VAT treatment (`vat_mode`), VAT number (only when registered), bank
-  name and IBAN.
+- **Billing & payment** (`billing`): three captioned `.form-section`s, no box
+  inside the sheet (SPEC-2026-10-ui-patterns §8.1). *Invoices*: billing
+  interval, invoice language, payment term, invoice- and credit-note-number
+  prefixes (one even three-column grid), `itemize_tariff_bands` and
+  `participant_invoice_access` (one-sentence helper each; the long
+  explanations are in the user guide). *Payment recipient*: bank name (internal
+  only) and IBAN, a note that the creditor address on QR-bills is the invoice
+  issuer's, linking to the People tab, and the IBAN hint. *VAT and rounding*:
+  VAT treatment (`vat_mode`, its explanatory hint only for the fold-in mode),
+  VAT number (only when registered) and rounding. An invalid IBAN shows its
+  error under the field and focuses it on save.
 - **Documents & emails** (`documents`): three `.form-section`s — *Invoice email*
   (`ZevEmailTemplateFields`, which asks for the shipped default in the draft's
   invoice language, `GET …/email-template/invoice_email/?language=`; the source
@@ -627,8 +634,8 @@ Every validated control carries a `data-zev-field` anchor for focus jumps.
   print) and *Notes* (`notes`, internal, with a note saying it appears on no
   document).
 - **Audit log** (`audit`): embedded `AuditLogsPage scope="owner"`, locked to
-  the selected ZEV with a community description;
-  no platform-wide log or free-text search.
+  the selected ZEV; no platform-wide log. One filter row (search, category,
+  actor, status, date range); see `2026-05-audit-log-and-operational-traceability.md` §7.1.
 - **Export / transfer** (`export`): a "Transfer archive" card that opens `ZevExportModal` for the
   selected ZEV, and a card that deactivates the ZEV (quiet destructive action, `ConfirmDialog`; only an
   admin can reactivate, which the card and the confirmation say with one composed sentence).

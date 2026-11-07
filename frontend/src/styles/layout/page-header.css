@@ -208,3 +208,9 @@
   padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--border-default);
 }
+
+/* One sentence under a section's caption: what the section's fields are used for. */
+.form-section-note {
+  margin: 0;
+  font-size: 0.875rem;
+}

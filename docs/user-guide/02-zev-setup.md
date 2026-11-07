@@ -231,29 +231,37 @@ address, after which the new login belongs to that party.
 
 ![Billing and payment settings](screenshots/06b-zev-billing-settings.png)
 
-#### Billing & Payment
+The tab has three sections.
+
+#### Invoices
 
 | Setting | Purpose | Required |
 | --- | --- | --- |
 | **Billing interval** | Invoice frequency (see below) | Yes |
 | **Invoice language** | Language for generated PDFs (de/fr/it/en) | Yes |
 | **Payment term (days)** | Days from the issue date until payment is due (default 30, 1–365) | Yes |
+| **Invoice-number prefix** | Prefix for invoice numbers (default: `INV`); 1–10 uppercase letters, digits or hyphens | No |
+| **Credit-note-number prefix** | Prefix for credit-note numbers | No |
 | **Itemise price bands on the invoice** | Show each price band of a multi-band tariff as its own line (see [below](#price-bands-on-the-invoice)) | No |
 | **Participant QR code on the invoice** | Print a QR code that opens the invoice online (see [below](#participant-access-from-the-invoice)) | No |
 
-#### Payment Details
+#### Payment recipient
 
 | Setting | Purpose | Required |
 | --- | --- | --- |
-| **Invoice prefix** | Prefix for invoice numbers (default: `INV`); 1–10 uppercase letters, digits or hyphens | No |
-| **Bank name** | Internal reference for the payment account | No |
-| **Bank IBAN** | Account participants pay into; without it invoices carry no payment details or QR payment slip | No |
+| **Bank name** | Internal reference for the payment account (never printed) | No |
+| **Bank IBAN** | Account participants pay into; without it invoices carry no payment details or QR payment slip. An invalid IBAN is flagged next to the field and keeps you from saving | No |
+
+The QR-Rechnung creditor address is the address of the invoice issuer, taken
+from their record on the People & access tab; the section links there.
+
+#### VAT and rounding
+
+| Setting | Purpose | Required |
+| --- | --- | --- |
 | **VAT treatment** | How VAT is applied when billing participants (see [below](#vat-configuration)) | No |
 | **VAT number** | Swiss UID — shown only when VAT treatment is *VAT-registered* | If registered |
 | **Rounding of amounts** | Round what participants pay to 5 Rappen (see [below](#rounding-to-5-rappen)) | No |
-
-The QR-Rechnung creditor address is the address of the ZEV's responsible
-person, taken from their participant record.
 
 #### Document numbering
 
