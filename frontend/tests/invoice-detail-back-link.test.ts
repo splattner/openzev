@@ -151,7 +151,9 @@ describe('InvoiceDetailPage return link', () => {
     })
 
     it('gives an unavailable invoice a working return link without a pointless retry', async () => {
-        mockRole('participant')
+        // A participant 404 is redirected to My documents instead (#862); the
+        // error page is what a manager or admin sees.
+        mockRole('manager')
         vi.mocked(fetchInvoice).mockRejectedValueOnce({ response: { status: 404 } })
         const container = await renderDetail()
         expect(container.textContent).toContain('pages.invoices.dataReview.unavailable')
