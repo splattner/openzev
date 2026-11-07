@@ -519,32 +519,50 @@ Tab `people` after General (`ZevSettingsTab = 'general' | 'people' | 'billing' |
 like Audit and Export (`OUTSIDE_THE_FORM`). `ZevPeopleSection` renders `ZevPartiesSection`: two cards, **Roles** and **Other people**,
 with access shown and changed **on each person's row** — there is no separate access list.
 
-- Access per row: `AccessControls` (`features/zev/PartyAccess.tsx`) gets the access list rows
+- Access per row: `describeAccess` (`features/zev/PartyAccess.tsx`) takes the access list rows
   (`fetchZevAccess`, `queryKeys.zev.access(zevId, false)`) of the row's logins
-  (`Party.accounts`) and shows: a role-derived entry → "Manages in OpenZEV" + login; a grant →
-  "Manage" / "Read only" (+ "Invitation pending", "until …") with Make manager/viewer (viewer
-  through `ConfirmDialog`), Resend invitation, Remove access (`ConfirmDialog`); no access →
-  "No access to OpenZEV" with a Manage / Read only select and "Give access" (a login exists) or
-  "Invite" (only an email) → `createZevAccess({party, role})`; neither login nor email → "No
-  login and no email address". The issuer and representative holder rows pass `managingRole`:
-  without a login they say an invited login will manage and offer "Invite" (as manager).
+  (`Party.accounts`) and splits them for the row into **status** (text), **primary** (the one
+  visible action) and **menuItems** (the row's "…" menu). Status: a role-derived entry →
+  "Manages in OpenZEV" tag + login (the tag is dropped on the issuer's and representative's own
+  rows); a grant → `badge-tag` "Manage" / "Read only" (+ "Invitation pending" as `IssueText`,
+  "until …"); no access → "No access to OpenZEV"; neither login nor email → "No login and no
+  email address". Primary: only without access and with a login or an email — "Give access" (a
+  login exists) or "Invite" (only an email), which open the give-access form under that row with
+  the person chosen (only the level, and an optional end date, are left); the issuer and
+  representative holder rows pass `managingRole`: without a login they say an invited login will
+  manage and "Invite" sends it at once (as manager). Menu, per grant: Make manager / Make viewer
+  (viewer through `ConfirmDialog`), Resend invitation, Remove access (danger, `ConfirmDialog`).
   Mutations, toasts and confirmations live in `useAccessActions(zevId)`, shared by all rows.
 - Rows: the current issuer and representative holders, every listed landowner, and in
   **Other people** the contacts (parties without participations), the parties with access not
   shown elsewhere (e.g. a participant given read-only access, with a "Participant" badge) and
-  bare logins with access that belong to no party ("Login only").
-- **Other people** header: "Add contact" and "Give access" (`GiveAccessForm`: email — the
-  default — or a party of the ZEV, role, optional end date with `CivilDateInput`).
+  bare logins with access that belong to no party (named by their account name, else their
+  email; no "Login only" tag since #1224).
+- **Other people** header (`.people-rows-header`): the title and hint, "Give access" (secondary) and
+  "Add contact" (primary), the only primary action of the tab. "Give access" opens `GiveAccessForm`
+  (an inline form with its own heading, above the table; opened from a row's "Give access" /
+  "Invite" it sits under that row: email — the default — or a party of the ZEV, role, optional end date with
+  `CivilDateInput`). An empty email or party is reported under the field (`aria-invalid`,
+  `field-error`, focus), not in a toast (SPEC-2026-10-ui-patterns §8.2); a failed save keeps the
+  toast.
 - A contact can be deleted only without roles and without access. Ended grants are not listed
   (the audit log keeps them).
 
 Sections of the roles card and the contacts in Other people:
 
-- **Issuer** and **Representative**: today's holder with "since", the history behind "Show
-  history", and "Change from…" (party picker + date) for managers.
-- **Landowners**: list with "since/until"; add (party picker + date), end (date).
-- **Other parties**: non-participant parties (contact cards); add / edit (person or
-  organisation form) / delete (only unused).
+- **Issuer** and **Representative**: today's holder with "since", the history in a `Disclosure`
+  ("Show history", closed), and "Change issuer" / "Change representative" ("Set …" while nobody
+  holds the role; party picker + date) for managers, in the block header beside the title.
+- **Landowners**: rows with "since/until" and the building; add (party picker + date), end (date).
+- **Other people**: a table sheet (`.table-card.people-rows`; columns Person · Access · actions,
+  cards on narrow containers) of the non-participant parties and everyone else with access; add /
+  edit (person or organisation form) / delete (only unused).
+
+Row pattern (#1224, as the participants and metering points): no box per row, the sheet is the
+container. A role holder is a `RoleRow` (name and dates, status, actions); a contact is a table
+row. At most two visible actions per row — the edit pencil (icon only, with an accessible name)
+and the one access action — and a "…" menu (`RowMenu` → `ActionMenu`, label "More actions") for
+the rest (access changes, "End" for a landowner, "Delete" for an unused contact, danger-styled).
 
 Party picker: every party of the ZEV by `display_name`, with "New contact…" opening the party
 form; the created contact is selected in the picker. Viewers see everything read-only. Follows
@@ -553,16 +571,32 @@ form; the created contact is selected in the picker. Viewers see everything read
 As shipped: one query of all roles (`include_ended=true`) and one of the parties; each block
 derives today's holder, upcoming rows ("From" badge) and the history client-side
 (`todayBusinessIso`). Issuer and representative (`SingleHolderRole`): "Set" when nobody holds
-the role, else "Change from…", opening an inline `AssignForm` (picker + date, default today)
-with a hint that the previous holder ends the day before; no issuer → `warning-banner`.
-Landowners (for a ZEV and a vZEV alike; the hint says a community spanning several plots has several; a landowner row shows the building it owns and offers "Set building" / "Change building", and the add form an optional building select, SPEC-2026-10-buildings-and-sites §7.5): current and future rows; "End" opens an inline last-day form (default today);
-"Add landowner" the same `AssignForm`. Other contacts: parties without participations, with
-their role badges; edit in `PartyFormModal` (`features/zev/PartyFormModal.tsx`: kind,
+the role, else "Change issuer" / "Change representative", opening an inline `AssignForm` (a
+heading named like the button, picker + date, default today; a missing party is reported under the
+picker) with a hint that the previous holder ends the day before; no issuer → `IssueText` (warning) whose click opens the same form (plain text for a viewer).
+Landowners (for a ZEV and a vZEV alike; the hint says a community spanning several plots has several; a landowner row shows the building it owns and offers "Set building" / "Change building" (a compact building select with Save and Cancel, saved only on Save), and the add form an optional building select, SPEC-2026-10-buildings-and-sites §7.5): current and future rows; "End" (in the row menu) opens an inline last-day form (default today) whose neutral "End" button asks for confirmation (`ConfirmDialog` naming the date and that earlier documents stay unchanged);
+"Add landowner" the same `AssignForm` (submit "Add"). Other contacts: parties without participations, with
+their role tags; edit in `PartyFormModal` (`features/zev/PartyFormModal.tsx`: kind,
 organisation name, title, first/last name — "contact" labels for an organisation —, name
 addition, email, phone, address, notes); delete (with `ConfirmDialog`) only while it holds no
 role. Every change invalidates parties, roles, access, the ZEV list (issuer) and participants.
-Styles `.zev-parties-*` in `features/zev/ZevPartiesSection.css` (`.zev-parties-block-first` drops the divider of the
-contacts card's first block), reusing the `.zev-access-*` rows.
+Access tags (`describeAccess`): the access level is a quiet `badge-tag`; a pending invitation is
+`IssueText` (warning), with "Resend invitation" in the row menu; the issuer's and representative's own rows show
+the managing login without the "Manages in OpenZEV" tag (their heading says it), contact and
+landowner rows keep the tag; a login whose address the row already shows (the contact's email, or
+the name of a login without one) is not repeated (`shownEmail`).
+
+**Inline forms are an exception to SPEC-2026-10-ui-patterns §5 rule F** (#1224): role changes,
+"Add landowner" and "Give access" stay inline because their party picker offers "New contact…",
+which opens the contact dialog — a dialog over a dialog if the form were one (rule B). Each inline
+form has its own heading and validates on submit with field errors; revisit when the picker can
+create a contact inline.
+
+Loading and failure go through `PageState` (skeleton; `Notice` with retry); when nobody else is
+listed, `EmptyState` replaces the table sheet and offers "Add contact" and "Give access" to
+managers. Styles in `features/zev/ZevPartiesSection.css`: `.zev-parties-*` (role blocks; block
+headers keep the action on the right), `.zev-role-*` (plain role rows), `.people-rows*` (the
+table, with a container query to cards); radii and the type scale come from the shared tokens.
 
 ### 8.4 Participants
 
