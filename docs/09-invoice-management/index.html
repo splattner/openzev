@@ -2694,6 +2694,8 @@ community stops watching the previous period.</p>
 <p>The system calculates energy allocation and applies tariffs, creating a <strong>Draft</strong> invoice.</p>
 <p>Concurrent generation requests for the same participant run in sequence.
 The regeneration rules below apply to overlapping billing periods.</p>
+<p>Tariff-generation errors stay visible with <strong>Check tariffs</strong>, which opens the
+tariff configuration. Processing timeouts offer a status refresh.</p>
 <h3 id="regenerating-an-existing-invoice">Regenerating an Existing Invoice<a class="headerlink" href="#regenerating-an-existing-invoice" title="Permanent link">&para;</a></h3>
 <p>While an invoice is a <strong>Draft</strong>, <strong>More → Regenerate invoice</strong> replaces it with a
 freshly calculated one. Use this after correcting metering data or tariff
@@ -2707,11 +2709,15 @@ they are stored separately and added to the new draft again.</p>
 <h3 id="metering-corrections-on-issued-invoices">Metering corrections on issued invoices<a class="headerlink" href="#metering-corrections-on-issued-invoices" title="Permanent link">&para;</a></h3>
 <p>A committed metering correction (or an import deletion) never rewrites an
 invoice — amounts, PDFs and delivery records stay as issued. Instead the
-affected invoices stay in the <strong>Issues</strong> filter and carry a <strong>Data review</strong>
-flag. The period rows and invoice detail page identify them; managers and viewers
-also see source evidence (delivery ID or CSV filename, changed intervals) on the
-detail page. The <strong>Overview</strong> readiness
+affected invoices stay in the <strong>Issues</strong> filter. Their metering step under
+<strong>Progress</strong> shows a red exclamation mark. <strong>Review corrections</strong> under <strong>Actions</strong> opens the invoice's evidence and
+available resolution action. Managers and viewers see source evidence (delivery
+ID or CSV filename, changed intervals) on the detail page. The <strong>Overview</strong> readiness
 check gains a <strong>Data corrections</strong> step linking to the period's billing page.</p>
+<p>The arrow-marked <strong>Open import protocol</strong> link opens the source import's
+<a href="../05-metering-import/#recorded-reading-changes">recorded reading changes</a>,
+with the affected dates as context. It still shows the whole import's retained
+history. Reviewing it does not clear the invoice's flag.</p>
 <table>
 <thead>
 <tr>
@@ -2722,29 +2728,59 @@ check gains a <strong>Data corrections</strong> step linking to the period's bil
 <tbody>
 <tr>
 <td><strong>Draft</strong></td>
-<td><strong>More → Regenerate invoice</strong> bills the corrected values.</td>
+<td><strong>Regenerate invoice</strong> creates a new draft using the corrected values, after confirmation.</td>
 </tr>
 <tr>
 <td><strong>Approved / Sent</strong></td>
-<td>With no payments, cancel through the API and generate a new invoice. A sent invoice with payments needs <strong>Correct invoice → Reverse the invoice</strong> first.</td>
+<td>With no payments, <strong>Create replacement invoice</strong> cancels the original and creates a new draft in one confirmed operation. A sent invoice with payments needs <strong>Correct invoice → Reverse the invoice</strong> first.</td>
 </tr>
 <tr>
 <td><strong>Paid</strong></td>
-<td>Use <strong>Correct invoice → Reverse the invoice</strong>, then generate a new invoice. Payments and partial credits leave the review flag open.</td>
+<td>Use <strong>Correct invoice → Reverse the invoice</strong>, then <strong>Create replacement invoice</strong>. Payments and partial credits leave the review flag open.</td>
 </tr>
 </tbody>
 </table>
+<p>Before <strong>Regenerate invoice</strong> or <strong>Create replacement invoice</strong>, the detail page
+shows the expected total and energy changes using current readings and tariffs,
+beside the button on wide screens and above it on phones. The current amount,
+expected amount and signed difference are plain text; an unchanged amount is
+shown only once. A shift between local and grid energy
+is shown in one line; other energy changes show old and new quantities. The source
+import link remains below the action. Loading or failed calculation prevents
+submission; a failed preview offers <strong>Retry</strong>, with <strong>Check tariffs</strong> for tariff
+errors. This preview changes no invoice or invoice number. Confirmation calculates
+again, so changes made in the meantime can affect the final result.</p>
+<p>A flagged draft's stored PDF is labelled <strong>Stored PDF – changes not yet included</strong>.
+An issued invoice's PDF is labelled <strong>Issued invoice – original</strong>: it remains
+the document that was issued. Cancelling or failing a recalculation keeps that
+context visible; the successfully recalculated draft no longer has the pending-changes label.</p>
+<p>The issued original stays in the records with its original amount and PDF. For an
+unpaid replacement, a calculation failure leaves it valid. The replacement opens
+for review before approval or sending. Its result message compares the old and
+new amounts as plain text, explicitly notes an unchanged amount, and lists changed energy
+totals. Viewers
+and managers of disabled communities can inspect the evidence without write actions.</p>
 <p>Full reversal is available for a positive invoice with uncredited payments
 or applied credit. If neither remains, the flag stays open for review.
 Zero invoices and payouts cannot be reversed.</p>
 <p>Participants see the review flag on their own sent and paid invoices,
 without internal import evidence or management actions.</p>
 <h2 id="reviewing-invoices">Reviewing Invoices<a class="headerlink" href="#reviewing-invoices" title="Permanent link">&para;</a></h2>
-<p>Click the invoice number in the <strong>Participant</strong> column to view the invoice detail page.</p>
+<p>Click the underlined invoice number in the <strong>Participant</strong> column to view the invoice detail page.</p>
 <h3 id="invoice-detail-page">Invoice Detail Page<a class="headerlink" href="#invoice-detail-page" title="Permanent link">&para;</a></h3>
+<p>The detail page also offers the next invoice action: <strong>Approve</strong> for a draft,
+then <strong>Send email</strong> for an approved invoice. Only one workflow step is offered
+at a time, aligned to the right like the correction action; sent invoices keep <strong>Mark Paid</strong> in the payments card. While email
+is queued the send button stays busy; a failed delivery leaves it available
+again with a visible error. Open corrections take priority over these ordinary
+actions. Read-only users and managers of disabled communities receive no write
+actions; opening the PDF remains available.</p>
+<p>If a stored PDF cannot be loaded, <strong>Retry</strong> loads it again without regenerating
+the invoice. Read-only users receive no instruction to generate a document.</p>
 <p><img alt="Invoice detail page" src="../screenshots/08b-invoice-detail.png" /></p>
 <p>The page header names the invoice and, next to the recipient and the billing
-period, its current <strong>status</strong> as a quiet label (a participant sees whether
+period, its current <strong>status</strong> as plain text, with <strong>Cancelled</strong> in red error text and
+<strong>Partly paid</strong> kept as a blue pill (a participant sees whether
 payment is due, overdue or paid instead). The invoice PDF itself no longer prints
 a status line; only a draft or cancelled document carries a plain <strong>Draft</strong> or
 <strong>Cancelled</strong> marking. Below it, two rows of figure tiles summarise the invoice the way its
