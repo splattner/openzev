@@ -206,7 +206,8 @@ export function ImportProtocolModal({ log, onClose, focusCorrections, correction
                             )}
                             <section className="form-section">
                                 <h4>{t('pages.imports.protocol.skippedReasons')}</h4>
-                                <DataTable data={log.errors ?? []} columns={columns} emptyMessage={t('pages.imports.protocol.noSkippedDetails')} />
+                                {/* One skipped row is not a data list: keep the header plain. */}
+                                <DataTable data={log.errors ?? []} columns={columns} enableSorting={false} emptyMessage={t('pages.imports.protocol.noSkippedDetails')} />
                             </section>
                         </>
                     )}
