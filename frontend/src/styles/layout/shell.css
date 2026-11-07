@@ -570,3 +570,19 @@
 .top-nav > .notification-bell {
   margin-bottom: 0.5rem;
 }
+
+/* Forced colours replace the dark sidebar's palette: the current page keeps an outline and the logo, drawn
+   for a dark ground, keeps one. */
+@media (forced-colors: active) {
+  .nav-link.active {
+    outline: 0.125rem solid Highlight;
+    outline-offset: -0.125rem;
+    text-decoration: underline;
+  }
+
+  .sidebar-brand-row {
+    forced-color-adjust: none;
+    background: var(--sidebar-bg);
+    border-radius: var(--radius-sm);
+  }
+}

@@ -97,9 +97,13 @@ Admins can create a ZEV together with a new responsible-person account in a sing
 
 ![ZEV settings](screenshots/06-zev-settings.png)
 
-One save bar serves every tab. Switching tabs keeps your edits; **Save changes**
-checks all settings and opens the first invalid field. Switching communities
-or leaving settings asks for confirmation while edits are unsaved.
+One save bar serves the General, Billing & payment and Documents & e-mails
+tabs. A dot on a tab marks unsaved edits, and the bar names the tabs that hold
+them. Switching tabs keeps your edits; **Save** checks all settings and opens
+the first invalid field. Switching communities or leaving settings asks for
+confirmation while edits are unsaved. The People & access and Energy data tabs
+save each action as you make it. If you only have read access, the fields are
+shown as flat read-only values.
 
 ### General tab
 
@@ -392,7 +396,7 @@ Both fields support variable placeholders such as `{invoice_number}`, `{zev_name
 
 Subject and body can inherit the platform template or use your own text
 independently. Their badges show the saved choice; **Unsaved changes** marks a
-staged edit. **Use platform default** takes effect after **Save changes**. See
+staged edit. **Use platform default** takes effect after **Save**. See
 [Email Configuration](10-email-configuration.md#email-templates) for details.
 
 If a template contains an invalid placeholder, the system falls back to defaults automatically.

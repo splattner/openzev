@@ -188,7 +188,7 @@ async function rerender(root: Root, route: string, client: QueryClient) {
 
 function findTab(container: ParentNode, key: string) {
     return Array.from(container.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
-        .find((button) => button.textContent === `pages.zevSettings.tabs.${key}`)!
+        .find((button) => button.textContent?.startsWith(`pages.zevSettings.tabs.${key}`))!
 }
 
 async function clickTab(container: ParentNode, key: string) {
@@ -304,7 +304,10 @@ describe('ZEV settings routed form', () => {
         expect(saveButton(container)).toBeUndefined()
         setField(generalInput(container)!, 'Unsaved name')
         expect(saveBar(container)).not.toBeNull()
-        expect(container.textContent).toContain('pages.zevSettings.unsavedChanges')
+        // The bar names where the edits are, and the tab that holds them carries a marker.
+        expect(saveBar(container)!.textContent).toContain('pages.zevSettings.unsavedIn')
+        expect(findTab(container, 'general').querySelector('.app-tabs-dot')).not.toBeNull()
+        expect(findTab(container, 'billingPayment').querySelector('.app-tabs-dot')).toBeNull()
         expect(hasUnsavedZevSettingsDraft()).toBe(true)
         expect(saveButton(container)).toBeDefined()
         // Typing the value back reads as clean again — no manual flag.
@@ -533,7 +536,10 @@ describe('ZEV settings routed form', () => {
     it('locks every control for disabled-ZEV owners but not for admins', async () => {
         state.zev = fixtureZev({ disabled_at: '2026-01-01T00:00:00Z' })
         const { container } = await renderAt('/zev-settings/general')
-        expect(container.querySelector('.warning-banner')?.getAttribute('role')).toBe('status')
+        // The notice is a shared `Notice`, not a banner with inline styles.
+        const banner = container.querySelector('.warning-banner')!
+        expect(banner.getAttribute('role')).toBe('status')
+        expect(banner.hasAttribute('style')).toBe(false)
         expect(generalInput(container)?.disabled).toBe(true)
         expect(saveButton(container)).toBeUndefined()
         await clickTab(container, 'documentsEmails')
@@ -718,14 +724,14 @@ describe('ZEV settings routed form', () => {
             .toContain('pages.zevSettings.unsavedGuardLeaveMessage')
         await act(async () => {
             Array.from(container.querySelectorAll<HTMLButtonElement>('[role="dialog"] button'))
-                .find((button) => button.textContent === 'common.cancel')!.click()
+                .find((button) => button.textContent === 'common.unsavedChanges.keepEditing')!.click()
         })
         expect(generalInput(container)?.value).toBe('Unsaved name')
         expect(router.state.location.pathname).toBe('/zev-settings/general')
         await act(async () => { void router.navigate('/participants') })
         await act(async () => {
             Array.from(container.querySelectorAll<HTMLButtonElement>('[role="dialog"] button'))
-                .find((button) => button.textContent === 'pages.zevSettings.leaveWithoutSaving')!.click()
+                .find((button) => button.textContent === 'common.unsavedChanges.discard')!.click()
         })
         await waitForCondition(() => router.state.location.pathname === '/participants', 'navigation after confirmation')
     })

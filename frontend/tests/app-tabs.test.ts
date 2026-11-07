@@ -81,4 +81,29 @@ describe('AppTabs', () => {
         render({ ref })
         expect(ref.current).toBe(container.querySelector('.app-tabs'))
     })
+
+    it('keeps the active tab in view, also when a tab is added after the first render', async () => {
+        const scrolled: string[] = []
+        const original = HTMLElement.prototype.scrollIntoView
+        HTMLElement.prototype.scrollIntoView = function scrollIntoView(this: HTMLElement) { scrolled.push(this.textContent ?? '') }
+        try {
+            const view = (extra: boolean) => createElement(MantineProvider, null,
+                createElement(AppTabs, { value: 'b' },
+                    createElement(AppTabs.List, { 'aria-label': 'Views' },
+                        createElement(AppTabs.Tab, { value: 'a' }, 'A'),
+                        extra ? createElement(AppTabs.Tab, { value: 'x' }, 'X') : null,
+                        createElement(AppTabs.Tab, { value: 'b' }, 'B'),
+                    ),
+                    createElement(AppTabs.Panel, { value: 'b' }, 'panel b'),
+                ))
+            act(() => root.render(view(false)))
+            expect(scrolled).toEqual(['B'])
+            // A tab appearing shifts the strip; the active one is revealed again.
+            await act(async () => { root.render(view(true)); await new Promise((resolve) => setTimeout(resolve, 0)) })
+            expect(scrolled.length).toBeGreaterThan(1)
+            expect(scrolled.every((label) => label === 'B')).toBe(true)
+        } finally {
+            HTMLElement.prototype.scrollIntoView = original
+        }
+    })
 })

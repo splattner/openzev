@@ -58,7 +58,6 @@ export function ZevGeneralSettingsFields({ form, onChange, group, zevId, readOnl
             {/* General ZEV Settings (identity) */}
             {(!group || group === 'general') && (
             <div className="form-section">
-                <p className="form-section-header">{t('pages.zevSettings.sections.general')}</p>
                 <div className="inline-form grid grid-2">
                     <label data-zev-field="name">
                         <span>{t('pages.zevSettings.fields.name')}</span>
@@ -104,7 +103,6 @@ export function ZevGeneralSettingsFields({ form, onChange, group, zevId, readOnl
             {/* Billing & payment */}
             {(!group || group === 'billing') && (
             <div className="form-section">
-                <p className="form-section-header">{t('pages.zevSettings.sections.billingPayment')}</p>
                 <div className="inline-form grid grid-2">
                     <label data-zev-field="billing_interval">
                         <span>{t('pages.zevSettings.fields.billingInterval')}</span>

@@ -2,10 +2,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faBan, faDownload, faPlay, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons'
+import { faBan, faDownload, faPlay } from '@fortawesome/free-solid-svg-icons'
 import { AppTabs } from '../components/AppTabs'
 import { useBlocker, useParams } from 'react-router-dom'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
+import { Notice } from '../components/Notice'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { ZevEmailTemplateFields } from '../components/ZevEmailTemplateFields'
 import { ZevGeneralSettingsFields } from '../components/ZevGeneralSettingsFields'
@@ -20,6 +21,7 @@ import { useCommunityAccess, useScopeNote } from '../lib/communityAccess'
 import { ZevPeopleSection } from '../features/zev/ZevPeopleSection'
 import {
     ZEV_FIELD_TABS,
+    dirtyZevTabs,
     focusZevField,
     getDefaultZevForm,
     isZevFormDirty,
@@ -46,6 +48,15 @@ import { useEnergyDataEligibility } from '../lib/supplementary'
  */
 
 const TABS: ZevSettingsTab[] = ['general', 'people', 'billing', 'documents', 'energy', 'audit', 'export']
+const TAB_LABEL_KEYS: Record<ZevSettingsTab, string> = {
+    general: 'pages.zevSettings.tabs.general',
+    people: 'pages.zevSettings.tabs.people',
+    billing: 'pages.zevSettings.tabs.billingPayment',
+    documents: 'pages.zevSettings.tabs.documentsEmails',
+    energy: 'pages.zevSettings.tabs.energyData',
+    audit: 'pages.zevSettings.tabs.auditLog',
+    export: 'pages.zevSettings.tabs.exportTransfer',
+}
 // Tabs merged into People & access (#761); old links keep working.
 const MERGED_INTO_PEOPLE = new Set(['parties', 'access'])
 // Tabs that save on their own: the sticky bar saves the draft without submitting a form there.
@@ -69,6 +80,17 @@ function focusDraftField(field: string) {
     if (field === 'grid_operator_elcom_id') {
         focusZevField('grid_operator')
     }
+}
+
+/** A dot on a tab whose fields have unsaved edits; the words are for screen readers. */
+function UnsavedMarker() {
+    const { t } = useTranslation()
+    return (
+        <>
+            <span className="app-tabs-dot" aria-hidden="true" />
+            <span className="visually-hidden"> ({t('pages.zevSettings.unsavedChanges')})</span>
+        </>
+    )
 }
 
 /** /zev-settings/:tab — renders the hub with the routed tab (404s unknown). */
@@ -128,6 +150,8 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
 
     const draftIsSelected = draft.zevId === selectedZevId && selectedZev?.id === selectedZevId
     const isDirty = draftIsSelected && isZevFormDirty(draft.form, draft.baseline)
+    // Where the unsaved edits are: the draft is shared, so the bar and the tabs say which tabs hold them.
+    const dirtyTabs = draftIsSelected ? dirtyZevTabs(draft.form, draft.baseline) : []
     const leaveBlocker = useBlocker(({ nextLocation }) =>
         isDirty && !/^\/zev-settings(?:\/|$)/.test(nextLocation.pathname),
     )
@@ -347,11 +371,21 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
     ) : (
         <div className="page-stack zev-settings-page">
             {isDisabled && (
-                <div className="warning-banner" role="status" style={{ display: 'grid', gap: '0.35rem', maxWidth: '1000px' }}>
-                    <strong>
-                        <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth style={{ marginRight: '0.4rem' }} />
-                        {t('pages.zevSettings.lifecycle.bannerTitle')}
-                    </strong>
+                <Notice
+                    tone="warning"
+                    actions={isAdmin ? (
+                        <button
+                            className="button button-secondary button-compact"
+                            type="button"
+                            disabled={enableMutation.isPending}
+                            onClick={() => enableMutation.mutate()}
+                        >
+                            <FontAwesomeIcon icon={faPlay} fixedWidth />
+                            {t('pages.zevSettings.lifecycle.enableAction')}
+                        </button>
+                    ) : undefined}
+                >
+                    <strong>{t('pages.zevSettings.lifecycle.bannerTitle')}</strong>
                     <p className="m-0">
                         {t('pages.zevSettings.lifecycle.bannerBody', {
                             date: selectedZev?.disabled_at ? formatShortDate(selectedZev.disabled_at, settings) : '',
@@ -360,20 +394,7 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                         {' '}
                         {isAdmin ? t('pages.zevSettings.lifecycle.bannerAdminHint') : t('pages.zevSettings.lifecycle.bannerReadOnly')}
                     </p>
-                    {isAdmin && (
-                        <div className="actions-row" style={{ marginTop: '0.15rem' }}>
-                            <button
-                                className="button button-secondary button-compact"
-                                type="button"
-                                disabled={enableMutation.isPending}
-                                onClick={() => enableMutation.mutate()}
-                            >
-                                <FontAwesomeIcon icon={faPlay} fixedWidth />
-                                {t('pages.zevSettings.lifecycle.enableAction')}
-                            </button>
-                        </div>
-                    )}
-                </div>
+                </Notice>
             )}
 
             <AppTabs
@@ -382,10 +403,10 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                 onChange={handleTabChange}
             >
                 <AppTabs.List aria-label={t('pages.zevSettings.title')}>
-                    <AppTabs.Tab value="general">{t('pages.zevSettings.tabs.general')}</AppTabs.Tab>
+                    <AppTabs.Tab value="general">{t('pages.zevSettings.tabs.general')}{dirtyTabs.includes('general') && <UnsavedMarker />}</AppTabs.Tab>
                     <AppTabs.Tab value="people">{t('pages.zevSettings.tabs.people')}</AppTabs.Tab>
-                    <AppTabs.Tab value="billing">{t('pages.zevSettings.tabs.billingPayment')}</AppTabs.Tab>
-                    <AppTabs.Tab value="documents">{t('pages.zevSettings.tabs.documentsEmails')}</AppTabs.Tab>
+                    <AppTabs.Tab value="billing">{t('pages.zevSettings.tabs.billingPayment')}{dirtyTabs.includes('billing') && <UnsavedMarker />}</AppTabs.Tab>
+                    <AppTabs.Tab value="documents">{t('pages.zevSettings.tabs.documentsEmails')}{dirtyTabs.includes('documents') && <UnsavedMarker />}</AppTabs.Tab>
                     {/* Only while the energy data feature is on (or the link names the tab). */}
                     {(energyData.featureOn || tab === 'energy') && <AppTabs.Tab value="energy">{t('pages.zevSettings.tabs.energyData')}</AppTabs.Tab>}
                     <AppTabs.Tab value="audit">{t('pages.zevSettings.tabs.auditLog')}</AppTabs.Tab>
@@ -525,7 +546,9 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                     <span className="zev-settings-save-bar-text" role="status">
                         {isPending
                             ? t('pages.zevSettings.saving')
-                            : t('pages.zevSettings.unsavedChanges')}
+                            : dirtyTabs.length > 0
+                                ? t('pages.zevSettings.unsavedIn', { tabs: dirtyTabs.map((name) => t(TAB_LABEL_KEYS[name])).join(', ') })
+                                : t('pages.zevSettings.unsavedChanges')}
                     </span>
                     <div className="actions-row actions-row-wrap">
                         <button
@@ -561,9 +584,11 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
 
             {leaveBlocker.state === 'blocked' && (
                 <ConfirmDialog
-                    title={t('pages.zevSettings.unsavedGuardTitle')}
+                    title={t('common.unsavedChanges.title')}
                     message={t('pages.zevSettings.unsavedGuardLeaveMessage')}
-                    confirmText={t('pages.zevSettings.leaveWithoutSaving')}
+                    confirmText={t('common.unsavedChanges.discard')}
+                    cancelText={t('common.unsavedChanges.keepEditing')}
+                    isDangerous
                     onConfirm={() => leaveBlocker.proceed()}
                     onCancel={() => leaveBlocker.reset()}
                 />
@@ -585,6 +610,7 @@ function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                 communitySwitch
                 scopeNote={scopeNote}
                 title={t('pages.zevSettings.title')}
+                documentTitle={`${t(TAB_LABEL_KEYS[tab])} · ${t('pages.zevSettings.title')}`}
                 description={t('pages.zevSettings.description')}
             />
             <ScopeGuard skeleton="card">{content}</ScopeGuard>

@@ -84,7 +84,7 @@ including their placeholders.
 Subject and body can be customized independently. **Customize** starts from the
 platform text; **Use platform default** stages a reset of that field. The badge
 shows its saved source, while **Unsaved changes** marks a staged edit. Click
-**Save changes** to apply it. Later platform edits reach inherited fields; a
+**Save** to apply it. Later platform edits reach inherited fields; a
 saved ZEV override takes precedence even when its text matches the platform text.
 You can clear the editor and type replacement text without reopening it.
 **Discard changes** restores the saved text or inherited preview.

@@ -101,3 +101,15 @@ select:where(:not([multiple]):not([class*='mantine-'])) {
 label :is(input, select, textarea) {
   font-weight: 400;
 }
+
+/* A role that cannot change the settings reads them: the same flat, legible field everywhere, whether the
+   control is native or Mantine's (whose disabled state is faint and grey). */
+.zev-general-settings-fields :is(input, select, textarea, .mantine-Input-input):disabled,
+.zev-email-field :is(input, select, textarea, .mantine-Input-input):disabled {
+  border-color: var(--border-default);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  -webkit-text-fill-color: currentColor;
+  opacity: 1;
+  cursor: default;
+}

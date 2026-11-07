@@ -79,4 +79,12 @@ describe('document title', () => {
         mounted.splice(0).forEach((unmount) => unmount())
         expect(document.title).toBe('Sign in – OpenZEV')
     })
+
+    it('can say more than the heading, so a tab of a hub names itself', async () => {
+        await render(createElement(PageHeader, {
+            eyebrow: 'Muster ZEV', title: 'Settings', documentTitle: 'Billing & payment · Settings',
+        }))
+        expect(document.title).toBe('Billing & payment · Settings · Muster ZEV – OpenZEV')
+        expect(document.querySelector('h1')?.textContent).toBe('Settings')
+    })
 })
