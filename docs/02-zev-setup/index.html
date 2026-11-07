@@ -2326,8 +2326,9 @@ always name whoever held a role on their own date:</p>
 </tbody>
 </table>
 <ul>
-<li><strong>Change from…</strong> on the issuer or the representative picks a party and a
-  date. The current holder ends the day before. Invoices for earlier periods
+<li><strong>Change issuer</strong> and <strong>Change representative</strong> (<strong>Set issuer</strong> / <strong>Set
+  representative</strong> while nobody holds the role) open a form that picks a party
+  and a date. The current holder ends the day before. Invoices for earlier periods
   keep naming the earlier issuer, and an invoice that is already approved never
   changes.</li>
 <li><strong>The issuer and the representative manage the community.</strong> While a party
@@ -2345,7 +2346,8 @@ always name whoever held a role on their own date:</p>
   so until one is set.</li>
 <li><strong>Add landowner</strong> adds a party from a date, optionally with the building it
   owns; <strong>Set building</strong> / <strong>Change building</strong> on a landowner's row links or
-  re-links it, and <strong>End</strong> sets a landowner's last day. A party that owns two
+  re-links it (choose the building, then <strong>Save</strong>), and <strong>End</strong> (in the row's <strong>⋯</strong>
+  menu) asks for the landowner's last day and a confirmation. A party that owns two
   buildings has two landowner rows. Ending a role before it started removes
   it.</li>
 <li>Whoever a ZEV is created for — through self-registration or the admin
@@ -2356,17 +2358,19 @@ always name whoever held a role on their own date:</p>
 <h4 id="access-on-each-row">Access on each row<a class="headerlink" href="#access-on-each-row" title="Permanent link">&para;</a></h4>
 <p>Every person on the tab shows its access to OpenZEV on its own row:</p>
 <ul>
-<li><strong>Issuer and representative</strong> — <strong>Manages in OpenZEV</strong> with the login, for
-  as long as the role lasts; that access changes with the role. A holder
+<li><strong>Issuer and representative</strong> — the login that manages, for as long as the
+  role lasts; that access changes with the role. A holder
   without a login says so, and <strong>Invite</strong> sends it an invitation to set one up
   (as manager).</li>
-<li><strong>Landowners and other people</strong> — <strong>Manage</strong> or <strong>Read only</strong> with the
-  login, or <strong>No access to OpenZEV</strong>. Without access, choose <strong>Manage</strong> or
-  <strong>Read only</strong> and press <strong>Give access</strong> (or <strong>Invite</strong>, when the person has
-  no login yet — the invitation goes to the email address on the person).
-  With access: <strong>Make manager</strong> / <strong>Make viewer</strong> (making a manager a viewer
-  asks for confirmation), <strong>Resend invitation</strong> for an invitation that has not
-  been accepted, and <strong>Remove access</strong>, after a confirmation.</li>
+<li><strong>Landowners and other people</strong> — <strong>Manages in OpenZEV</strong> (through a role),
+  <strong>Manage</strong> or <strong>Read only</strong> with the login, or <strong>No access to OpenZEV</strong>.
+  Without access, press <strong>Give access</strong> (or <strong>Invite</strong>, when the person has no
+  login yet — the invitation goes to the email address on the person): a form
+  opens under the person and asks for the level (<strong>Manage</strong> or <strong>Read only</strong>)
+  and, optionally, an end date. With access, the <strong>⋯</strong> menu on the row has
+  <strong>Make manager</strong> / <strong>Make viewer</strong> (making a manager a viewer asks for
+  confirmation), <strong>Resend invitation</strong> for an invitation that has not been
+  accepted, and <strong>Remove access</strong>, after a confirmation.</li>
 </ul>
 <p><strong>Invitation pending</strong> marks a login that has not been set up yet. A ZEV
 always keeps at least one manager — by access or through a role. Removing the
@@ -2380,8 +2384,8 @@ is recorded in the ZEV's audit log.</p>
 property management company that represents the community — and everyone else
 who has access: a participant given read-only access, or a login added by email
 (a bookkeeper). <strong>Add contact</strong> creates a contact (a person, or an organisation
-with a contact person); a contact that holds no role and has no access can be
-deleted. In a role's party picker, <strong>New contact…</strong> creates one on the spot.</p>
+with a contact person); the pencil on a contact's row edits it, and a contact that holds no role
+and has no access can be deleted from the row's <strong>⋯</strong> menu. In a role's party picker, <strong>New contact…</strong> creates one on the spot.</p>
 <p><strong>Give access</strong> in the header adds someone who is not listed yet: pick a
 <strong>party of the community</strong> or enter an <strong>email address</strong>, choose <strong>Manage</strong> or
 <strong>Read only</strong> and, if the access should end, a last day. Someone with an
