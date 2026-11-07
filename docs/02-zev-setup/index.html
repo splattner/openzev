@@ -796,10 +796,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#billing--payment" class="md-nav__link">
+  <a href="#invoices" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Billing &amp; Payment
+        Invoices
       
     </span>
   </a>
@@ -807,10 +807,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#payment-details" class="md-nav__link">
+  <a href="#payment-recipient" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Payment Details
+        Payment recipient
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vat-and-rounding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VAT and rounding
       
     </span>
   </a>
@@ -1936,10 +1947,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#billing--payment" class="md-nav__link">
+  <a href="#invoices" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Billing &amp; Payment
+        Invoices
       
     </span>
   </a>
@@ -1947,10 +1958,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#payment-details" class="md-nav__link">
+  <a href="#payment-recipient" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Payment Details
+        Payment recipient
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vat-and-rounding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VAT and rounding
       
     </span>
   </a>
@@ -2398,7 +2420,8 @@ gets an invitation email to set up their account — a party at its own email
 address, after which the new login belongs to that party.</p>
 <h3 id="billing--payment-tab">Billing &amp; payment tab<a class="headerlink" href="#billing--payment-tab" title="Permanent link">&para;</a></h3>
 <p><img alt="Billing and payment settings" src="../screenshots/06b-zev-billing-settings.png" /></p>
-<h4 id="billing--payment">Billing &amp; Payment<a class="headerlink" href="#billing--payment" title="Permanent link">&para;</a></h4>
+<p>The tab has three sections.</p>
+<h4 id="invoices">Invoices<a class="headerlink" href="#invoices" title="Permanent link">&para;</a></h4>
 <table>
 <thead>
 <tr>
@@ -2424,6 +2447,16 @@ address, after which the new login belongs to that party.</p>
 <td>Yes</td>
 </tr>
 <tr>
+<td><strong>Invoice-number prefix</strong></td>
+<td>Prefix for invoice numbers (default: <code>INV</code>); 1–10 uppercase letters, digits or hyphens</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Credit-note-number prefix</strong></td>
+<td>Prefix for credit-note numbers</td>
+<td>No</td>
+</tr>
+<tr>
 <td><strong>Itemise price bands on the invoice</strong></td>
 <td>Show each price band of a multi-band tariff as its own line (see <a href="#price-bands-on-the-invoice">below</a>)</td>
 <td>No</td>
@@ -2435,7 +2468,7 @@ address, after which the new login belongs to that party.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="payment-details">Payment Details<a class="headerlink" href="#payment-details" title="Permanent link">&para;</a></h4>
+<h4 id="payment-recipient">Payment recipient<a class="headerlink" href="#payment-recipient" title="Permanent link">&para;</a></h4>
 <table>
 <thead>
 <tr>
@@ -2446,20 +2479,29 @@ address, after which the new login belongs to that party.</p>
 </thead>
 <tbody>
 <tr>
-<td><strong>Invoice prefix</strong></td>
-<td>Prefix for invoice numbers (default: <code>INV</code>); 1–10 uppercase letters, digits or hyphens</td>
-<td>No</td>
-</tr>
-<tr>
 <td><strong>Bank name</strong></td>
-<td>Internal reference for the payment account</td>
+<td>Internal reference for the payment account (never printed)</td>
 <td>No</td>
 </tr>
 <tr>
 <td><strong>Bank IBAN</strong></td>
-<td>Account participants pay into; without it invoices carry no payment details or QR payment slip</td>
+<td>Account participants pay into; without it invoices carry no payment details or QR payment slip. An invalid IBAN is flagged next to the field and keeps you from saving</td>
 <td>No</td>
 </tr>
+</tbody>
+</table>
+<p>The QR-Rechnung creditor address is the address of the invoice issuer, taken
+from their record on the People &amp; access tab; the section links there.</p>
+<h4 id="vat-and-rounding">VAT and rounding<a class="headerlink" href="#vat-and-rounding" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Purpose</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
 <tr>
 <td><strong>VAT treatment</strong></td>
 <td>How VAT is applied when billing participants (see <a href="#vat-configuration">below</a>)</td>
@@ -2477,8 +2519,6 @@ address, after which the new login belongs to that party.</p>
 </tr>
 </tbody>
 </table>
-<p>The QR-Rechnung creditor address is the address of the ZEV's responsible
-person, taken from their participant record.</p>
 <h4 id="document-numbering">Document numbering<a class="headerlink" href="#document-numbering" title="Permanent link">&para;</a></h4>
 <p>Invoice and participation-contract numbers are assigned automatically. Their
 counters cannot be reset through settings or the standard API.</p>
