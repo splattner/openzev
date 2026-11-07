@@ -27,7 +27,7 @@ added later, but today an import is a copy.
 ## Exporting
 
 1. Open **Setup → Settings → Export / transfer** for the community.
-2. Scroll to **Export ZEV** and click **Export ZEV**.
+2. In the **Transfer archive** card, click **Export ZEV**.
 3. Pick the sections you want. The **structure sections are pre-ticked** — ZEV
    settings, participants, metering points and tariffs — and readings,
    invoices, invoice PDFs and participant documents start unticked, because they are the bulk of the
@@ -35,8 +35,17 @@ added later, but today an import is a copy.
 4. Click **Download archive**.
 
 The Export panel names the selected community. Tab switches keep any unsaved
-settings draft; Save remains available across the tabs. Viewers can export,
-including a disabled community.
+settings draft; Save remains available across the tabs. Viewers can export on
+purpose — a read-only role such as a trustee may keep a copy of the data — and so
+can anyone for a disabled community. Importing an archive is done by an
+administrator in the platform's ZEV list; the card says so, and gives
+administrators a link there.
+
+Below the archive, the same tab holds **Deactivate** for the community. A
+deactivated community loses participant access and can only be viewed by its
+managers; no data is deleted, and **only an administrator can reactivate it** —
+the card and the confirmation both say so. Download a transfer archive first if
+you may need the data outside this instance.
 
 You get a file named `openzev-export-<community>-<date>.zip`.
 

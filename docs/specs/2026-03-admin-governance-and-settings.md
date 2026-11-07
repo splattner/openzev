@@ -632,9 +632,11 @@ Every validated control carries a `data-zev-field` anchor for focus jumps.
 - **Audit log** (`audit`): embedded `AuditLogsPage scope="owner"`, locked to
   the selected ZEV with a community description;
   no platform-wide log or free-text search.
-- **Export / transfer** (`export`): opens `ZevExportModal` for the selected
-  ZEV. Eligibility and draft retention are described in
-  `2026-08-zev-transfer-archive.md` §9. Import is on the platform ZEVs tab.
+- **Export / transfer** (`export`): a "Transfer archive" card that opens `ZevExportModal` for the
+  selected ZEV, and a card that deactivates the ZEV (quiet destructive action, `ConfirmDialog`; only an
+  admin can reactivate, which the card and the confirmation say with one composed sentence).
+  Eligibility and draft retention are described in `2026-08-zev-transfer-archive.md` §9. Import is on
+  the platform ZEVs tab (the card links admins there).
 
 **Cross-tab validation:** `attemptSave` runs `validateZevForm` over the whole
 draft first (required name/start date, IBAN checksum, required payment term 1–365
