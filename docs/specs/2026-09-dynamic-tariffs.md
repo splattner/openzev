@@ -696,6 +696,8 @@ Only admins see the maintenance link to `/admin/dynamic-sources?source=<id>`.
 
 `AdminDynamicSourcesPanel` presents source operations and global KPIs,
 uses the shared responsive stat grid and labels reuse counts as platform-wide.
+The Platform usage (`reuse`) column sorts by `linked_tariff_count + linked_zev_count`, descending
+first, with equal totals tied (`frontend/tests/dynamic-sources.test.ts`).
 The optional `source` query filters the table, survives reload, and has a
 Show all sources control that removes only `source`, preserving query/hash.
 Unknown IDs show “Source not found.” Initial loading/failure uses

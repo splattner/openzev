@@ -193,6 +193,8 @@ export function AdminDynamicSourcesPanel() {
     },
     {
       id: 'reuse',
+      // Sort by total tariff and community links.
+      accessorFn: (source) => source.linked_tariff_count + source.linked_zev_count,
       header: t('pages.dynamicSources.columns.reuse'),
       cell: ({ row }) => t('pages.dynamicSources.reuseSummary', {
         tariffs: row.original.linked_tariff_count,

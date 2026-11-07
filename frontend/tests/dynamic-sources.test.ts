@@ -1,5 +1,12 @@
 import MockAdapter from 'axios-mock-adapter'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, createElement } from 'react'
+import { createRoot } from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MantineProvider } from '@mantine/core'
+import { MemoryRouter } from 'react-router-dom'
+import { AdminDynamicSourcesPanel } from '../src/pages/AdminDynamicSourcesPanel'
+import { queryKeys } from '../src/lib/api/queryKeys'
 import { api } from '../src/lib/api/client'
 import {
   clearDynamicSourcePrices,
@@ -12,6 +19,13 @@ import {
 } from '../src/lib/api/tariffs'
 import { dynamicSourceOptions, impliedEnergyType } from '../src/features/tariffs/dynamicSources'
 import type { DynamicTariffSource } from '../src/types/api'
+
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
+vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast: vi.fn() }) }))
+vi.mock('../src/lib/appSettings', async importOriginal => ({
+  ...await importOriginal<typeof import('../src/lib/appSettings')>(),
+  useAppSettings: () => ({ settings: {} }),
+}))
 
 /**
  * The tariff form's "dynamic price source" picker: which energy type a
@@ -80,6 +94,33 @@ describe('dynamicSourceOptions', () => {
     expect(dynamicSourceOptions([grid, feedIn], null)).toEqual([grid, feedIn])
     expect(dynamicSourceOptions([grid, feedIn], undefined)).toEqual([grid, feedIn])
   })
+})
+
+it('sorts source reuse by total links and keeps equal totals tied', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } })
+  client.setQueryData(queryKeys.tariffs.dynamicSources(), [
+    source({ id: 'tariffs', label: 'Tariffs', linked_tariff_count: 3, linked_zev_count: 0 }),
+    source({ id: 'zevs', label: 'Communities', linked_tariff_count: 0, linked_zev_count: 3 }),
+    source({ id: 'both', label: 'Both', linked_tariff_count: 2, linked_zev_count: 2 }),
+  ])
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  try {
+    await act(async () => root.render(createElement(MemoryRouter, {},
+      createElement(MantineProvider, {}, createElement(QueryClientProvider, { client }, createElement(AdminDynamicSourcesPanel))))))
+    const button = Array.from(container.querySelectorAll<HTMLButtonElement>('th button'))
+      .find(button => button.textContent === 'pages.dynamicSources.columns.reuse')!
+    const labels = () => Array.from(container.querySelectorAll('tbody tr')).map(row => row.querySelector('strong')?.textContent)
+    await act(async () => button.click())
+    expect(labels()).toEqual(['Both', 'Tariffs', 'Communities'])
+    await act(async () => button.click())
+    expect(labels()).toEqual(['Tariffs', 'Communities', 'Both'])
+  } finally {
+    act(() => root.unmount())
+    container.remove()
+    client.clear()
+  }
 })
 
 describe('fetchDynamicTariffSources', () => {
