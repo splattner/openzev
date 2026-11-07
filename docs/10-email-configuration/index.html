@@ -2076,7 +2076,7 @@ including their placeholders.</p>
 <tr>
 <td><strong>Subject</strong></td>
 <td>Email subject line</td>
-<td><code>Invoice {invoice_number} – {zev_name}</code></td>
+<td><code>Rechnung {invoice_number} – {zev_name}</code> (in the community's invoice language, see below)</td>
 </tr>
 <tr>
 <td><strong>Body</strong></td>
@@ -2087,8 +2087,8 @@ including their placeholders.</p>
 </table>
 <p>Subject and body can be customized independently. <strong>Customize</strong> starts from the
 platform text; <strong>Use platform default</strong> stages a reset of that field. The badge
-shows its saved source, while <strong>Unsaved changes</strong> marks a staged edit. Click
-<strong>Save</strong> to apply it. Later platform edits reach inherited fields; a
+shows its saved source; what saving will do is stated under the field, and the
+save bar marks the unsaved edit. Click <strong>Save</strong> to apply it. Later platform edits reach inherited fields; a
 saved ZEV override takes precedence even when its text matches the platform text.
 You can clear the editor and type replacement text without reopening it.
 <strong>Discard changes</strong> restores the saved text or inherited preview.</p>
@@ -2151,6 +2151,11 @@ You can clear the editor and type replacement text without reopening it.
 </tbody>
 </table>
 <h3 id="default-template">Default Template<a class="headerlink" href="#default-template" title="Permanent link">&para;</a></h3>
+<p>The shipped text follows the community's <strong>invoice language</strong> (Billing &amp;
+payment tab): German, French, Italian or English. <strong>Use platform default</strong>
+shows it in that language. A text you or the platform administrator saved is
+used as written for every language, so it opts out of translation. The English
+text is shown below.</p>
 <p><strong>Subject:</strong>
 <div class="highlight"><pre><span></span><code>Invoice {invoice_number} – {zev_name}
 </code></pre></div></p>
