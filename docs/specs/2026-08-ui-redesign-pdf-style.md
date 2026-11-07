@@ -1143,12 +1143,13 @@ contracts are unchanged.
   `--text-body`), so a row shows one coloured pill — its state — among quiet
   tags. The tariff list and pane header set their attributes as a muted
   text line instead (see the tariff list above). Tariff validity `scheduled` is info (the blue of
-  "upcoming" elsewhere); an inactive metering point is neutral, not danger. `.badge-brand` (brand-pale, brand-glow border, brand-mid text) is the
-  invoice document's pill; `invoiceStatusBadgeClass('approved')` uses it, so
-  "approved" looks the same in the app and on the PDF. The invoice detail page
-  renders the same `InvoiceStatusBadge` as the tables, so the former
-  per-status classes (`.badge-draft`, `.badge-approved`, `.badge-sent`,
-  `.badge-paid`, `.badge-cancelled`) are gone.
+  "upcoming" elsewhere); an inactive metering point is neutral, not danger. Invoice staff tables use one quiet neutral
+  tag (`INVOICE_STATUS_BADGE_CLASS`) for workflow states. Detail headers use
+  `InvoiceStatusBadge variant="plain"` text (draft/sent/paid in dark gold,
+  approved in green, cancelled in red), except partly paid (blue pill);
+  cancelled labels also use red text in staff tables. Participants see their payment
+  state instead. Issued PDFs do not print a workflow status pill.
+
 - Dialogs (`FormModal`): `--radius-xl`, `--shadow-overlay`, forest scrim;
   the header is sticky and closes with the documents' rule.
 - Charts: Recharts legend text in `--text-body` beside the swatch (the PDF
@@ -1156,7 +1157,7 @@ contracts are unchanged.
 
 ### 15.4 Pages
 
-- Invoice detail: the status pill joins the recipient and period in the page
+- Invoice detail: the status label (plain text, except the partly-paid pill) joins the recipient and period in the page
   header (`.invoice-detail-meta`, with a visually-hidden "Status:" label);
   below it `.invoice-figures` holds two `.stat-grid` rows of figure tiles —
   Total (accent), Subtotal, VAT; Local, Grid, Feed-in (`aria-label` =

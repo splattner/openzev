@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useEffectEvent, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type FormEvent } from 'react'
+import { Tooltip } from '@mantine/core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
     faEye,
+    faEllipsis,
     faPlus,
     faTrash,
 } from '@fortawesome/free-solid-svg-icons'
@@ -22,11 +24,15 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { invalidateReadingQueries } from '../lib/api/invalidateReadingQueries'
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
 import { businessDayStartMs, nextIsoDate } from '../lib/dates'
+import { billingRangeFromParams } from '../lib/billingPeriod'
 import { useAuth } from '../lib/auth'
 import { useWriteScope } from '../lib/useWriteScope'
 import { useManagedZev } from '../lib/managedZev'
 import { useCommunityAccess, useScopeNote } from '../lib/communityAccess'
+import { usePageNavigation } from '../lib/usePageNavigation'
 import { useTranslation } from 'react-i18next'
+import { useLocation } from 'react-router-dom'
+import { allowNavigation } from '../components/useDraftGuard'
 import { useToast } from '../lib/toast'
 import type { ImportLog, ImportTimestampTimezone } from '../types/api'
 import { PageSkeleton } from '../components/PageSkeleton'
@@ -77,7 +83,7 @@ export function ImportsPage() {
     const scopeNote = useScopeNote()
     const { selectedZev } = useManagedZev()
     return (
-        <div className="page-stack">
+        <div className="page-stack plain-feedback">
             <PageHeader
                 eyebrow={selectedZev?.name}
                 communitySwitch
@@ -96,13 +102,15 @@ export function ImportsContent() {
     const { pushToast } = useToast()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
     const { settings } = useAppSettings()
-    const { selectedZevId, selectedZev } = useManagedZev()
+    const { selectedZevId, selectedZev, isLoading: scopeLoading } = useManagedZev()
     // A viewer sees the import history and its protocols, but imports and
     // deletes nothing (#761). Managers of a disabled ZEV keep read access only.
     const { canWriteSelectedCommunity } = useCommunityAccess()
     const { t } = useTranslation()
     const { user } = useAuth()
     const { scope, isCurrent, assertWritable } = useWriteScope({ selectedZevId, canWrite: canWriteSelectedCommunity, accountId: user?.id }, t('common.error'))
+    const dialogScope = useRef<typeof scope | null>(null)
+    const protocolNavigationBypass = useRef(false)
     const wizardGeneration = useRef(0)
     const cancelConfirmation = useEffectEvent(handleCancel)
 
@@ -135,7 +143,6 @@ export function ImportsContent() {
     const [detection, setDetection] = useState<DetectionState>({ status: 'idle' })
     const detectReqId = useRef(0)
     const detectedFor = useRef<string | null>(null)
-    const [selectedLog, setSelectedLog] = useState<ImportLog | null>(null)
     const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
     const [bulkDeleteMode, setBulkDeleteMode] = useState<'period' | 'all'>('period')
     const [bulkDeleteFrom, setBulkDeleteFrom] = useState('')
@@ -147,6 +154,37 @@ export function ImportsContent() {
         () => (data ?? []).filter((log) => !selectedZevId || log.zev === selectedZevId),
         [data, selectedZevId],
     )
+
+    const { searchParams, updateParams } = usePageNavigation()
+    const requestedImportId = searchParams.get('import')
+    const { hash } = useLocation()
+    // Resolve against all accessible logs, not the selected community.
+    const requestedLog = data?.find((log) => log.id === requestedImportId)
+    const protocolLog = requestedLog ?? null
+    const requestedImportMissing = !!requestedImportId && !!data && !protocolLog && !isFetching
+    const linkedProtocol = !!protocolLog && hash === '#correction-history'
+    const correctionPeriod = billingRangeFromParams(searchParams.get('change_from'), searchParams.get('change_to'))
+
+    function closeProtocol() {
+        allowNavigation(protocolNavigationBypass, () => updateParams((params) => {
+            params.delete('import')
+            params.delete('change_from')
+            params.delete('change_to')
+        }, { clearHash: '#correction-history' }))
+    }
+
+    const openProtocol = useCallback((log: ImportLog) => {
+        const listedLog = { ...log }
+        delete listedLog.reading_changes
+        queryClient.setQueryData<ImportLog[]>(queryKeys.metering.importLogs(), (logs) =>
+            logs?.some((item) => item.id === log.id) ? logs : [...(logs ?? []), listedLog],
+        )
+        allowNavigation(protocolNavigationBypass, () => updateParams((params) => {
+            params.set('import', log.id)
+            params.delete('change_from')
+            params.delete('change_to')
+        }, { clearHash: '#correction-history' }))
+    }, [queryClient, updateParams])
 
     const currentStamp = useMemo<PreviewStamp | null>(() => {
         if (files.length === 0) return null
@@ -227,7 +265,7 @@ export function ImportsContent() {
 
         if (imported.length === 0) {
             // Nothing landed: keep the wizard open so the user can retry.
-            if (firstRejected) setSelectedLog(firstRejected)
+            if (firstRejected) openProtocol(firstRejected)
             const detail = firstRejected
                 ? t('pages.imports.messages.importSdatRejected')
                 : describeUploadError(failed[0]?.error)
@@ -268,7 +306,7 @@ export function ImportsContent() {
             setFiles(failedFiles)
             setPreviews((prev) => prev.filter((_, position) => failedPositions.has(position)))
             setPreviewStamp((prev) => (prev ? { ...prev, files: stampFilesOf(failedFiles) } : prev))
-            if (logToOpen) setSelectedLog(logToOpen)
+            if (logToOpen) openProtocol(logToOpen)
             pushToast(
                 t('pages.imports.messages.importBatchPartial', {
                     done: imported.length,
@@ -283,7 +321,7 @@ export function ImportsContent() {
         }
 
         resetWizard()
-        if (logToOpen) setSelectedLog(logToOpen)
+        if (logToOpen) openProtocol(logToOpen)
         if (outcomes.length > 1) {
             pushToast(
                 t(totals.issues > 0
@@ -358,8 +396,8 @@ export function ImportsContent() {
         onSuccess: (result, variables) => {
             invalidateReadingQueries(queryClient)
             if (!isCurrent(variables.scope)) return
-            if (selectedLog?.id === variables.id) {
-                setSelectedLog(null)
+            if (protocolLog?.id === variables.id) {
+                closeProtocol()
             }
             pushToast(deletionSuccessMessage(result), 'success')
         },
@@ -382,7 +420,7 @@ export function ImportsContent() {
             setBulkDeleteFrom('')
             setBulkDeleteTo('')
             setBulkDeleteArmed(false)
-            setSelectedLog(null)
+            closeProtocol()
             pushToast(deletionSuccessMessage(result), 'success')
         },
         onError: (error, variables) => {
@@ -476,26 +514,29 @@ export function ImportsContent() {
                 header: t('pages.imports.columns.protocol'),
                 enableSorting: false,
                 cell: (ctx) => (
-                    <button type="button" className="button button-secondary button-compact" onClick={() => setSelectedLog(ctx.row.original)}>
-                        <FontAwesomeIcon icon={faEye} fixedWidth />
-                        {t('pages.imports.actions.openProtocol')}
-                    </button>
+                    <Tooltip label={t('pages.imports.actions.openProtocol')} events={{ hover: true, focus: true, touch: false }}>
+                        <button type="button" className="button button-secondary button-compact" aria-label={t('pages.imports.actions.openProtocol')} onClick={() => openProtocol(ctx.row.original)}>
+                            <FontAwesomeIcon icon={faEye} fixedWidth aria-hidden="true" />
+                        </button>
+                    </Tooltip>
                 ),
             },
             {
                 id: 'actions',
                 header: t('pages.imports.columns.actions'),
                 enableSorting: false,
-                cell: (ctx) => (
+                cell: (ctx) => isImportLogDeletable(ctx.row.original) ? (
                     <ActionMenu
                         label={t('pages.imports.actions.rowActions')}
+                        icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
+                        iconOnly
                         items={[
                             {
                                 key: 'delete',
                                 label: t('pages.imports.actions.deleteImport'),
                                 icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
                                 danger: true,
-                                disabled: deleteImportMutation.isPending || dialogLoading || !isImportLogDeletable(ctx.row.original),
+                                disabled: deleteImportMutation.isPending || dialogLoading,
                                 onClick: () => confirm({
                                     title: t('pages.imports.delete.singleTitle'),
                                     message: t('pages.imports.delete.singleMessage', {
@@ -511,12 +552,12 @@ export function ImportsContent() {
                             },
                         ]}
                     />
-                ),
+                ) : null,
             },
         ]
             return canWriteSelectedCommunity ? columns : columns.filter((column) => column.id !== 'actions')
         },
-        [t, settings, confirm, deleteImportMutation, dialogLoading, canWriteSelectedCommunity, scope, isCurrent],
+        [t, settings, confirm, deleteImportMutation, dialogLoading, canWriteSelectedCommunity, scope, isCurrent, openProtocol],
     )
 
     function clearDetection() {
@@ -591,12 +632,14 @@ export function ImportsContent() {
     const resetWriteDialogs = useEffectEvent(() => {
         resetWizard()
         closeBulkDeleteModal()
-        setSelectedLog(null)
+        closeProtocol()
         cancelConfirmation()
     })
     useEffect(() => {
-        resetWriteDialogs()
-    }, [scope])
+        if (scopeLoading) return
+        if (dialogScope.current && dialogScope.current !== scope) resetWriteDialogs()
+        dialogScope.current = scope
+    }, [scope, scopeLoading])
 
     function handleSourceChange(nextSource: 'csv' | 'sdatch') {
         clearDetection()
@@ -879,7 +922,7 @@ export function ImportsContent() {
         return <PageSkeleton variant="table" />
     if (isError)
         return (
-            <div className="page-stack">
+            <div className="page-stack plain-feedback">
                 <Notice tone="error" onRetry={() => void refetchLogs()} isRetrying={isFetching}>
                     {t('pages.imports.loadFailed')}
                     {logsErrorMessage ? ` — ${logsErrorMessage}` : ''}
@@ -888,7 +931,7 @@ export function ImportsContent() {
         )
 
     return (
-        <div className="page-stack">
+        <div className="page-stack plain-feedback">
             {canWriteSelectedCommunity && (
             <section className="card">
                 <div className="card-header">
@@ -943,6 +986,7 @@ export function ImportsContent() {
                 canStartImport={canStartImport}
                 csvConfigValid={csvConfigValid}
                 uploadPending={uploadMutation.isPending}
+                navigationBypassRef={protocolNavigationBypass}
                 onClose={resetWizard}
                 onSourceChange={handleSourceChange}
                 onFileChange={handleFileChange}
@@ -965,6 +1009,10 @@ export function ImportsContent() {
             />
             )}
 
+            {requestedImportMissing && (
+                <p className="warning-banner">{t('pages.imports.requestedImportMissing')}</p>
+            )}
+
             <ImportHistoryTable
                 rows={importLogRows}
                 columns={importLogColumns}
@@ -976,6 +1024,7 @@ export function ImportsContent() {
 
             <BulkDeleteModal
                 open={showBulkDeleteModal}
+                navigationBypassRef={protocolNavigationBypass}
                 mode={bulkDeleteMode}
                 dateFrom={bulkDeleteFrom}
                 dateTo={bulkDeleteTo}
@@ -994,7 +1043,12 @@ export function ImportsContent() {
                 onConfirm={confirmBulkDelete}
             />
 
-            <ImportProtocolModal log={selectedLog} onClose={() => setSelectedLog(null)} />
+            <ImportProtocolModal
+                log={protocolLog}
+                onClose={closeProtocol}
+                focusCorrections={linkedProtocol}
+                correctionPeriod={correctionPeriod ?? undefined}
+            />
 
             {dialog && (
                 <ConfirmDialog {...dialog} isLoading={dialogLoading} onConfirm={handleConfirm} onCancel={handleCancel} />

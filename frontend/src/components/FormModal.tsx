@@ -23,6 +23,8 @@ interface FormModalProps {
      * the draft lives outside the controls.
      */
     dirty?: boolean
+    /** For page-owned navigation that saves or preserves this draft; use allowNavigation. */
+    navigationBypassRef?: RefObject<boolean>
     returnFocusRef?: RefObject<HTMLElement | null>
 }
 
@@ -51,13 +53,14 @@ export function FormModal({ isOpen, ...props }: FormModalProps) {
     return isOpen ? <OpenFormModal {...props} /> : null
 }
 
-function OpenFormModal({ title, children, onClose, size = 'sm', dirty, returnFocusRef }: Omit<FormModalProps, 'isOpen'>) {
+function OpenFormModal({ title, children, onClose, size = 'sm', dirty, navigationBypassRef, returnFocusRef }: Omit<FormModalProps, 'isOpen'>) {
     const { t } = useTranslation()
     const titleId = useId()
     const hasDataRouter = useContext(UNSAFE_DataRouterContext) !== null
     // Only the discard question is ever asked, so no confirm hook (and no toast context) is needed.
     const [discard, setDiscard] = useState<Parameters<Parameters<typeof useDraftConfirm>[0]['confirm']>[0] | null>(null)
-    const bypass = useRef(false)
+    const localBypass = useRef(false)
+    const bypass = navigationBypassRef ?? localBypass
 
     // Escape, scrim and X reach the same guard as Cancel.
     const { dialogRef, depth, isTop } = useDialogBehavior({ onClose: requestClose, returnFocusRef })
@@ -99,7 +102,7 @@ function OpenFormModal({ title, children, onClose, size = 'sm', dirty, returnFoc
                     </div>
                 </div>
             </FormModalGuardContext.Provider>
-            {hasDataRouter && <RouterDraftBlock ask={guard.ask} isActive={guard.isActive} bypass={bypass} />}
+            {hasDataRouter && dirty !== false && <RouterDraftBlock ask={guard.ask} isActive={guard.isActive} bypass={bypass} />}
             {discard && (
                 <ConfirmDialog
                     {...discard}

@@ -1,6 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowLeft, faTrash, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
+import type { RefObject } from 'react'
 import { CivilDateInput } from '../../components/CivilDateInput'
 import { FormModal } from '../../components/FormModal'
 import { formatShortDate, useAppSettings } from '../../lib/appSettings'
@@ -24,6 +25,7 @@ interface BulkDeleteModalProps {
     /** Selected ZEV name; null deletes across all visible ZEVs. */
     zevName: string | null
     onClose: () => void
+    navigationBypassRef?: RefObject<boolean>
     onModeChange: (mode: BulkDeleteMode) => void
     onDateFromChange: (value: string) => void
     onDateToChange: (value: string) => void
@@ -41,8 +43,8 @@ export function BulkDeleteModal(props: BulkDeleteModalProps) {
     const blocked = protectedCount > 0
 
     return (
-        <FormModal isOpen={open} title={t('pages.imports.delete.bulkModalTitle')} onClose={props.onClose}>
-            <div className="page-stack" style={{ gap: '1rem' }}>
+        <FormModal isOpen={open} title={t('pages.imports.delete.bulkModalTitle')} onClose={props.onClose} navigationBypassRef={props.navigationBypassRef}>
+            <div className="page-stack plain-feedback" style={{ gap: '1rem' }}>
                 <p className="muted">{t('pages.imports.delete.overwriteProtected')}</p>
                 {!armed ? (
                     <>

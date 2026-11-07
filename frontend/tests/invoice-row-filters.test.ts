@@ -36,6 +36,9 @@ describe('invoice row filters', () => {
         const corrected = { ...base, invoice: { ...invoice, status: 'paid', needs_data_review: true } }
         expect(invoiceRowCounts([corrected]).issues).toBe(1)
         expect(filterInvoiceRows([corrected], 'issues')).toEqual([corrected])
+        expect(invoiceRowProgress(corrected)?.[0]).toEqual({ step: 'metering', state: 'issue', reason: 'correction' })
+        expect(states(corrected).paid).toBe('done')
+        expect(states({ ...corrected, invoice: { ...corrected.invoice, needs_data_review: false } }).metering).toBe('done')
     })
 
     it('counts exactly the rows each segment and batch action names', () => {

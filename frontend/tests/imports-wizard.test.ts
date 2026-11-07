@@ -1,8 +1,8 @@
 import { waitForCondition } from './helpers/waitForCondition'
-import { act, createElement } from 'react'
+import { act, createElement, useLayoutEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MantineProvider } from '@mantine/core'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ImportPreviewResult } from '../src/types/api'
 
@@ -21,8 +21,13 @@ const refetchLogs = vi.fn()
 const translate = vi.fn((key: string) => key)
 
 vi.mock('@tanstack/react-query', () => ({
-    useQueryClient: () => ({ invalidateQueries }),
-    useQuery: () => ({ data: importLogsData, isLoading: false, isError: !!logsError, error: logsError, refetch: refetchLogs }),
+    useQueryClient: () => ({
+        invalidateQueries,
+        setQueryData: (_key: unknown, update: (logs: typeof importLogsData) => typeof importLogsData) => {
+            importLogsData = update(importLogsData)
+        },
+    }),
+    useQuery: () => ({ data: importLogsData, isLoading: false, isFetching: logsFetching, isError: !!logsError, error: logsError, refetch: refetchLogs }),
     useMutation: (options: any) => {
         mutationOptions.push(options)
         return {
@@ -44,6 +49,8 @@ vi.mock('@tanstack/react-query', () => ({
 let selectedZevId = 'zev-1'
 let importLogsData: any[] = []
 let logsError: unknown = null
+let logsFetching = false
+let scopeLoading = false
 // Exercise date selection without depending on the shared calendar's DOM.
 vi.mock('../src/components/CivilDateInput', () => ({
     CivilDateInput: ({ value, onChange }: { value: string; onChange: (value: string) => void }) =>
@@ -55,6 +62,7 @@ vi.mock('../src/lib/managedZev', () => {
     const context = {
         useManagedZev: () => ({
             selectedZevId,
+            isLoading: scopeLoading,
             selectedZev: selectedZevId ? { id: selectedZevId, name: 'ZEV 1' } : null,
         }),
     }
@@ -76,10 +84,22 @@ import { ImportsPage } from '../src/pages/ImportsPage'
 
 let container: HTMLDivElement
 let root: ReturnType<typeof createRoot>
+let navigate: ReturnType<typeof useNavigate>
+let location: ReturnType<typeof useLocation>
+
+function RouteProbe() {
+    const nextNavigate = useNavigate()
+    const nextLocation = useLocation()
+    useLayoutEffect(() => {
+        navigate = nextNavigate
+        location = nextLocation
+    }, [nextNavigate, nextLocation])
+    return null
+}
 
 function buttons(label: string): HTMLButtonElement[] {
     return Array.from(container.querySelectorAll('button')).filter(
-        (button) => button.textContent === label,
+        (button) => button.textContent === label || button.getAttribute('aria-label') === label,
     ) as HTMLButtonElement[]
 }
 
@@ -133,11 +153,33 @@ function startButton(): HTMLButtonElement {
     return buttons('pages.imports.wizard.startImport')[0]
 }
 
-function renderPage() {
+function logRow(overrides: Record<string, unknown> = {}) {
+    return {
+        id: 'log-7',
+        batch_id: 'batch-7',
+        zev: 'zev-1',
+        zev_name: 'ZEV 1',
+        created_at: '2026-03-10T09:00:00Z',
+        source: 'sdatch',
+        filename: 'delivery.xml',
+        rows_total: 4,
+        rows_imported: 4,
+        rows_overwritten: 0,
+        rows_skipped: 0,
+        errors: [],
+        warnings: [],
+        result_status: 'accepted',
+        ...overrides,
+    }
+}
+
+function renderPage(path = '/') {
     act(() => {
         root.render(
             createElement(MantineProvider, null,
-                createElement(MemoryRouter, null, createElement(ImportsPage))),
+                // A path change remounts the router, so a deep link is not swallowed by
+                // the location the earlier render committed.
+                createElement(MemoryRouter, { initialEntries: [path], key: path }, createElement(RouteProbe), createElement(ImportsPage))),
         )
     })
 }
@@ -162,6 +204,7 @@ function cleanPreview(): ImportPreviewResult {
 }
 
 beforeEach(() => {
+    Element.prototype.scrollIntoView = vi.fn()
     mutateCalls.length = 0
     mutationOptions.length = 0
     detectCalls.length = 0
@@ -172,6 +215,8 @@ beforeEach(() => {
     selectedZevId = 'zev-1'
     importLogsData = []
     logsError = null
+    logsFetching = false
+    scopeLoading = false
     Object.defineProperty(window, 'matchMedia', {
         writable: true,
         configurable: true,
@@ -198,6 +243,146 @@ afterEach(() => {
 })
 
 describe('ImportsPage wizard gating', () => {
+    it('follows same-mounted URL changes after opening a row and closes without reopening it', async () => {
+        importLogsData = [logRow(), logRow({ id: 'log-8', filename: 'another.xml' })]
+        renderPage('/metering/imports?keep=yes')
+        act(() => buttons('pages.imports.actions.openProtocol')[0].click())
+        await act(async () => navigate('/metering/imports?import=log-8&change_from=2026-02-03&change_to=2026-02-04&keep=yes'))
+        expect(container.querySelector('[role="dialog"]')?.textContent).toContain('another.xml')
+        act(() => container.querySelector<HTMLButtonElement>('.form-modal-close')!.click())
+        expect(container.querySelector('[role="dialog"]')).toBeNull()
+        expect(new URLSearchParams(location.search).toString()).toBe('keep=yes')
+    })
+
+    it.each(['#correction-history', '#unrelated'])('clears only its own hash on row open and close: %s', (hash) => {
+        importLogsData = [logRow()]
+        renderPage(`/metering/imports?keep=yes${hash}`)
+        act(() => buttons('pages.imports.actions.openProtocol')[0].click())
+        expect(location.hash).toBe(hash === '#correction-history' ? '' : hash)
+        act(() => container.querySelector<HTMLButtonElement>('.form-modal-close')!.click())
+        expect(location.hash).toBe(hash === '#correction-history' ? '' : hash)
+        expect(location.search).toBe('?keep=yes')
+    })
+
+    it('lets an upload result supersede an incoming link and dismisses it once', async () => {
+        importLogsData = [logRow()]
+        goToStep2()
+        loadPreview()
+        succeedPreview(cleanPreview())
+        act(() => startButton().click())
+        await act(async () => navigate('/metering/imports?import=log-7&change_from=2026-02-03&change_to=2026-02-04&keep=yes'))
+        succeedUpload(logRow({ id: 'new-upload', filename: 'uploaded.xml' }))
+        expect(container.querySelector('[role="dialog"]')?.textContent).toContain('uploaded.xml')
+        expect(new URLSearchParams(location.search).get('import')).toBe('new-upload')
+        act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+        expect(container.querySelector('[role="dialog"]')).toBeNull()
+        expect(new URLSearchParams(location.search).toString()).toBe('keep=yes')
+    })
+
+    it('preserves an incoming link during initial scope loading and closes it on a real scope change', () => {
+        const path = '/metering/imports?import=log-7'
+        importLogsData = [logRow()]
+        scopeLoading = true
+        selectedZevId = ''
+        renderPage(path)
+        scopeLoading = false
+        selectedZevId = 'zev-1'
+        renderPage(path)
+        expect(container.querySelector('[role="dialog"]')).not.toBeNull()
+        selectedZevId = 'zev-2'
+        renderPage(path)
+        expect(container.querySelector('[role="dialog"]')).toBeNull()
+        expect(new URLSearchParams(location.search).has('import')).toBe(false)
+    })
+
+    it('waits for a cached history refresh before declaring an import missing', () => {
+        const path = '/metering/imports?import=log-8'
+        importLogsData = [logRow()]
+        logsFetching = true
+        renderPage(path)
+        expect(container.textContent).not.toContain('pages.imports.requestedImportMissing')
+        importLogsData = [logRow(), logRow({ id: 'log-8' })]
+        logsFetching = false
+        renderPage(path)
+        expect(container.querySelector('[role="dialog"]')).not.toBeNull()
+    })
+
+    it('does not keep a row protocol after a refreshed list removes its import', () => {
+        importLogsData = [logRow()]
+        renderPage()
+        act(() => buttons('pages.imports.actions.openProtocol')[0].click())
+        importLogsData = []
+        renderPage()
+        expect(container.querySelector('[role="dialog"]')).toBeNull()
+        expect(container.textContent).toContain('pages.imports.requestedImportMissing')
+    })
+
+    it('honors an invoice link to the same import that was opened from a row', async () => {
+        importLogsData = [logRow()]
+        renderPage()
+        act(() => buttons('pages.imports.actions.openProtocol')[0].click())
+        await act(async () => navigate('/metering/imports?import=log-7&change_from=2026-02-03&change_to=2026-02-04#correction-history'))
+        expect(container.textContent).toContain('pages.imports.protocol.correctionsPeriod')
+        await vi.waitFor(() => expect(document.activeElement?.id).toBe('correction-history'))
+    })
+
+    it.each(['single', 'bulk'])('clears URL-driven selection after successful %s deletion', async (mode) => {
+        importLogsData = [logRow()]
+        renderPage('/metering/imports?keep=yes')
+        const variables = await startDeletion(mode)
+        await act(async () => navigate('/metering/imports?import=log-7&change_from=2026-02-03&change_to=2026-02-04&keep=yes'))
+        const mutation = mutationOptions.at(mode === 'single' ? -3 : -2)
+        await act(async () => mutation.onSuccess({ deleted_logs: 1, deleted_readings: 4 }, variables))
+        expect(container.querySelector('[role="dialog"]')).toBeNull()
+        expect(new URLSearchParams(location.search).toString()).toBe('keep=yes')
+    })
+
+    it.each([
+        ['junk', '2026-02-04'], ['2026-02-31', '2026-03-04'],
+        ['2026-02-04', '2026-02-03'], ['2026-02-03', ''],
+    ])('omits invalid affected-period context: %s to %s', (from, to) => {
+        importLogsData = [logRow()]
+        renderPage(`/metering/imports?import=log-7&change_from=${from}&change_to=${to}`)
+        expect(container.querySelector('[role="dialog"]')).not.toBeNull()
+        expect(container.textContent).not.toContain('pages.imports.protocol.correctionsPeriod')
+    })
+
+    it('opens the import an invoice review notice links to', async () => {
+        importLogsData = [logRow()]
+        renderPage('/metering/imports?import=log-7&change_from=2026-02-03&change_to=2026-02-04#correction-history')
+
+        await vi.waitFor(() => expect(container.textContent).toContain('pages.imports.protocol.title'))
+        expect(translate).toHaveBeenCalledWith('pages.imports.protocol.correctionsPeriod', {
+            from: '2026-02-03', to: '2026-02-04',
+        })
+        await vi.waitFor(() => expect(document.activeElement?.id).toBe('correction-history'))
+        expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'start' })
+        act(() => container.querySelector<HTMLButtonElement>('.form-modal-close')!.click())
+        expect(container.querySelector('[role="dialog"]')).toBeNull()
+        expect(location.hash).toBe('')
+    })
+
+    it('opens a linked import from another community the caller can read', async () => {
+        // The header filter stays on zev-1; the API history already limits the
+        // rows to communities this account can read, so the link still opens.
+        importLogsData = [logRow(), logRow({ id: 'log-8', zev: 'zev-2' })]
+        renderPage('/metering/imports?import=log-8')
+
+        await vi.waitFor(() => expect(container.textContent).toContain('pages.imports.protocol.title'))
+        expect(container.textContent).not.toContain('pages.imports.requestedImportMissing')
+    })
+
+    it('says so when the linked import is not in the visible history', async () => {
+        importLogsData = [logRow({ id: 'log-other' })]
+        renderPage('/metering/imports?import=log-7')
+
+        await waitForCondition(
+            () => (container.textContent ?? '').includes('pages.imports.requestedImportMissing'),
+            'missing-import notice',
+        )
+        expect(container.textContent).not.toContain('pages.imports.protocol.title')
+    })
+
     it('allows merge re-imports when existing days will be skipped', () => {
         goToStep2()
         loadPreview()
@@ -541,16 +726,16 @@ describe('ImportsPage wizard gating', () => {
         expect(refetchLogs).toHaveBeenCalled()
     })
 
-    it('disables deletion and explains protection for overwritten imports', () => {
+    it('omits dead deletion controls and explains protection for overwritten imports', () => {
         twoLogs()
         importLogsData[0].rows_overwritten = 1
         importLogsData[0].deletable = false
         importLogsData[0].deletion_protection_code = 'overwrite_import_protected'
         renderPage()
         const row = Array.from(container.querySelectorAll('tbody tr')).find((entry) => entry.textContent?.includes('alpha.csv'))!
-        const actions = Array.from(row.querySelectorAll('button')).find((button) => button.textContent === 'pages.imports.actions.rowActions')!
-        expect(actions.disabled).toBe(true)
-        const protocol = Array.from(row.querySelectorAll('button')).find((button) => button.textContent === 'pages.imports.actions.openProtocol')!
+        const actions = row.querySelector('[aria-label="pages.imports.actions.rowActions"]')
+        expect(actions).toBeNull()
+        const protocol = row.querySelector<HTMLButtonElement>('[aria-label="pages.imports.actions.openProtocol"]')!
         act(() => protocol.click())
         expect(container.textContent).toContain('pages.imports.delete.overwriteProtected')
     })
@@ -721,6 +906,25 @@ function setInputValue(input: HTMLInputElement, value: string) {
         setter.call(input, value)
         input.dispatchEvent(new Event('input', { bubbles: true }))
     })
+}
+
+async function startDeletion(mode: string) {
+    if (mode === 'single') {
+        await act(async () => buttons('pages.imports.actions.rowActions')[0].click())
+        await waitForCondition(() => !!document.querySelector('[role=menuitem]'), 'import action menu')
+        const item = Array.from(document.querySelectorAll<HTMLButtonElement>('[role=menuitem]'))
+            .find(button => button.textContent?.includes('pages.imports.actions.deleteImport'))!
+        act(() => item.click())
+        act(() => buttons('pages.imports.delete.confirmAction')[0].click())
+    } else {
+        act(() => buttons('pages.imports.actions.deleteImports')[0].click())
+        const dates = container.querySelectorAll<HTMLInputElement>('input[type=date]')
+        setInputValue(dates[0], '2026-03-01')
+        setInputValue(dates[1], '2026-03-31')
+        act(() => buttons('pages.imports.delete.reviewAction')[0].click())
+        act(() => buttons('pages.imports.delete.confirmAction')[0].click())
+    }
+    return mutateCalls.at(-1)!.vars
 }
 
 function twoLogs() {
@@ -1072,22 +1276,7 @@ describe('import deletion completion ownership', () => {
     it.each(['single', 'bulk'])('keeps B’s protocol and deletion dialog after A’s delayed %s deletion', async mode => {
         twoLogs()
         const mutation = mutationOptions[mode === 'single' ? 2 : 3]
-        if (mode === 'single') {
-            await act(async () => buttons('pages.imports.actions.rowActions')[0].click())
-            await waitForCondition(() => !!document.querySelector('[role=menuitem]'), 'import action menu')
-            const item = Array.from(document.querySelectorAll<HTMLButtonElement>('[role=menuitem]'))
-                .find(button => button.textContent?.includes('pages.imports.actions.deleteImport'))!
-            act(() => item.click())
-            act(() => buttons('pages.imports.delete.confirmAction')[0].click())
-        } else {
-            act(() => buttons('pages.imports.actions.deleteImports')[0].click())
-            const dates = container.querySelectorAll<HTMLInputElement>('input[type=date]')
-            setInputValue(dates[0], '2026-03-01')
-            setInputValue(dates[1], '2026-03-31')
-            act(() => buttons('pages.imports.delete.reviewAction')[0].click())
-            act(() => buttons('pages.imports.delete.confirmAction')[0].click())
-        }
-        const variables = mutateCalls.at(-1)!.vars
+        const variables = await startDeletion(mode)
         selectedZevId = 'zev-2'
         importLogsData = importLogsData.map(log => ({ ...log, id: `B-${log.id}`, zev: 'zev-2', filename: `B-${log.filename}` }))
         renderPage()

@@ -6,10 +6,15 @@ from .models import DynamicTariffSource
 
 def lock_sources(source_ids):
     """Lock in a total order; the caller holds an atomic transaction."""
-    return list(
-        DynamicTariffSource.objects.select_for_update()
-        .filter(pk__in=source_ids).order_by("pk")
-    )
+    return fetch_sources(source_ids, lock=True)
+
+
+def fetch_sources(source_ids, *, lock: bool = True):
+    """Fetch dynamic tariff sources in total order, locking rows only when requested."""
+    qs = DynamicTariffSource.objects.filter(pk__in=source_ids).order_by("pk")
+    if lock:
+        qs = qs.select_for_update()
+    return list(qs)
 
 
 def record_invoice_evidence(invoice, tariffs):

@@ -25,7 +25,7 @@ from metering.testing import upload_csv
 from metering.importers.csv_importer import ImportFileError, import_csv, _upsert_reading
 from testing.sdat import build_block, build_e66, quarter_block
 from testing.helpers import authenticate as auth, make_user, create_managed_zev
-from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant
+from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, ZevAccessGrant, ZevAccessRole
 
 
 class ImportLogDeletionTests(TestCase):
@@ -80,16 +80,45 @@ class ImportLogDeletionTests(TestCase):
         )
         return log
 
-    def test_list_omits_reading_evidence_but_detail_keeps_it(self):
-        log = self._create_import_log_with_reading(zev=self.zev, metering_point=self.metering_point,
-            created_at=datetime(2026, 2, 10, tzinfo=timezone.utc))
-        evidence = [{"kind": "value", "timestamp": "2026-02-10T00:00:00Z"}]
-        log.reading_changes = evidence
+    def _create_correction_log(self):
+        log = self._create_import_log_with_reading(
+            zev=self.zev, metering_point=self.metering_point,
+            created_at=datetime(2026, 2, 10, tzinfo=timezone.utc),
+        )
+        log.reading_changes = [{"kind": "value", "timestamp": "2026-02-10T00:00:00Z"}]
         log.save(update_fields=["reading_changes"])
+        return log
+
+    def test_list_omits_reading_evidence_but_detail_keeps_it(self):
+        log = self._create_correction_log()
         listed = self.client.get("/api/v1/metering/import-logs/")
         self.assertNotIn("reading_changes", listed.data["results"][0])
         detail = self.client.get(f"/api/v1/metering/import-logs/{log.id}/")
-        self.assertEqual(detail.data["reading_changes"], evidence)
+        self.assertEqual(detail.data["reading_changes"], log.reading_changes)
+
+    def test_viewer_can_read_correction_history(self):
+        log = self._create_correction_log()
+        viewer = make_user("correction_viewer", UserRole.USER)
+        ZevAccessGrant.objects.create(zev=self.zev, user=viewer, role=ZevAccessRole.VIEWER)
+        auth(self.client, viewer)
+        detail = self.client.get(f"/api/v1/metering/import-logs/{log.id}/")
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.data["reading_changes"], log.reading_changes)
+
+    def test_other_community_manager_cannot_read_correction_history(self):
+        log = self._create_correction_log()
+        auth(self.client, self.other_owner)
+        detail = self.client.get(f"/api/v1/metering/import-logs/{log.id}/")
+        self.assertEqual(detail.status_code, 404)
+
+    def test_participant_cannot_read_correction_history(self):
+        log = self._create_correction_log()
+        tenant = make_user("correction_tenant", UserRole.USER)
+        self.participant.user = tenant
+        self.participant.save(update_fields=["user"])
+        auth(self.client, tenant)
+        detail = self.client.get(f"/api/v1/metering/import-logs/{log.id}/")
+        self.assertEqual(detail.status_code, 403)
 
     def test_delete_single_import_log_removes_log_and_imported_readings(self):
         created_at = datetime(2026, 2, 10, 8, 0, tzinfo=timezone.utc)

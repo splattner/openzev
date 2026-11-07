@@ -116,6 +116,11 @@ class SdatchImportTests(TestCase):
         self.assertEqual(resp.data["rows_imported"], 0)
         self.assertTrue(resp.data["errors"])
         self.assertIn("Malformed SDAT-CH XML", resp.data["errors"][0]["error"])
+        issue = resp.data["issues"][0]
+        self.assertEqual(issue["xml_line"], 1)
+        self.assertGreater(issue["xml_column"], 0)
+        self.assertTrue(issue["xml_error_type"].startswith("ERR_"))
+        self.assertEqual(ImportLog.objects.get(pk=resp.data["id"]).issues, resp.data["issues"])
 
     def test_e66_basic_imports_billable_and_quarantines_temporary(self):
         resp = self._upload("basic.xml", fixture("e66_basic.xml"))
@@ -254,6 +259,8 @@ class SdatchImportTests(TestCase):
         self.assertEqual(resp.data["rows_total"], 0)
         self.assertEqual(resp.data["rows_imported"], 0)
         self.assertIn("AggregatedMeteredData", resp.data["errors"][0]["error"])
+        self.assertEqual(resp.data["issues"][0]["detail_code"], "aggregated_data")
+        self.assertTrue(resp.data["issues"][0]["root_element"].startswith("AggregatedMeteredData_"))
         self.assertEqual(MeterReading.objects.count(), 0)
         self.assertEqual(QuarantinedReading.objects.count(), 0)
 
@@ -476,6 +483,8 @@ class SdatchLimitTests(TestCase):
 
         self.assertEqual(resp.status_code, 201)
         self.assertIn("too large", resp.data["errors"][0]["error"].lower())
+        self.assertEqual(resp.data["issues"][0]["size_bytes"], len(xml))
+        self.assertEqual(resp.data["issues"][0]["limit_bytes"], 10)
         self.assertEqual(resp.data["rows_imported"], 0)
         self.assertEqual(MeterReading.objects.count(), 0)
 

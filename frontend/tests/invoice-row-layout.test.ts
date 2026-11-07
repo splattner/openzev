@@ -78,6 +78,18 @@ describe('invoice period row layout', () => {
         expect(container.querySelector('.invoice-rows .invoice-progress-legend')).toBeNull()
     })
 
+    it('marks corrected readings in progress and leaves only the review action in Actions', () => {
+        const { container } = mount([{ ...base, invoice: { ...invoice, needs_data_review: true } }], {
+            getPrimaryRowAction: () => ({ key: 'review-corrections', label: 'pages.invoices.dataReview.review', onClick: vi.fn() }),
+        })
+        const row = rowsOf(container)[0]
+        const metering = row.querySelector('[data-step="metering"]')!
+        expect(metering.getAttribute('data-state')).toBe('issue')
+        expect(metering.querySelector('.invoice-progress-icon--issue [data-icon="circle-exclamation"]')).not.toBeNull()
+        expect(metering.getAttribute('title')).toBe('pages.invoices.dataReview.badge')
+        expect(row.querySelector('.invoice-actions-cell')?.textContent).toBe('pages.invoices.dataReview.review')
+    })
+
     it('puts the invoice number in the identity cell as the row\'s only detail link', async () => {
         const { container } = mount([{ ...base, generation_eligibility: { state: 'eligible', invoice_id: null, invoice_number: null } }])
         const row = rowsOf(container)[0]

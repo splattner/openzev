@@ -19,7 +19,7 @@ vi.mock('../src/lib/appSettings', () => ({
 }))
 // A participant has no live invoice (#862): the detail request is a 404.
 vi.mock('../src/lib/api/invoices', () => ({
-    fetchInvoice: vi.fn(() => Promise.reject(new Error('Not found'))),
+    fetchInvoice: vi.fn(() => Promise.reject({ response: { status: 404 } })),
     fetchInvoicePdfBlob: vi.fn(),
     generateInvoicePdf: vi.fn(),
 }))
@@ -65,7 +65,9 @@ describe('an invoice link a participant can no longer open', () => {
         account(access, role)
         const container = await renderAt('/billing/invoices/42')
         expect(container.textContent).not.toContain('MY DOCUMENTS')
-        expect(container.textContent).toContain('common.error')
+        // 403/404 is the branch's unavailable state with a working back link,
+        // not a generic retryable error.
+        expect(container.textContent).toContain('pages.invoices.dataReview.unavailable')
         container.remove()
     })
 })
