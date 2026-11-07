@@ -333,6 +333,11 @@ period overview has loaded (also when the period has no invoice rows). Props: `z
   `charges.list(zevId, periodStart, periodEnd)`): date, description, amount, paid by ("All
   participants" / "N participants" / the single name), VAT treatment, and an `ActionMenu`
   (`faEllipsis`) with edit and delete. Writes are gated with `useWriteScope`.
+  Paid-by sorting groups `all_participants` before `selected_participants`, then
+  compares the sorted lists of raw participant names using `Intl.Collator` for
+  the UI language. Missing names fall back to participant IDs. Display-only
+  location/validity labels do not affect ordering; participant-name or language
+  changes update the ordering. Covered by `frontend/tests/period-charges-sorting.test.ts`.
 - Locked period: no *Add charge* button, no row actions, and a warning `Notice` ("An invoice of this
   period has been approved, so its charges can no longer change"). The table is rendered even when
   the period has no charges; its single row says so (`pages.charges.emptyPeriod`).

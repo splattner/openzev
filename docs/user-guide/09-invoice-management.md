@@ -61,6 +61,9 @@ covered by readiness steps or setup guidance.
 
 Below the invoice table, the **Charges** section lists the period's one-off
 charges and, until an invoice of the period is approved, offers **Add charge**.
+With at least two charges, click a column header to sort. **Paid by** groups
+all-participant charges first, then orders selected bearers alphabetically by
+name in the current language. Missing participant names use their IDs.
 
 When the community has [one-off charges](07-tariff-configuration.md#one-off-charges)
 in a period, the period card gains a **Charges** step between generating and
