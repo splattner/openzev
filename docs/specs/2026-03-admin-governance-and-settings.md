@@ -608,8 +608,10 @@ Every validated control carries a `data-zev-field` anchor for focus jumps.
   ElCom ID and tariff-source URL), grid connection point.
   The grid-connection section uses Mantine `TextInput` for postal code,
   tariff-source URL, and connection point, plus `GridOperatorField` autocomplete.
-  Its two-column grid aligns fields at the top, with descriptions below the
-  controls and a full-width tariff URL. Native fields, autocomplete, and the
+  Name, start date and ZEV type share one three-column row (`grid-3`, one column at 400 px) under no caption; the
+  start date's `CivilDateInput` has `clearable={false}` because `Zev.start_date` is required. The grid-connection
+  section's two-column grid aligns fields at the top, with descriptions below the
+  controls and a full-width tariff URL whose guidance ends in a `.text-link` to `/tariffs` (the import runs there; omitted when `readOnly`). Native fields, autocomplete, and the
   shared civil-date picker inherit the same field tokens and neutral border;
   no caller-specific Mantine size prop is required. URL placeholders are
   translated in all four locales.

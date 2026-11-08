@@ -107,7 +107,8 @@ shown as flat read-only values.
 
 ### General tab
 
-#### General ZEV Settings
+Name, start date and ZEV type come first, in one row, without a heading of their own (the tab is already called
+General). The start date is required, so its field has no clear button.
 
 | Setting | Purpose | Required |
 | --- | --- | --- |
@@ -123,7 +124,7 @@ In **Grid Connection**, each field's guidance appears directly beneath it.
 | --- | --- | --- |
 | **Postal Code** | Postal code of the grid connection. Used only to suggest a grid operator and its tariff document URL from the official ElCom register — see below | No |
 | **Grid Operator** | VNB name (Verteilnetzbetreiber) | No |
-| **Tariff document URL** | Where this operator publishes its machine-readable tariffs (Art. 7b StromVV). Used by the [tariff import](07-tariff-configuration.md#importing-tariffs-from-your-grid-operator) | No |
+| **Tariff document URL** | Where this operator publishes its machine-readable tariffs (Art. 7b StromVV). Used by the [tariff import](07-tariff-configuration.md#importing-tariffs-from-your-grid-operator); the field's guidance ends in a link to it (not shown to read-only roles) | No |
 | **Grid Connection Point** | Verknüpfungspunkt / EAN identifier | No |
 
 > **Tip:** Enter a **Postal Code** and OpenZEV suggests the grid operator that
