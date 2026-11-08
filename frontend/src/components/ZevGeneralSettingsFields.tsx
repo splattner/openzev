@@ -59,7 +59,7 @@ export function ZevGeneralSettingsFields({ form, onChange, group, zevId, readOnl
             {/* General ZEV Settings (identity) */}
             {(!group || group === 'general') && (
             <div className="form-section">
-                <div className="inline-form grid grid-2">
+                <div className="inline-form grid grid-3">
                     <label data-zev-field="name">
                         <span>{t('pages.zevSettings.fields.name')}</span>
                         <input
@@ -77,6 +77,8 @@ export function ZevGeneralSettingsFields({ form, onChange, group, zevId, readOnl
                         <CivilDateInput
                             value={form.start_date || null}
                             disabled={readOnly}
+                            // A community cannot exist without a start date: clearing it could only produce an error.
+                            clearable={false}
                             onChange={(iso) => onChange({ start_date: iso ?? '' })}
                             error={fieldErrors.start_date}
                             errorId="zev-settings-field-start_date-error"
@@ -146,7 +148,17 @@ export function ZevGeneralSettingsFields({ form, onChange, group, zevId, readOnl
                     <TextInput
                         className="grid-span-full"
                         label={t('pages.zevSettings.fields.tariffSourceUrl')}
-                        description={t('pages.zevSettings.fields.tariffSourceUrlHint')}
+                        description={(
+                            <>
+                                {t('pages.zevSettings.fields.tariffSourceUrlHint')}
+                                {!readOnly && (
+                                    <>
+                                        {' '}
+                                        <Link className="text-link" to="/tariffs">{t('pages.zevSettings.fields.tariffImportLink')}</Link>
+                                    </>
+                                )}
+                            </>
+                        )}
                         type="url"
                         value={form.tariff_source_url ?? ''}
                         disabled={readOnly}

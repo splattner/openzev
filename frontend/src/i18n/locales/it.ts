@@ -3805,6 +3805,7 @@ export const it = {
                 },
                         tariffSourceUrl: 'URL del file tariffario',
                         tariffSourceUrlHint: 'Dove questo gestore di rete pubblica le sue tariffe leggibili dalle macchine (art. 7b OAEl). Usato dall\u2019importazione delle tariffe.',
+                        tariffImportLink: 'All’importazione delle tariffe',
                         tariffSourceUrlPlaceholder: 'https://…/tariffe.json',
                 gridConnectionPoint: 'Punto di allacciamento alla rete',
                 invoicePrefix: 'Prefisso dei numeri di fattura',

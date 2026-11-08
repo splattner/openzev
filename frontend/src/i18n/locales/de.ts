@@ -3805,6 +3805,7 @@ export const de = {
                 },
                         tariffSourceUrl: 'URL der Tarifdatei',
                         tariffSourceUrlHint: 'Wo dieser Netzbetreiber seine maschinenlesbaren Tarife publiziert (Art. 7b StromVV). Wird f\u00fcr den Tarifimport verwendet.',
+                        tariffImportLink: 'Zum Tarifimport',
                         tariffSourceUrlPlaceholder: 'https://…/tarife.json',
                 gridConnectionPoint: 'Netzanschlusspunkt',
                 invoicePrefix: 'Rechnungsnummern-Präfix',
