@@ -989,15 +989,18 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
 - **7.3 The Energy data tab of the ZEV settings** (`features/supplementary/ZevEnergySources.tsx`; the tab `energy` of
   `/zev-settings/:tab`, shown while the energy data feature is on, and outside the settings form: no save bar). It is where
   a manager looks after the community's sources, and what the metering-point list used to carry. With **no source** the tab
-  shows one `EmptyState` and nothing else: its explanation (`supplementary.zev.empty.manager`, which already says who connects what;
-  `empty.nothing` when the community has nothing it could connect; `empty.other` for a viewer) and, for a manager with something to connect, its
+  shows one `EmptyState` and nothing else: its explanation (`supplementary.zev.empty.manager`;
+  `empty.nothing` when the community has nothing it could connect; `empty.other` for a viewer), for a manager the `note` line that says where
+  participants connect their own sources (`participantsOwn` as plain text, or `participantsOwnSelf` followed by a `.text-link` to
+  `/me/metering-points` when the manager holds a capable meter in this community, i.e. has the entry; the same line closes the description once sources exist; a viewer gets none) and, for a manager with something to connect, its
   **Connect a source** button, the one primary action (UI patterns §9, §10.3 rule 12). The short description and the toolbar button come
   with the first source. Then every source of the selected community in one list (`source-rows`: the grid connection point first, then the meters by
   id; each row the meter id, the holder or "ZEV-operated" and what it provides as plain text with a problem as
   `IssueText` next to the capability it concerns, no pills) and, beside it, the source in a `SourcePane`
   (`useSourcePane`: `?source=<id>`, from 56rem of content, focus and draft handling as on My metering points). Managers get a primary
   **Connect a source** in the toolbar (live flag on; disabled with "There is nothing left to connect." when `zevEligibleByPoint` and the
-  connection point offer nothing): `ZevConnectDialog` asks what the source reports on (the grid connection point, or a meter
+  connection point offer nothing): `ZevConnectDialog` asks "Which data do you want to show?" (`supplementary.zev.target`; until a choice exists a muted `pickHint` says what follows, since there is no
+  primary action before it) among the grid connection point and a meter
   nobody holds personally with the capabilities it can still get: live, forecast), then runs the existing flows
   (`SupplementarySourceModal` with `holder="connection-point"` or `"zev"`, `ForecastConnectDialog`), and the new source
   opens in the pane (`onConnected`). A source the community holds shows every action of its owner. A participant's source
@@ -1005,6 +1008,10 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   on** (`PATCH {enabled}`), **Delete data** (history) and **Remove source**, never test, sync, key, token or capabilities; the
   pane says who connected it, and for a manager who holds the meter themselves it links to My metering points. A
   viewer sees the list and the pane without any action. The connection point is no longer a card of its own.
+- **Names (UI patterns §10.3 rule 9).** The tab is **Energy data** (the kind of data), one connection is an **energy data source**
+  (empty-state title, `Quelle verbinden` inside the tab), and **Live energy** in the navigation is the page that *shows* the values, a
+  different thing: the three are kept. The tab is absent while the feature is off and not replaced by an explanatory tab, because
+  only the platform administrator can switch the feature on (a link that names the tab still shows `supplementary.zev.off`).
 - **Eligibility semantics.** With the live flag on, `/sources/eligible/` lists every held point, so
   history logic uses `historyEligible` (capability `history`, or no `eligible_capabilities` field while
   the flag is off) and `useEnergyDataEligibility` exposes `historyEligible` and `liveEligible`;

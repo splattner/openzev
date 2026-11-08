@@ -1,6 +1,6 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import type { IconDefinition } from '@fortawesome/free-solid-svg-icons'
-import { useId } from 'react'
+import { useId, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
@@ -18,10 +18,12 @@ export type EmptyStateProps = {
     descriptionKey: string
     /** i18next interpolation values for `descriptionKey`, e.g. a date range known only at render time. */
     descriptionOptions?: Record<string, unknown>
+    /** A further line under the description, for text that holds a link. */
+    note?: ReactNode
     actions?: EmptyStateAction[]
 }
 
-export function EmptyState({ titleKey, descriptionKey, descriptionOptions, actions }: EmptyStateProps) {
+export function EmptyState({ titleKey, descriptionKey, descriptionOptions, note, actions }: EmptyStateProps) {
     const { t } = useTranslation()
     const titleId = useId()
     const descId = useId()
@@ -30,6 +32,7 @@ export function EmptyState({ titleKey, descriptionKey, descriptionOptions, actio
         <section className="card empty-state" aria-labelledby={titleId} aria-describedby={descId}>
             <h3 id={titleId}>{t(titleKey)}</h3>
             <p id={descId} className="muted">{t(descriptionKey, descriptionOptions)}</p>
+            {note && <p className="muted">{note}</p>}
             {actions?.length ? (
                 <div className="actions-row actions-row-wrap">
                     {actions.map((action, index) => (

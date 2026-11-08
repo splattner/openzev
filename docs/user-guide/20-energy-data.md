@@ -488,10 +488,17 @@ The metering point list shows nothing about energy data. What a manager looks af
 **Settings** (it appears while the feature is on): every source of the community in one list, the grid connection point
 first, with who holds it and what it provides. Nothing is coloured while a source works; a source that has gone quiet or
 failed shows its problem in red text. Choose a source to open its details beside the list. Until the first source exists the tab shows a single explanation with one **Connect a source** button; the introduction and the button in the toolbar come with the first source.
+Both say where participants connect their own sources: a link to **My metering points** if you hold a meter yourself
+and have that page, the name of the page otherwise.
 
-- **Your community's own sources.** **Connect a source** connects live data for a metering point nobody holds
-  personally (a common area, a spare meter), the production forecast of such a plant, or the grid connection point. You
-  have every action there, as a participant has on their own source.
+The tab is only there while the energy data feature is on, so a community without it shows six tabs. It is not an
+empty tab with instructions, because only the platform administrator can switch the feature on (**Platform →
+Settings → Functions**).
+
+- **Your community's own sources.** **Connect a source** asks *Which data do you want to show?*, with the grid
+  connection point and every metering point nobody holds personally (a common area, a spare meter) to choose from.
+  For the choice it then lists what can still be connected: live data, or the production forecast of such a plant.
+  You have every action there, as a participant has on their own source.
 - **A participant's source.** You see its state and can **switch it off** (or on again), **delete its data** or
   **remove** it, each after a confirmation. The key, the push token and the connection itself stay the participant's.
   If you hold the meter yourself, the details point you to **My metering points**.

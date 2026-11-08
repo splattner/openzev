@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ConfirmDialog, useConfirmDialog } from '../../components/ConfirmDialog'
 import { EmptyState } from '../../components/EmptyState'
@@ -8,7 +9,7 @@ import { PageSkeleton } from '../../components/PageSkeleton'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { fetchZevEligibleSources, listSupplementarySources } from '../../lib/api/supplementary'
 import { useLiveEnabled } from '../../lib/live'
-import { capabilityProblem, forecastEligible, historyEligible, liveEligible, useEnergyDataEligibility } from '../../lib/supplementary'
+import { capabilityProblem, forecastEligible, hasCapability, historyEligible, liveEligible, useEnergyDataEligibility } from '../../lib/supplementary'
 import type { SupplementarySource } from '../../types/api'
 import { CapabilityProblemText } from './CapabilityProblemText'
 import { SourcePane } from './SourceDialog'
@@ -76,6 +77,13 @@ export function ZevEnergySources({ zevId, canManage }: Props) {
     const targets = connectableTargets(eligibilityQuery.data)
     const canConnect = canManage && liveOn && !!eligibilityQuery.data
     const selectedPoint = selected?.metering_point ? ownPoints.get(selected.metering_point) : undefined
+    // Where participants connect their own: a link for a manager who has that page too (a meter of their own), plain text otherwise.
+    const holdsOwnMeter = [...ownPoints.values()].some((entry) => hasCapability(entry))
+    const participantsNote = canManage && (
+        holdsOwnMeter
+            ? <>{t('supplementary.zev.participantsOwnSelf')} <Link className="text-link" to="/me/metering-points">{t('supplementary.zev.myPointsLink')}</Link></>
+            : t('supplementary.zev.participantsOwn')
+    )
     const sourceName = (source: SupplementarySource) => (source.target === 'connection_point' ? t('live.points.connection') : source.metering_point_meter_id ?? '')
     const holder = (source: SupplementarySource) => (source.held_by === 'zev' ? t('live.points.zevOperated') : source.participant_name ?? '')
 
@@ -84,7 +92,10 @@ export function ZevEnergySources({ zevId, canManage }: Props) {
             {/* An empty list explains itself once, in the empty state with its own button; the intro and the toolbar button come with the first source. */}
             {sources.length > 0 && (
                 <div className="actions-row actions-row-wrap actions-row-between">
-                    <p className="muted m-0 energy-sources-intro">{t(canManage ? 'supplementary.zev.description' : 'supplementary.zev.descriptionReadOnly')}</p>
+                    <p className="muted m-0 energy-sources-intro">
+                        {t(canManage ? 'supplementary.zev.description' : 'supplementary.zev.descriptionReadOnly')}
+                        {participantsNote && <> {participantsNote}</>}
+                    </p>
                     {canConnect && (
                         <div className="energy-sources-connect">
                             <button type="button" className="button button-primary" disabled={!targets.any} onClick={() => setConnecting(true)}>
@@ -107,6 +118,7 @@ export function ZevEnergySources({ zevId, canManage }: Props) {
                         <EmptyState
                             titleKey="supplementary.zev.empty.title"
                             descriptionKey={canConnect ? (targets.any ? 'supplementary.zev.empty.manager' : 'supplementary.zev.empty.nothing') : 'supplementary.zev.empty.other'}
+                            note={participantsNote || undefined}
                             actions={canConnect && targets.any ? [{ labelKey: 'supplementary.zev.connect', onClick: () => setConnecting(true) }] : undefined}
                         />
                     ) : (
