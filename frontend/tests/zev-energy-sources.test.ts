@@ -172,6 +172,30 @@ describe('ZevEnergySources', () => {
         expect(api.updateSupplementarySource).toHaveBeenCalledWith('src-part', { enabled: false })
     })
 
+    it('says where participants connect their own, as a link only for a manager who has that page', async () => {
+        // No meter of their own: the place is named in plain text, because the manager cannot go there.
+        const plain = await mount()
+        expect(plain.container.querySelector('.empty-state')?.textContent).toContain('supplementary.zev.participantsOwn')
+        expect(plain.container.querySelector('.empty-state a')).toBeNull()
+        cleanups.splice(0).forEach((cleanup) => cleanup())
+
+        // A meter of their own: the sentence is followed by the link.
+        api.fetchEligibleOrNull.mockResolvedValue([{ metering_point: 'mp-1', meter_id: 'CH-100', zev: 'zev-1', zev_name: 'Sonnenhof', participant: 'p-1', source: null, eligible_capabilities: ['live'] }])
+        const linked = await mount()
+        expect(linked.container.querySelector('.empty-state')?.textContent).toContain('supplementary.zev.participantsOwnSelf')
+        expect(linked.container.querySelector('.empty-state a')?.getAttribute('href')).toBe('/me/metering-points')
+        cleanups.splice(0).forEach((cleanup) => cleanup())
+
+        // With sources listed it sits in the intro; a viewer is told nothing about it.
+        api.listSupplementarySources.mockResolvedValue([zevSource()])
+        const listed = await mount()
+        expect(listed.container.querySelector('.energy-sources-intro a')?.getAttribute('href')).toBe('/me/metering-points')
+        cleanups.splice(0).forEach((cleanup) => cleanup())
+        const viewer = await mount({ canManage: false })
+        expect(viewer.container.querySelector('.energy-sources-intro')?.textContent).not.toContain('participantsOwn')
+        expect(viewer.container.querySelector('a')).toBeNull()
+    })
+
     it('points a manager who holds the meter themselves to My metering points', async () => {
         api.listSupplementarySources.mockResolvedValue([participantSource()])
         api.fetchEligibleOrNull.mockResolvedValue([{ metering_point: 'mp-1', meter_id: 'CH-100', zev: 'zev-1', zev_name: 'Sonnenhof', participant: 'p-1', source: 'src-part', eligible_capabilities: ['history', 'live'] }])
@@ -214,6 +238,8 @@ describe('connecting a source for the community', () => {
 
         const options = Array.from(dialog.querySelectorAll('option')).map((option) => option.textContent)
         expect(options).toEqual(['supplementary.zev.pickTarget', 'live.points.connection', 'CH-300 · supplementary.capability.live'])
+        // Until something is chosen the dialog says what comes next, instead of showing only Cancel.
+        expect(dialog.textContent).toContain('supplementary.zev.pickHint')
     })
 
     it('connects the grid connection point through its own flow', async () => {

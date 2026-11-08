@@ -74,6 +74,7 @@ export function ZevConnectDialog({ zevId, eligibility, sources, onClose, onConne
                         ))}
                     </select>
                 </label>
+                {!target && <p className="muted m-0">{t('supplementary.zev.pickHint')}</p>}
                 {target === CONNECTION_POINT && (
                     <>
                         <p className="muted m-0">{t('supplementary.connection.description')}</p>
