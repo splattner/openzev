@@ -123,6 +123,7 @@ vi.mock('../src/components/dashboard/HourlyProfileCard', async (importOriginal) 
 
 import { DashboardPage } from '../src/pages/DashboardPage'
 import { ParticipantDashboardBody } from '../src/features/dashboard/ParticipantDashboardBody'
+import { ParticipantTableCard } from '../src/components/dashboard/ParticipantTableCard'
 import { HourlyProfileCard } from '../src/components/dashboard/HourlyProfileCard'
 import { ToastProvider } from '../src/lib/toast'
 
@@ -307,6 +308,54 @@ describe('dashboard behavior preservation', () => {
         expect(names()).toEqual(['Alice', 'Bob'])
         await sort(1)
         expect(names()).toEqual(['Bob', 'Alice'])
+    })
+
+    function participantTable(stats = managerSummary().participant_stats) {
+        const container = document.createElement('div')
+        document.body.append(container)
+        const root = createRoot(container)
+        cleanups.push(() => { act(() => root.unmount()); container.remove() })
+        const onSelect = vi.fn()
+        const draw = (selectedParticipantId: string, ownParticipantIds?: string[]) => act(() => root.render(
+            createElement(ParticipantTableCard, {
+                participantStats: stats.map((participant) => ({ ...participant, has_behind_meter_generation: false })),
+                selectedParticipantId, ownParticipantIds, onSelect,
+            }),
+        ))
+        draw('')
+        return { container, onSelect, draw }
+    }
+
+    it('keeps participant selection focus when selection and ownership change', () => {
+        const { container, onSelect, draw } = participantTable()
+        const button = container.querySelector<HTMLButtonElement>('button.participant-select')!
+        button.focus()
+        act(() => button.click())
+        expect(onSelect).toHaveBeenLastCalledWith('p1')
+        draw('p1', ['p1'])
+        expect(document.activeElement).toBe(button)
+        expect(button.getAttribute('aria-pressed')).toBe('true')
+        expect(button.parentElement?.textContent).toContain('pages.dashboard.youBadge')
+        act(() => button.click())
+        expect(onSelect).toHaveBeenLastCalledWith('')
+    })
+
+    it('selects the correct participant after numeric sorting and pagination', () => {
+        const stats = Array.from({ length: 101 }, (_, i) => ({
+            ...managerSummary().participant_stats[0], participant_id: `p${i}`,
+            participant_name: `Participant ${i}`, total_consumed_kwh: i,
+        }))
+        const { container, onSelect } = participantTable(stats)
+        act(() => container.querySelector<HTMLButtonElement>('button[aria-label="pages.dashboard.col.consumption"]')!.click())
+        expect(container.querySelectorAll('tbody tr')).toHaveLength(100)
+        const selectFirst = () => container.querySelector<HTMLButtonElement>('button.participant-select')!.click()
+        act(selectFirst)
+        expect(onSelect).toHaveBeenLastCalledWith('p100')
+        act(() => container.querySelector<HTMLButtonElement>('button[aria-label="common.pagination.next"]')!.click())
+        expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
+        expect(container.querySelector('button[aria-label="pages.dashboard.col.consumption"]')).not.toBeNull()
+        act(selectFirst)
+        expect(onSelect).toHaveBeenLastCalledWith('p0')
     })
 
     it('manager sees the per-participant breakdown table and no metering migration card', async () => {

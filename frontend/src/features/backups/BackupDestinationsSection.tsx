@@ -1,5 +1,4 @@
-import { SortableHeader, useTableSorting } from '../../components/tableSorting'
-import { useState, type FormEvent } from 'react'
+import { createContext, useContext, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Switch } from '@mantine/core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -16,6 +15,7 @@ import { formatApiError } from '../../lib/api/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { useToast } from '../../lib/toast'
 import { ConfirmDialog, consumeReportedError, useConfirmDialog } from '../../components/ConfirmDialog'
+import { DataTable, type CellContext, type ColumnDef } from '../../components/DataTable'
 import { FormModal } from '../../components/FormModal'
 import type { BackupDestination, BackupStatus } from '../../types/api'
 import {
@@ -26,6 +26,51 @@ import {
     type DestinationFormState,
 } from './backupHelpers'
 import { FormModalCancelButton } from '../../components/FormModalFooter'
+
+const DestinationActionsContext = createContext<{
+    testingId: string | null
+    deleting: boolean
+    test: (destination: BackupDestination) => void
+    edit: (destination: BackupDestination) => void
+    delete: (destination: BackupDestination) => void
+} | null>(null)
+
+function DestinationActionsCell({ row }: CellContext<BackupDestination, unknown>) {
+    const { t } = useTranslation()
+    const actions = useContext(DestinationActionsContext)
+    if (!actions) throw new Error('DestinationActionsCell requires DestinationActionsContext')
+    const destination = row.original
+    return (
+        <div className="actions-cell-content">
+            <button
+                type="button"
+                className="button button-secondary button-compact"
+                disabled={actions.testingId === destination.id}
+                onClick={() => actions.test(destination)}
+            >
+                <FontAwesomeIcon icon={faPlug} fixedWidth />
+                {t('pages.backups.destinations.test')}
+            </button>
+            <button
+                type="button"
+                className="button button-secondary button-compact"
+                onClick={() => actions.edit(destination)}
+            >
+                <FontAwesomeIcon icon={faPen} fixedWidth />
+                {t('common.edit')}
+            </button>
+            <button
+                type="button"
+                className="button button-danger button-compact"
+                disabled={actions.deleting}
+                onClick={() => actions.delete(destination)}
+            >
+                <FontAwesomeIcon icon={faTrash} fixedWidth />
+                {t('common.delete')}
+            </button>
+        </div>
+    )
+}
 
 export function BackupDestinationsSection({ status }: { status: BackupStatus | undefined }) {
     const { t } = useTranslation()
@@ -45,14 +90,6 @@ export function BackupDestinationsSection({ status }: { status: BackupStatus | u
     })
     const destinations = destinationsQuery.data ?? []
 
-    const sorting = useTableSorting(destinations, {
-        name: row => row.name,
-        type: row => row.kind,
-        target: row => destinationTarget(row),
-        credentials: row => row.credential_mode,
-        keeps: row => row.retention_count > 0 ? row.retention_count : Number.MAX_SAFE_INTEGER,
-        status: row => Number(row.enabled),
-    })
     const encryptionAvailable = status?.encrypted ?? false
     const environmentCredentials = status?.environment_credentials ?? false
 
@@ -143,6 +180,64 @@ export function BackupDestinationsSection({ status }: { status: BackupStatus | u
     // rather than letting the admin find out from a rejected save.
     const secretDisabled = !encryptionAvailable
 
+    const columns: ColumnDef<BackupDestination, unknown>[] = [
+        {
+            accessorKey: 'name',
+            header: t('pages.backups.destinations.columns.name'),
+            cell: ({ row }) => <strong>{row.original.name}</strong>,
+        },
+        {
+            accessorKey: 'kind',
+            header: t('pages.backups.destinations.columns.type'),
+            cell: ({ row }) => t(`pages.backups.destinations.kind.${row.original.kind}`),
+        },
+        {
+            id: 'target',
+            accessorFn: destinationTarget,
+            header: t('pages.backups.destinations.columns.target'),
+            cell: ({ row }) => (
+                <span style={{ display: 'inline-block', minWidth: '12rem', overflowWrap: 'anywhere' }}>
+                    {destinationTarget(row.original)}
+                </span>
+            ),
+        },
+        {
+            id: 'credentials',
+            accessorFn: (destination) => destination.kind === 's3' ? destination.credential_mode : '',
+            header: t('pages.backups.destinations.columns.credentials'),
+            cell: ({ row }) => row.original.kind === 's3'
+                ? t(`pages.backups.destinations.credentialMode.${row.original.credential_mode}`)
+                : '—',
+        },
+        {
+            id: 'keeps',
+            accessorKey: 'retention_count',
+            header: t('pages.backups.destinations.columns.keeps'),
+            meta: { numeric: true },
+            cell: ({ row }) => row.original.retention_count > 0
+                ? t('pages.backups.destinations.keepsN', { count: row.original.retention_count })
+                : t('pages.backups.destinations.keepsAll'),
+        },
+        {
+            id: 'status',
+            accessorFn: (destination) => destination.enabled ? 1 : 0,
+            header: t('pages.backups.destinations.columns.status'),
+            cell: ({ row }) => (
+                <span className={`badge ${row.original.enabled ? 'badge-success' : 'badge-neutral'}`}>
+                    {row.original.enabled
+                        ? t('pages.backups.destinations.enabled')
+                        : t('pages.backups.destinations.disabled')}
+                </span>
+            ),
+        },
+        {
+            id: 'actions',
+            header: () => <span className="visually-hidden">{t('common.actions')}</span>,
+            enableSorting: false,
+            cell: DestinationActionsCell,
+        },
+    ]
+
     return (
         <section className="card page-stack">
             <div className="actions-row actions-row-wrap" style={{ justifyContent: 'space-between' }}>
@@ -162,75 +257,20 @@ export function BackupDestinationsSection({ status }: { status: BackupStatus | u
                 <div className="muted">{t('pages.backups.destinations.empty')}</div>
             ) : (
                 <div className="table-card">
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <SortableHeader {...sorting.header('name')}>{t('pages.backups.destinations.columns.name')}</SortableHeader>
-                                <SortableHeader {...sorting.header('type')}>{t('pages.backups.destinations.columns.type')}</SortableHeader>
-                                <SortableHeader {...sorting.header('target')}>{t('pages.backups.destinations.columns.target')}</SortableHeader>
-                                <SortableHeader {...sorting.header('credentials')}>{t('pages.backups.destinations.columns.credentials')}</SortableHeader>
-                                <SortableHeader {...sorting.header('keeps')}>{t('pages.backups.destinations.columns.keeps')}</SortableHeader>
-                                <SortableHeader {...sorting.header('status')}>{t('pages.backups.destinations.columns.status')}</SortableHeader>
-                                <th>{t('common.actions')}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {sorting.rows.map((destination) => (
-                                <tr key={destination.id}>
-                                    <td><strong>{destination.name}</strong></td>
-                                    <td>{t(`pages.backups.destinations.kind.${destination.kind}`)}</td>
-                                    <td style={{ minWidth: '12rem', overflowWrap: 'anywhere' }}>{destinationTarget(destination)}</td>
-                                    <td>
-                                        {destination.kind === 's3'
-                                            ? t(`pages.backups.destinations.credentialMode.${destination.credential_mode}`)
-                                            : '—'}
-                                    </td>
-                                    <td>
-                                        {destination.retention_count > 0
-                                            ? t('pages.backups.destinations.keepsN', { count: destination.retention_count })
-                                            : t('pages.backups.destinations.keepsAll')}
-                                    </td>
-                                    <td>
-                                        <span className={`badge ${destination.enabled ? 'badge-success' : 'badge-neutral'}`}>
-                                            {destination.enabled
-                                                ? t('pages.backups.destinations.enabled')
-                                                : t('pages.backups.destinations.disabled')}
-                                        </span>
-                                    </td>
-                                    <td className="actions-cell">
-                                        <div className="actions-cell-content">
-                                            <button
-                                                type="button"
-                                                className="button button-secondary button-compact"
-                                                disabled={testingId === destination.id}
-                                                onClick={() => void runTest(destination)}
-                                            >
-                                                <FontAwesomeIcon icon={faPlug} fixedWidth />
-                                                {t('pages.backups.destinations.test')}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="button button-secondary button-compact"
-                                                onClick={() => openEdit(destination)}
-                                            >
-                                                <FontAwesomeIcon icon={faPen} fixedWidth />
-                                                {t('common.edit')}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="button button-danger button-compact"
-                                                disabled={deleteMutation.isPending}
-                                                onClick={() => confirmDelete(destination)}
-                                            >
-                                                <FontAwesomeIcon icon={faTrash} fixedWidth />
-                                                {t('common.delete')}
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    <DestinationActionsContext.Provider value={{
+                        testingId,
+                        deleting: deleteMutation.isPending,
+                        test: (destination) => { void runTest(destination) },
+                        edit: openEdit,
+                        delete: confirmDelete,
+                    }}>
+                        <DataTable
+                            data={destinations}
+                            columns={columns}
+                            getRowId={(destination) => destination.id}
+                            initialSorting={[{ id: 'name', desc: false }]}
+                        />
+                    </DestinationActionsContext.Provider>
                 </div>
             )}
 

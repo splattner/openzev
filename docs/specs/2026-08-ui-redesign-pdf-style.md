@@ -471,7 +471,10 @@ live on Reports; participant invoice PDF actions remain on the dashboard.
      grid and from-ZEV % per participant (— for behind-meter participants). A
      row click sets the participant filter, the name button makes that
      keyboard-reachable, and the table scrolls with a sticky header and name
-     column.
+     column. It uses `DataTable` with 100 rows per page and sort controls for
+     at least two rows. Names sort as text; energy values and the from-ZEV share
+     sort numerically, descending on the first click. Selection is identified
+     by `participant_id` across sorting and pagination.
   5. `HourlyProfileCard`, only when a participant is selected and the profile
      has data (the hourly-profile query runs only with a selection).
 - **Participant body.** No participant filter; the summary and hourly-profile

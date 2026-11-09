@@ -18,6 +18,13 @@ If backup status cannot load, use **Retry**. Destinations, Schedule, Jobs and
 Restore load independently and remain available. A failed status refresh
 keeps the last loaded status visible with a warning.
 
+The Destinations, Jobs and restore History tables offer sorting when there are
+at least two rows. Click a column header to sort; the first click on Status
+puts failures first, as does Integrity in Jobs. Destinations start in name
+order, while Jobs and History start with the newest first. Tables show up to
+100 rows per page; longer tables have page controls below. In History,
+**Backup taken** sorts newest first; undated archives stay last.
+
 ## What a backup contains
 
 A backup holds everything needed to rebuild what it covers:

@@ -133,6 +133,50 @@ async function click(element: Element | undefined | null) {
 const labelled = (container: Element, key: string) =>
     Array.from(container.querySelectorAll('label')).find((l) => l.textContent?.includes(key))
 
+it.each([
+    ['destination', 'testBackupDestination', 'common.edit', 'pages.backups.destinations.test'],
+    ['job', 'verifyBackupJob', 'pages.backups.jobs.details', 'pages.backups.jobs.check'],
+] as const)('keeps %s action focus while another action is pending', async (_kind, operation, focusLabel, triggerLabel) => {
+    setup({ jobs: [completed()] })
+    let finish!: () => void
+    api[operation].mockReturnValueOnce(new Promise<void>((resolve) => { finish = resolve }))
+    const container = await render()
+    const focused = button(container, focusLabel)!
+    focused.focus()
+    const trigger = button(container, triggerLabel)!
+    await click(trigger)
+    await waitForCondition(() => trigger.disabled, 'pending action')
+    expect(document.activeElement).toBe(focused)
+    await act(async () => { finish() })
+    await waitForCondition(() => !trigger.disabled, 'completed action')
+    expect(document.activeElement).toBe(focused)
+})
+
+it('sorts backup statuses and integrity by priority on the first click', async () => {
+    setup({ jobs: [
+        completed({ id: 'ok', verification_ok: true }),
+        completed({ id: 'queued', status: 'queued', artifact_available: false }),
+        completed({ id: 'running', status: 'running', artifact_available: false }),
+        completed({ id: 'checking', verifying: true }),
+        completed({ id: 'never' }),
+        completed({ id: 'bad-file', verification_ok: false }),
+        completed({ id: 'removed', artifact_available: false }),
+        completed({ id: 'failed', status: 'failed', artifact_available: false }),
+    ] })
+    const container = await render()
+    const heading = button(container, 'pages.backups.jobs.columns.status')!
+    const table = heading.closest('table')!
+    await click(heading)
+    const cells = (index: number) => Array.from(table.querySelectorAll('tbody tr'), (row) =>
+        row.children[index].querySelector('.badge')?.textContent ?? row.children[index].textContent)
+    expect(cells(3)).toEqual(['failed', 'queued', 'running', ...Array(5).fill('completed')]
+        .map((status) => `pages.backups.jobs.status.${status}`))
+    await click(button(container, 'pages.backups.jobs.columns.integrity'))
+    expect(cells(6)).toEqual(['failed', 'checking', 'never', 'ok', '—', '—', '—', '—']
+        .map((state) => state === '—' ? state : `pages.backups.jobs.verification.${state}`))
+    expect(table.querySelector('th[aria-sort]')?.getAttribute('aria-sort')).toBe('ascending')
+})
+
 for (const kind of ['destination', 'file']) {
     for (const dismiss of [false, true]) {
         it(`reports one ${kind} deletion error with dismissal=${dismiss}`, async () => {
