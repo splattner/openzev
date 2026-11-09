@@ -458,6 +458,9 @@ Only the primary sorted column has `aria-sort`, including during Shift-click
 multi-sort. Data columns should normally be sortable, using meaningful accessor
 values rather than formatted labels. Disable sorting for action and selection columns.
 
+`meta.numeric` applies the `numeric` class to header and body cells; headers
+use `scope="col"`. Interactive cells preserve focus and local state across rerenders.
+
 Custom record tables use `components/tableSorting.tsx` for the same header,
 ARIA and focus behavior. `useTableSorting(data, accessors)` sorts raw numbers
 numerically and text with the UI locale's `Intl.Collator`, including natural
