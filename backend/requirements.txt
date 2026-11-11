@@ -30,7 +30,7 @@ execnet==2.1.2
 factory_boy==3.3.3
 Faker==40.54.0
 fonttools==4.68.0
-gunicorn==26.2.0
+gunicorn==27.0.0
 inflection==0.5.1
 iniconfig==2.3.1
 iso3166==3.0.0
@@ -51,7 +51,7 @@ pycparser==3.12
 pydyf==0.13.0
 pyOpenSSL==26.4.0
 pyotp==2.10.0  # direct: TOTP secret generation and code verification
-pypdf==6.21.4
+pypdf==7.0.1
 Pygments==2.21.0
 PyJWT==2.15.1
 pyphen==0.18.1
@@ -60,7 +60,7 @@ pytest-cov==7.1.0
 pytest-django==4.14.0
 pytest-xdist==3.8.0
 python-crontab==3.4.0
-python-dateutil==2.9.0.post0  # direct: lenient timestamp parsing in the metering CSV import
+python-dateutil==4.0.0  # direct: lenient timestamp parsing in the metering CSV import
 python-stdnum==2.2
 PyYAML==6.0.3
 qrbill==1.2.0
