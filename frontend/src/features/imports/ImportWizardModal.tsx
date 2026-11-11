@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
     faArrowLeft,
@@ -152,6 +153,14 @@ function FilePreviewBlock({ entry, heading }: { entry: FilePreview; heading: boo
     const { t } = useTranslation()
     const { preview } = entry
     const rows = preview?.preview_rows ?? []
+    const sorting = useTableSorting(rows, {
+        row: row => row.row,
+        meterId: row => row.meter_id,
+        status: row => Number(row.metering_point_exists),
+        timestamp: row => row.timestamp,
+        direction: row => row.directions?.join(' '),
+        existingData: row => row.existing_data == null ? null : Number(row.existing_data),
+    })
     return (
         <div className="page-stack" style={{ gap: '0.5rem' }}>
             {heading && <strong>{entry.fileName}</strong>}
@@ -188,16 +197,16 @@ function FilePreviewBlock({ entry, heading }: { entry: FilePreview; heading: boo
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <thead>
                                     <tr>
-                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.row')}</th>
-                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.meterId')}</th>
-                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.status')}</th>
-                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.timestamp')}</th>
-                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.direction')}</th>
-                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.existingData')}</th>
+                                        <SortableHeader {...sorting.header('row')} style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.row')}</SortableHeader>
+                                        <SortableHeader {...sorting.header('meterId')} style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.meterId')}</SortableHeader>
+                                        <SortableHeader {...sorting.header('status')} style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.status')}</SortableHeader>
+                                        <SortableHeader {...sorting.header('timestamp')} style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.timestamp')}</SortableHeader>
+                                        <SortableHeader {...sorting.header('direction')} style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.direction')}</SortableHeader>
+                                        <SortableHeader {...sorting.header('existingData')} style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.existingData')}</SortableHeader>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {rows.map((row) => (
+                                    {sorting.rows.map((row) => (
                                         <tr key={`${row.row}-${row.meter_id ?? 'empty'}`} style={{ borderTop: '1px solid var(--border-default)' }}>
                                             <td style={{ padding: '0.4rem 0.6rem' }}>{row.row}</td>
                                             <td style={{ padding: '0.4rem 0.6rem' }}>{row.meter_id ?? '-'}</td>

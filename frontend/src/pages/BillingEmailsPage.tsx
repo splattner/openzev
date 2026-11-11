@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../components/tableSorting'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faEnvelope, faRotate } from '@fortawesome/free-solid-svg-icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -95,6 +96,12 @@ function BillingEmailsContent() {
     const invoices = deliveryInvoices.filter(
         (invoice) => filter === 'all' || invoice.last_email_status === filter,
     )
+    const sorting = useTableSorting(invoices, {
+        invoice: row => row.invoice_number,
+        period: row => row.period_start,
+        participant: row => row.participant_name,
+        emailStatus: row => row.last_email_status,
+    })
     const failedCount = deliveryInvoices.filter((invoice) => invoice.last_email_status === 'failed').length
 
     const retryMutation = useMutation({
@@ -159,10 +166,10 @@ function BillingEmailsContent() {
                     <table className="billing-workflow-table">
                         <thead>
                             <tr>
-                                <th>{t('pages.billingEmails.col.invoice')}</th>
-                                <th>{t('pages.billingEmails.col.period')}</th>
-                                <th>{t('pages.billingEmails.col.participant')}</th>
-                                <th>{t('pages.billingEmails.col.emailStatus')}</th>
+                                <SortableHeader {...sorting.header('invoice')}>{t('pages.billingEmails.col.invoice')}</SortableHeader>
+                                <SortableHeader {...sorting.header('period')}>{t('pages.billingEmails.col.period')}</SortableHeader>
+                                <SortableHeader {...sorting.header('participant')}>{t('pages.billingEmails.col.participant')}</SortableHeader>
+                                <SortableHeader {...sorting.header('emailStatus')}>{t('pages.billingEmails.col.emailStatus')}</SortableHeader>
                                 <th>{t('pages.billingEmails.col.actions')}</th>
                             </tr>
                         </thead>
@@ -171,7 +178,7 @@ function BillingEmailsContent() {
                                 <tr>
                                     <td colSpan={5} className="muted">{t('pages.billingEmails.empty')}</td>
                                 </tr>
-                            ) : invoices.map((invoice) => (
+                            ) : sorting.rows.map((invoice) => (
                                 <tr key={invoice.id}>
                                     <td>{invoice.invoice_number}</td>
                                     <td className="billing-period-cell">

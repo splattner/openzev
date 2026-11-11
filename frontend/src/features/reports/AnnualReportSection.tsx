@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
@@ -7,7 +8,7 @@ import { queryKeys } from '../../lib/api/queryKeys'
 import { AXIS_COLOR, CHART_GRIDLINE, CHART_LOCAL, CONS_COLORS } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
 import { formatChf, formatChfAmount, formatKwh, formatPercent, formatPercentFigure } from '../../lib/numbers'
-import { behindMeterHintKey } from '../../lib/supplementary'
+import { behindMeterHintKey, grossRate } from '../../lib/supplementary'
 import { StatCard } from '../../components/StatCard'
 import { PageSkeleton } from '../../components/PageSkeleton'
 import { BehindMeterBadge } from '../../components/BehindMeterBadge'
@@ -184,6 +185,15 @@ function AnnualTrendCard({ report }: { report: AnnualReport }) {
 
 function ParticipantSavingsCard({ report }: { report: AnnualReport }) {
     const { t } = useTranslation()
+    const savingsSort = useTableSorting(report.participants, {
+        participant: row => row.participant_name,
+        consumption: row => row.consumed_kwh,
+        fromZev: row => row.from_zev_kwh,
+        selfSufficiency: row => row.has_behind_meter_generation ? grossRate(row.gross_energy) : row.self_sufficiency_rate,
+        localCost: row => row.savings ? Number(row.savings.local_chf) : null,
+        gridCost: row => row.savings ? Number(row.savings.hypothetical_chf) : null,
+        savings: row => row.savings ? Number(row.savings.saved_chf) : null,
+    })
     return (
         <section className="card">
             <h3 className="mt-0">{t('pages.reports.annualReport.participants.title')}</h3>
@@ -195,17 +205,17 @@ function ParticipantSavingsCard({ report }: { report: AnnualReport }) {
                     <table className="participant-table participant-table--static">
                         <thead>
                             <tr>
-                                <th>{t('pages.reports.annualReport.col.participant')}</th>
-                                <th className="numeric">{t('pages.reports.annualReport.col.consumption')}</th>
-                                <th className="numeric">{t('pages.reports.annualReport.col.fromZev')}</th>
-                                <th className="numeric">{t('pages.reports.annualReport.col.selfSufficiency')}</th>
-                                <th className="numeric">{t('pages.reports.annualReport.col.localCost')}</th>
-                                <th className="numeric">{t('pages.reports.annualReport.col.gridCost')}</th>
-                                <th className="numeric">{t('pages.reports.annualReport.col.savings')}</th>
+                                <SortableHeader {...savingsSort.header('participant')}>{t('pages.reports.annualReport.col.participant')}</SortableHeader>
+                                <SortableHeader {...savingsSort.header('consumption')} className="numeric">{t('pages.reports.annualReport.col.consumption')}</SortableHeader>
+                                <SortableHeader {...savingsSort.header('fromZev')} className="numeric">{t('pages.reports.annualReport.col.fromZev')}</SortableHeader>
+                                <SortableHeader {...savingsSort.header('selfSufficiency')} className="numeric">{t('pages.reports.annualReport.col.selfSufficiency')}</SortableHeader>
+                                <SortableHeader {...savingsSort.header('localCost')} className="numeric">{t('pages.reports.annualReport.col.localCost')}</SortableHeader>
+                                <SortableHeader {...savingsSort.header('gridCost')} className="numeric">{t('pages.reports.annualReport.col.gridCost')}</SortableHeader>
+                                <SortableHeader {...savingsSort.header('savings')} className="numeric">{t('pages.reports.annualReport.col.savings')}</SortableHeader>
                             </tr>
                         </thead>
                         <tbody>
-                            {report.participants.map((row) => (
+                            {savingsSort.rows.map((row) => (
                                 <tr key={row.participant_id}>
                                     <td>
                                         {row.participant_name || '-'}
@@ -255,6 +265,13 @@ function ParticipantSavingsCard({ report }: { report: AnnualReport }) {
 function ProducerUpliftCard({ report }: { report: AnnualReport }) {
     const { t } = useTranslation()
     const producers = report.participants.filter((row) => row.uplift !== null || row.produced_kwh > 0)
+    const upliftSort = useTableSorting(producers, {
+        participant: row => row.participant_name,
+        sold: row => row.uplift ? Number(row.uplift.local_sold_kwh) : null,
+        zevRevenue: row => row.uplift ? Number(row.uplift.local_chf) : null,
+        feedInRevenue: row => row.uplift ? Number(row.uplift.feed_in_chf) : null,
+        uplift: row => row.uplift ? Number(row.uplift.uplift_chf) : null,
+    })
     if (producers.length === 0) return null
     return (
         <section className="card">
@@ -264,15 +281,15 @@ function ProducerUpliftCard({ report }: { report: AnnualReport }) {
                 <table className="participant-table participant-table--static">
                     <thead>
                         <tr>
-                            <th>{t('pages.reports.annualReport.col.participant')}</th>
-                            <th className="numeric">{t('pages.reports.annualReport.col.sold')}</th>
-                            <th className="numeric">{t('pages.reports.annualReport.col.zevRevenue')}</th>
-                            <th className="numeric">{t('pages.reports.annualReport.col.feedInRevenue')}</th>
-                            <th className="numeric">{t('pages.reports.annualReport.col.uplift')}</th>
+                            <SortableHeader {...upliftSort.header('participant')}>{t('pages.reports.annualReport.col.participant')}</SortableHeader>
+                            <SortableHeader {...upliftSort.header('sold')} className="numeric">{t('pages.reports.annualReport.col.sold')}</SortableHeader>
+                            <SortableHeader {...upliftSort.header('zevRevenue')} className="numeric">{t('pages.reports.annualReport.col.zevRevenue')}</SortableHeader>
+                            <SortableHeader {...upliftSort.header('feedInRevenue')} className="numeric">{t('pages.reports.annualReport.col.feedInRevenue')}</SortableHeader>
+                            <SortableHeader {...upliftSort.header('uplift')} className="numeric">{t('pages.reports.annualReport.col.uplift')}</SortableHeader>
                         </tr>
                     </thead>
                     <tbody>
-                        {producers.map((row) => (
+                        {upliftSort.rows.map((row) => (
                             <tr key={row.participant_id}>
                                 <td>{row.participant_name || '-'}</td>
                                 <td className="numeric">{row.uplift ? yearKwh(Number(row.uplift.local_sold_kwh)) : '—'}</td>

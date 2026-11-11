@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { useTranslation } from 'react-i18next'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faBuilding, faSpinner } from '@fortawesome/free-solid-svg-icons'
@@ -6,7 +7,7 @@ import { InvoiceAmount, InvoiceLink, InvoiceRowActions, InvoiceTotal } from '../
 import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { InvoiceProgressLegend, InvoiceRowProgress } from './InvoiceRowProgress'
 import { invoiceStepReasonText } from './invoiceRowText'
-import { invoiceRowIssues, liveInvoice, type InvoiceRowWork } from './invoiceRowState'
+import { invoiceRowIssues, invoiceRowProgress, liveInvoice, type InvoiceRowWork } from './invoiceRowState'
 import type { InvoicePeriodParticipantRow } from '../../types/api'
 
 type InvoicePeriodRowsTableProps = {
@@ -32,6 +33,11 @@ export function InvoicePeriodRowsTable({
   const { t } = useTranslation()
   const { settings } = useAppSettings()
 
+  const sorting = useTableSorting(rows, {
+    participant: row => row.participant_name,
+    progress: row => invoiceRowProgress(row, getRowWork(row))?.filter(step => step.state === 'done').length,
+    amount: row => liveInvoice(row) ? Number(liveInvoice(row)!.total_chf) : null,
+  })
   return (
     <>
       <div className="table-card invoice-rows">
@@ -40,14 +46,14 @@ export function InvoicePeriodRowsTable({
         <table role="table">
           <thead role="rowgroup">
             <tr role="row">
-              <th role="columnheader" scope="col">{t('pages.invoices.col.participant')}</th>
-              <th role="columnheader" scope="col">{t('pages.invoices.col.progress')}</th>
-              <th role="columnheader" scope="col" className="numeric">{t('pages.invoices.col.amount')}</th>
+              <SortableHeader {...sorting.header('participant')} role="columnheader" scope="col">{t('pages.invoices.col.participant')}</SortableHeader>
+              <SortableHeader {...sorting.header('progress')} role="columnheader" scope="col">{t('pages.invoices.col.progress')}</SortableHeader>
+              <SortableHeader {...sorting.header('amount')} role="columnheader" scope="col" className="numeric">{t('pages.invoices.col.amount')}</SortableHeader>
               <th role="columnheader" scope="col" className="invoice-actions-cell">{t('pages.invoices.col.actions')}</th>
             </tr>
           </thead>
           <tbody role="rowgroup">
-            {rows.map((row) => {
+            {sorting.rows.map((row) => {
               const invoice = row.invoice
               const live = liveInvoice(row)
               const work = getRowWork(row)

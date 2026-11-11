@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faChevronRight, faClock } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
@@ -8,7 +9,7 @@ import type { AppSettings, Tariff, TariffSeries } from '../../types/api'
 import { seriesKeyOf, useTariffDisplay } from './useTariffDisplay'
 import type { TariffOverviewRow } from './validity'
 import { emphasizedDate } from './datePresentation'
-import { nextChange } from './rateLines'
+import { lowestTariffRate, nextChange, tariffRateUnit } from './rateLines'
 import { deltaSummary } from './priceDelta'
 import { bandCoverage } from './bandCoverage'
 import { TariffTypeIcon } from './TariffTypeIcon'
@@ -44,8 +45,14 @@ export function TariffCategorySections({
     const { t } = useTranslation()
     const today = todayBusinessIso()
     const { sourceById, validityBadge, rateLines, pricingTooltipFor } = useTariffDisplay(settings, today)
+    const sorting = useTableSorting(rows, {
+        name: row => row.series.name,
+        price: row => lowestTariffRate(row.version),
+        unit: row => tariffRateUnit(row.series, row.version),
+        valid: row => row.version.valid_from,
+    })
     const tariffSections = categoryOrder
-        .map((category) => ({ category, rows: rows.filter((row) => row.series.category === category) }))
+        .map((category) => ({ category, rows: sorting.rows.filter((row) => row.series.category === category) }))
         .filter((section) => section.rows.length > 0)
 
     // `ab 01.01.2027`, the year (and, within this year, the month) bold. The
@@ -62,18 +69,18 @@ export function TariffCategorySections({
                 <table key={section.category} className="tariff-table">
                     <thead>
                         <tr>
-                            <th scope="col">
+                            <SortableHeader {...sorting.header('name', section.rows.length)} scope="col">
                                 {t(`pages.tariffs.categories.${section.category}` as Parameters<typeof t>[0])}
-                            </th>
+                            </SortableHeader>
                             <th scope="col" className="tariff-table-applies">{t('pages.tariffs.rateCard.applies')}</th>
-                            <th scope="col" className="numeric">{t('pages.tariffs.rateCard.price')}</th>
-                            <th scope="col" className="tariff-table-unit">{t('pages.tariffs.rateCard.unit')}</th>
+                            <SortableHeader {...sorting.header('price', section.rows.length)} title={t('pages.tariffs.rateCard.sortLowestRate')} scope="col" className="numeric">{t('pages.tariffs.rateCard.price')}</SortableHeader>
+                            <SortableHeader {...sorting.header('unit', section.rows.length)} scope="col" className="tariff-table-unit">{t('pages.tariffs.rateCard.unit')}</SortableHeader>
                             <th scope="col" id={`tariff-bands-${kind}-${section.category}`} className="tariff-table-bands">
                                 <span className="visually-hidden">
                                     {t('pages.tariffs.rateCard.applies')} · {t('pages.tariffs.rateCard.price')} · {t('pages.tariffs.rateCard.unit')}
                                 </span>
                             </th>
-                            <th scope="col" className="tariff-table-valid">{t('pages.tariffs.rateCard.valid')}</th>
+                            <SortableHeader {...sorting.header('valid', section.rows.length)} scope="col" className="tariff-table-valid">{t('pages.tariffs.rateCard.valid')}</SortableHeader>
                             <th scope="col" className="tariff-table-open">
                                 <span className="visually-hidden">{t('pages.tariffs.viewDetails')}</span>
                             </th>

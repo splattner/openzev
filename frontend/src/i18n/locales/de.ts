@@ -2586,6 +2586,7 @@ export const de = {
             col: {
             },
             rateCard: {
+                sortLowestRate: "Nach dem niedrigsten aufgeführten Ansatz sortieren.",
                 applies: 'Gilt für',
                 price: 'Preis (CHF)',
                 unit: 'Einheit',
@@ -3073,7 +3074,6 @@ export const de = {
                 label: 'Sortieren',
                 meterId: 'Messpunkt-ID',
                 location: 'Standort',
-                lastReading: 'Ältester Messwert zuerst',
             },
             columns: {
                 actions: 'Aktionen',

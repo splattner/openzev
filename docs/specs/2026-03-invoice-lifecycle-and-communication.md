@@ -1540,6 +1540,10 @@ visibility, restored access, and strict selection with a second membership.
 
 - Invoice action button visibility by role and status
 - `InvoicePeriodRowsTable` has participant, progress, amount and actions columns.
+  Participant names, completed progress-step counts and numeric live invoice totals
+  are sortable. Delivery history, payment and credit tables also sort their data
+  columns. Sorting preserves row actions/identity and uses the shared
+  [management-page contract](2026-04-frontend-management-page-design.md#72-information-architecture-rules).
   The participant cell shows current participant identity, invoice-number link, dates inside
   the period and meter locations when a party has several participations.
   Repeated parties are determined before filtering. The invoice number is the

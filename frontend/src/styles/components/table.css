@@ -110,6 +110,20 @@
     display: none;
   }
 
+  .live-points-wide:has(.sortable-header) {
+    display: block;
+  }
+
+  .live-points-wide:has(.sortable-header) thead tr {
+    display: flex;
+    flex-wrap: wrap;
+    background: var(--brand-deep);
+  }
+
+  .live-points-wide:has(.sortable-header) tbody {
+    display: none;
+  }
+
   .live-points-list {
     display: block;
   }

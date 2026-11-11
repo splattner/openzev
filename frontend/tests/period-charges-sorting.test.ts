@@ -38,7 +38,7 @@ async function render(charges: Charge[], participants?: Participant[]) {
     await act(async () => root.render(createElement(QueryClientProvider, { client },
         createElement(PeriodCharges, { zevId: 'z1', periodStart: '2026-10-01', periodEnd: '2026-10-31', periodLocked: false }))))
     const sort = () => act(async () => Array.from(container.querySelectorAll<HTMLButtonElement>('th button'))
-        .find(button => button.textContent === 'pages.charges.columns.bearers')!.click())
+        .find(button => button.textContent?.startsWith('pages.charges.columns.bearers'))!.click())
     const descriptions = () => Array.from(container.querySelectorAll('tbody tr')).map(row => row.children[1].textContent)
     const setParticipants = async (next: Participant[]) => {
         await act(async () => { client.setQueryData(queryKeys.zev.participants('z1'), next); await new Promise(resolve => setTimeout(resolve, 0)) })

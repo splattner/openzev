@@ -157,7 +157,7 @@ export function useMeteringPointActions({
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
     const { settings } = useAppSettings()
-    const { t } = useTranslation()
+    const { t, i18n } = useTranslation()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
 
     const { user } = useAuth()
@@ -235,7 +235,8 @@ export function useMeteringPointActions({
         writeFilterParam(FILTER.building, value, value === 'all')
     }
     function setSort(value: MeteringPointSort) {
-        writeFilterParam(METERING_POINT_SORT_KEY, value, value === 'meter_id')
+        // Keep an explicit ID choice selected after a reload.
+        writeFilterParam(METERING_POINT_SORT_KEY, value, false)
     }
 
     function clearFilters() {
@@ -764,7 +765,13 @@ export function useMeteringPointActions({
     })
 
     // Sorted after filtering; the building groups keep this order within each group.
-    const meteringPoints = sortMeteringPoints(filteredMeteringPoints, sort)
+    const holderNames = new Map<string, string>()
+    for (const [id, assignments] of assignmentsByMeteringPoint) {
+        const current = assignments.filter(assignment => isAssignmentCurrent(assignment, todayIso))
+            .sort((a, b) => b.valid_from.localeCompare(a.valid_from))
+        if (current[0]) holderNames.set(id, participantNameById.get(current[0].participant) ?? current[0].participant)
+    }
+    const meteringPoints = sortMeteringPoints(filteredMeteringPoints, sort, holderNames, i18n?.language)
 
     const filteredAssignmentsByMeteringPoint = new Map(
         Array.from(assignmentsByMeteringPoint.entries()).filter(([meteringPointId]) =>

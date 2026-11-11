@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -96,6 +97,11 @@ export function VatSettingsSection() {
         }
     }
 
+    const sorting = useTableSorting(vatRates, {
+        rate: row => Number(row.rate),
+        validFrom: row => row.valid_from,
+        validTo: row => row.valid_to,
+    })
     return (
         <div className="page-stack">
             <section className="stat-grid">
@@ -176,14 +182,14 @@ export function VatSettingsSection() {
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>{t('adminVatSettings.table.rate')}</th>
-                                    <th>{t('adminVatSettings.table.validFrom')}</th>
-                                    <th>{t('adminVatSettings.table.validTo')}</th>
+                                    <SortableHeader {...sorting.header('rate')}>{t('adminVatSettings.table.rate')}</SortableHeader>
+                                    <SortableHeader {...sorting.header('validFrom')}>{t('adminVatSettings.table.validFrom')}</SortableHeader>
+                                    <SortableHeader {...sorting.header('validTo')}>{t('adminVatSettings.table.validTo')}</SortableHeader>
                                     <th>{t('common.actions')}</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {vatRates.map((rate) => (
+                                {sorting.rows.map((rate) => (
                                     <tr key={rate.id}>
                                         <td>{(Number(rate.rate) * 100).toFixed(2)}%</td>
                                         <td>{formatShortDate(rate.valid_from, settings)}</td>

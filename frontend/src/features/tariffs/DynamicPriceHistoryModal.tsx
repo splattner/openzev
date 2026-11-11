@@ -218,7 +218,8 @@ export function DynamicPriceHistoryPanel({ source, tariff, compact = false }: Pa
       cell: ({ row }) => intervalLabel(row.original.valid_from, row.original.valid_to, settings),
     },
     {
-      accessorKey: 'price_chf_per_kwh',
+      id: 'price_chf_per_kwh',
+      accessorFn: point => Number(point.price_chf_per_kwh),
       header: t('pages.dynamicSources.history.price'),
       cell: ({ row }) => Number(row.original.price_chf_per_kwh).toFixed(5),
       meta: { numeric: true },

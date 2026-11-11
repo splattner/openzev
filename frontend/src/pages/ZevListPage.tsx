@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../components/tableSorting'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -403,6 +404,13 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
         setFocusMeteringPointKey(null)
     }, [focusMeteringPointKey])
 
+    const sorting = useTableSorting(data ?? [], {
+        name: row => row.name,
+        issuer: row => row.issuer?.display_name,
+        startDate: row => row.start_date,
+        gridOperator: row => row.grid_operator,
+        billingInterval: row => row.billing_interval,
+    })
     const header = !embedded ? (
         <PageHeader
             eyebrow={t('nav.platformScope')}
@@ -917,16 +925,16 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                 <table>
                     <thead>
                         <tr>
-                            <th>{t('pages.zevs.col.name')}</th>
-                            <th>{t('pages.zevs.col.issuer')}</th>
-                            <th>{t('pages.zevs.col.startDate')}</th>
-                            <th>{t('pages.zevs.col.gridOperator')}</th>
-                            <th>{t('pages.zevs.col.billingInterval')}</th>
+                            <SortableHeader {...sorting.header('name')}>{t('pages.zevs.col.name')}</SortableHeader>
+                            <SortableHeader {...sorting.header('issuer')}>{t('pages.zevs.col.issuer')}</SortableHeader>
+                            <SortableHeader {...sorting.header('startDate')}>{t('pages.zevs.col.startDate')}</SortableHeader>
+                            <SortableHeader {...sorting.header('gridOperator')}>{t('pages.zevs.col.gridOperator')}</SortableHeader>
+                            <SortableHeader {...sorting.header('billingInterval')}>{t('pages.zevs.col.billingInterval')}</SortableHeader>
                             <th>{t('pages.zevs.col.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {data.map((zev) => (
+                        {sorting.rows.map((zev) => (
                             <tr key={zev.id}>
                                 <td>
                                     <div className="actions-row">

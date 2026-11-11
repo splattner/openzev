@@ -226,6 +226,8 @@ export-job flow (ADR 0017); only its location in the UI changed.
 
 ## 7. Frontend
 
+The participant-savings and producer-uplift tables sort by raw names and numeric figures, with missing figures last. Totals remain in the footer and are not reordered. They follow the shared sorting contract in [management-page design §7.2](2026-04-frontend-management-page-design.md#72-information-architecture-rules).
+
 ### 7.1 ReportsPage (owner/admin branch)
 
 **File:** `frontend/src/pages/ReportsPage.tsx`, route `/reports`.

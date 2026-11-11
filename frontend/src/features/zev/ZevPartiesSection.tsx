@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { useId, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -253,6 +254,10 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
         entries.filter((entry) => !shownAccountIds.has(entry.user.id)).map((entry) => [entry.user.id, entry]),
     ).values()]
     const listedParties = [...contacts, ...otherParties]
+    const sorting = useTableSorting([...listedParties, ...bareLogins], {
+        person: row => 'user' in row ? `${row.user.first_name} ${row.user.last_name}`.trim() || row.user.email : row.display_name,
+        access: row => 'user' in row ? entries.filter(entry => entry.user.id === row.user.id).length : entriesOf(row).length,
+    })
     const nobodyElse = listedParties.length + bareLogins.length === 0
 
     return (
@@ -332,15 +337,34 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
                 <table role="table">
                     <thead role="rowgroup">
                         <tr role="row">
-                            <th role="columnheader" scope="col">{t('pages.zevSettings.parties.col.person')}</th>
-                            <th role="columnheader" scope="col">{t('pages.zevSettings.parties.col.access')}</th>
+                            <SortableHeader {...sorting.header('person')} role="columnheader" scope="col">{t('pages.zevSettings.parties.col.person')}</SortableHeader>
+                            <SortableHeader {...sorting.header('access')} role="columnheader" scope="col">{t('pages.zevSettings.parties.col.access')}</SortableHeader>
                             <th role="columnheader" scope="col" className="people-actions-cell">
                                 <span className="visually-hidden">{t('pages.zevSettings.parties.col.actions')}</span>
                             </th>
                         </tr>
                     </thead>
                     <tbody role="rowgroup">
-                        {listedParties.map((party) => {
+                        {sorting.rows.map((person) => {
+                            if ('user' in person) {
+                                const entry = person
+                                const loginName = `${entry.user.first_name} ${entry.user.last_name}`.trim()
+                                const described = describeAccess({
+                                    t, settings, entries: entries.filter((item) => item.user.id === entry.user.id), canManage,
+                                    actions: accessActions, shownEmail: loginName ? undefined : entry.user.email, onGive: () => undefined,
+                                })
+                                return (
+                                    <PersonRows
+                                        key={`login-${entry.user.id}`}
+                                        cells={{
+                                            who: <span className="people-row-name"><strong>{loginName || entry.user.email}</strong></span>,
+                                            access: described.status,
+                                            actions: <RowMenu items={described.menuItems} />,
+                                        }}
+                                    />
+                                )
+                            }
+                            const party = person
                             const editable = canManage && party.participations.length === 0
                             const described = describeAccess({
                                 t, settings, entries: entriesOf(party), party, canManage, actions: accessActions,
@@ -406,23 +430,7 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
                                 />
                             )
                         })}
-                        {bareLogins.map((entry) => {
-                            const loginName = `${entry.user.first_name} ${entry.user.last_name}`.trim()
-                            const described = describeAccess({
-                                t, settings, entries: entries.filter((item) => item.user.id === entry.user.id), canManage,
-                                actions: accessActions, shownEmail: loginName ? undefined : entry.user.email, onGive: () => undefined,
-                            })
-                            return (
-                                <PersonRows
-                                    key={`login-${entry.user.id}`}
-                                    cells={{
-                                        who: <span className="people-row-name"><strong>{loginName || entry.user.email}</strong></span>,
-                                        access: described.status,
-                                        actions: <RowMenu items={described.menuItems} />,
-                                    }}
-                                />
-                            )
-                        })}
+
                     </tbody>
                 </table>
             </section>

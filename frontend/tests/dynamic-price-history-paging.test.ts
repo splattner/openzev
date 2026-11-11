@@ -55,8 +55,8 @@ async function flush() {
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) })
 }
 
-async function mount(count: number, compact: boolean) {
-    api.fetchDynamicPriceHistory.mockResolvedValue(history(count))
+async function mount(count: number, compact: boolean, data = history(count)) {
+    api.fetchDynamicPriceHistory.mockResolvedValue(data)
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     await act(async () => {
         root.render(createElement(QueryClientProvider, { client }, createElement(DynamicPriceHistoryPanel, { source: SOURCE, compact })))
@@ -88,6 +88,18 @@ afterEach(() => {
 })
 
 describe('the fetched-price table in the tariff pane', () => {
+    it('sorts decimal prices numerically in both directions', async () => {
+        const data = history(3)
+        data.points.forEach((point, index) => { point.price_chf_per_kwh = ['0.2', '0.10', '-0.3'][index] })
+        await mount(3, false, data)
+        const header = container.querySelectorAll<HTMLButtonElement>('th button')[1]
+        const prices = () => [...bodyRows()].map(row => row.querySelectorAll('td')[1].textContent)
+        await act(async () => header.click())
+        expect(prices()).toEqual(['0.20000', '0.10000', '-0.30000'])
+        await act(async () => header.click())
+        expect(prices()).toEqual(['-0.30000', '0.10000', '0.20000'])
+    })
+
     it('shows 12 rows at a time and pages through the range', async () => {
         await mount(30, true)
         expect(bodyRows()).toHaveLength(12)

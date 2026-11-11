@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../components/tableSorting'
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Skeleton, Switch } from '@mantine/core'
@@ -157,6 +158,14 @@ export function AdminSystemSettingsPage() {
     const previewDateTime = '2026-03-18T14:35:00Z'
     const flags = featureFlagsQuery.data ?? []
     const providers = oauthProvidersQuery.data ?? []
+    const providerSort = useTableSorting(providers, {
+        colName: row => row.display_name,
+        colClientId: row => row.client_id,
+        colRedirectUrl: row => row.redirect_url,
+        colScope: row => row.scope,
+        colEnabled: row => Number(row.enabled),
+    })
+
     const oauthMutationPending = createOAuthMutation.isPending || updateOAuthMutation.isPending
 
     function setActiveTab(tab: SystemSettingsTab) {
@@ -429,16 +438,16 @@ export function AdminSystemSettingsPage() {
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>{t('adminOAuth.colName')}</th>
-                                    <th>{t('adminOAuth.colClientId')}</th>
-                                    <th>{t('adminOAuth.colRedirectUrl')}</th>
-                                    <th>{t('adminOAuth.colScope')}</th>
-                                    <th style={{ textAlign: 'center' }}>{t('adminOAuth.colEnabled')}</th>
+                                    <SortableHeader {...providerSort.header('colName')}>{t('adminOAuth.colName')}</SortableHeader>
+                                    <SortableHeader {...providerSort.header('colClientId')}>{t('adminOAuth.colClientId')}</SortableHeader>
+                                    <SortableHeader {...providerSort.header('colRedirectUrl')}>{t('adminOAuth.colRedirectUrl')}</SortableHeader>
+                                    <SortableHeader {...providerSort.header('colScope')}>{t('adminOAuth.colScope')}</SortableHeader>
+                                    <SortableHeader {...providerSort.header('colEnabled')} style={{ textAlign: 'center' }}>{t('adminOAuth.colEnabled')}</SortableHeader>
                                     <th>{t('common.actions')}</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {providers.map((provider) => (
+                                {providerSort.rows.map((provider) => (
                                     <tr key={provider.id}>
                                         <td>
                                             <strong>{provider.display_name}</strong>

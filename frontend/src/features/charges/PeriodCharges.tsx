@@ -168,7 +168,7 @@ export function PeriodCharges({ zevId, periodStart, periodEnd, periodLocked }: P
             id: 'bearers',
             accessorKey: 'bearerNames',
             sortDescFirst: false,
-            sortingFn: ({ original: left }, { original: right }) => {
+            sortFn: ({ original: left }, { original: right }) => {
                 const allocation = collator.compare(left.allocation, right.allocation)
                 if (allocation) return allocation
                 for (let index = 0; index < Math.min(left.bearerNames.length, right.bearerNames.length); index++) {

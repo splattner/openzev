@@ -182,7 +182,7 @@ describe('metering gap selection', () => {
         ]
         const view = await renderChart('/metering/quality', 'quality')
         const button = Array.from(view.container.querySelectorAll<HTMLButtonElement>('th button'))
-            .find(button => button.textContent === 'meteringDataQuality.gaps')!
+            .find(button => button.textContent?.startsWith('meteringDataQuality.gaps'))!
         const header = button.closest('th')!
         const meters = () => Array.from(view.container.querySelectorAll('tbody tr')).map(row => row.children[0].textContent)
         await act(async () => button.click())

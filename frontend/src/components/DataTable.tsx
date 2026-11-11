@@ -23,6 +23,7 @@ import {
 } from '@tanstack/react-table'
 import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { SortableHeader } from './tableSorting'
 
 const features = tableFeatures({
     columnFilteringFeature,
@@ -55,13 +56,6 @@ const TANSTACK_DEFAULT_SIZE = 150
 /** One fixed page size: long enough that most lists fit on one page, so the
  *  footer offers only prev/next, never a rows-per-page choice. */
 const PAGE_SIZE = 100
-
-function preserveHeaderFocus(button: HTMLButtonElement | null) {
-    if (!button) return
-    return () => {
-        if (document.activeElement === button) button.closest('th')?.focus()
-    }
-}
 
 interface DataTableProps<T extends Record<string, any>> {
     data: T[]
@@ -132,24 +126,13 @@ export function DataTable<T extends Record<string, any>>({
                                 {headerGroup.headers.map((header) => {
                                     const canSort = showSortControls && header.column.getCanSort()
                                     const dir = header.column.getIsSorted()
-                                    const ariaSort = canSort && header.column.getSortIndex() === 0 && dir
-                                        ? (dir === 'asc' ? 'ascending' : 'descending') : undefined
                                     return (
-                                        <th key={header.id} tabIndex={-1} aria-sort={ariaSort} style={{ width: header.getSize() !== TANSTACK_DEFAULT_SIZE ? header.getSize() : undefined }}>
-                                            {header.isPlaceholder ? null : canSort ? (
-                                                <button
-                                                    type="button"
-                                                    ref={preserveHeaderFocus}
-                                                    className="data-table-sort"
-                                                    onClick={header.column.getToggleSortingHandler()}
-                                                >
-                                                    {flexRender(header.column.columnDef.header, header.getContext())}
-                                                    <span aria-hidden="true">{dir === 'asc' ? '▲' : dir === 'desc' ? '▼' : ''}</span>
-                                                </button>
-                                            ) : (
-                                                flexRender(header.column.columnDef.header, header.getContext())
-                                            )}
-                                        </th>
+                                        <SortableHeader key={header.id} direction={dir}
+                                            onSort={!header.isPlaceholder && canSort ? header.column.getToggleSortingHandler() : undefined}
+                                            primary={header.column.getSortIndex() === 0}
+                                            style={{ width: header.getSize() !== TANSTACK_DEFAULT_SIZE ? header.getSize() : undefined }}>
+                                            {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                                        </SortableHeader>
                                     )
                                 })}
                             </tr>

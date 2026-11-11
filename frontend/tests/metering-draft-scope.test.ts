@@ -472,8 +472,10 @@ describe('metering status availability', () => {
         expect(state.actions!).toMatchObject({ view: 'inactive', searchTerm: 'roof', typeFilter: 'production', buildingFilter: 'b1', sort: 'location' })
         expect(state.actions!.meteringPoints).toEqual([])
         act(() => state.navigate!(-1))
-        expect(state.actions!).toMatchObject({ view: 'all', searchTerm: '', typeFilter: 'all', buildingFilter: 'all', sort: 'meter_id' })
+        expect(state.actions!).toMatchObject({ view: 'all', searchTerm: '', typeFilter: 'all', buildingFilter: 'all', sort: undefined })
         expect(state.actions!.meteringPoints.map(point => point.id)).toEqual(['mp42'])
+        act(() => state.actions!.setSort('meter_id'))
+        expect(state.actions!.sort).toBe('meter_id')
     })
 })
 

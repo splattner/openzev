@@ -110,7 +110,7 @@ it('sorts source reuse by total links and keeps equal totals tied', async () => 
     await act(async () => root.render(createElement(MemoryRouter, {},
       createElement(MantineProvider, {}, createElement(QueryClientProvider, { client }, createElement(AdminDynamicSourcesPanel))))))
     const button = Array.from(container.querySelectorAll<HTMLButtonElement>('th button'))
-      .find(button => button.textContent === 'pages.dynamicSources.columns.reuse')!
+      .find(button => button.textContent?.startsWith('pages.dynamicSources.columns.reuse'))!
     const labels = () => Array.from(container.querySelectorAll('tbody tr')).map(row => row.querySelector('strong')?.textContent)
     await act(async () => button.click())
     expect(labels()).toEqual(['Both', 'Tariffs', 'Communities'])

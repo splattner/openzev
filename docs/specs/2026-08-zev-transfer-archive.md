@@ -553,7 +553,8 @@ The route/history policy is described in `2026-03-community-and-access.md` §9.2
 - Opened from `/admin/zevs` (Platform → Overview → ZEVs).
 - Uploads the zip, calls `inspect-archive` first, shows per-section row counts
   and a name field, then submits `import-archive` with the chosen sections;
-  per-entry errors are listed from the response body.
+  per-entry errors are listed from the response body. Section, entry label and error
+  text headings sort the shown errors; original entry positions remain visible.
 
 ### Types and API client
 

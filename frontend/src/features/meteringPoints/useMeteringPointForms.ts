@@ -204,32 +204,26 @@ export function meteringPointNeedsAttention(
 
 // ── Sort ────────────────────────────────────────────────────────────────────
 
-export type MeteringPointSort = 'meter_id' | 'location' | 'last_reading'
+export type MeteringPointSortColumn = 'meter_id' | 'location' | 'last_reading' | 'holder'
+export type MeteringPointSort = MeteringPointSortColumn | `-${MeteringPointSortColumn}`
 
-export function readMeteringPointSort(value: string | null): MeteringPointSort {
-  return value === 'location' || value === 'last_reading' ? value : 'meter_id'
+export function readMeteringPointSort(value: string | null): MeteringPointSort | undefined {
+  return ['meter_id', 'location', 'last_reading', 'holder', '-meter_id', '-location', '-last_reading', '-holder'].includes(value ?? '')
+    ? value as MeteringPointSort : undefined
 }
 
-/** A new array: `last_reading` puts the stalest first (a meter that never reported leads), because that is the one to look at. */
-export function sortMeteringPoints(points: MeteringPoint[], sort: MeteringPointSort): MeteringPoint[] {
-  const byMeterId = (left: MeteringPoint, right: MeteringPoint) =>
-    left.meter_id.localeCompare(right.meter_id, undefined, { numeric: true })
-  const compare = (left: MeteringPoint, right: MeteringPoint): number => {
-    if (sort === 'location') {
-      const leftLocation = left.location_description?.trim() ?? ''
-      const rightLocation = right.location_description?.trim() ?? ''
-      // An unset location sorts last, not first.
-      if (!leftLocation !== !rightLocation) return leftLocation ? -1 : 1
-      return leftLocation.localeCompare(rightLocation, undefined, { numeric: true }) || byMeterId(left, right)
-    }
-    if (sort === 'last_reading') {
-      const leftAt = left.last_reading_at ?? ''
-      const rightAt = right.last_reading_at ?? ''
-      return leftAt.localeCompare(rightAt) || byMeterId(left, right)
-    }
-    return byMeterId(left, right)
-  }
-  return [...points].sort(compare)
+/** Last reading starts with never/stalest; reverse order puts newest first. */
+export function sortMeteringPoints(points: MeteringPoint[], sort: MeteringPointSort = 'meter_id', holderNames = new Map<string, string>(), locale?: string): MeteringPoint[] {
+  const collator = new Intl.Collator(locale, { numeric: true })
+  const column = sort.replace(/^-/, '')
+  const direction = sort.startsWith('-') ? -1 : 1
+  return [...points].sort((left, right) => {
+    const a = column === 'location' ? left.location_description?.trim() : column === 'holder' ? holderNames.get(left.id) : column === 'last_reading' ? left.last_reading_at : left.meter_id
+    const b = column === 'location' ? right.location_description?.trim() : column === 'holder' ? holderNames.get(right.id) : column === 'last_reading' ? right.last_reading_at : right.meter_id
+    // Missing names/locations remain last in either direction.
+    if (column !== 'last_reading' && !a !== !b) return a ? -1 : 1
+    return direction * (collator.compare(a ?? '', b ?? '') || collator.compare(left.meter_id, right.meter_id))
+  })
 }
 
 // ── Filters as URL state (#625) ─────────────────────────────────────────────

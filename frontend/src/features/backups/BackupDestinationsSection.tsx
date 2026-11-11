@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Switch } from '@mantine/core'
@@ -44,6 +45,14 @@ export function BackupDestinationsSection({ status }: { status: BackupStatus | u
     })
     const destinations = destinationsQuery.data ?? []
 
+    const sorting = useTableSorting(destinations, {
+        name: row => row.name,
+        type: row => row.kind,
+        target: row => destinationTarget(row),
+        credentials: row => row.credential_mode,
+        keeps: row => row.retention_count > 0 ? row.retention_count : Number.MAX_SAFE_INTEGER,
+        status: row => Number(row.enabled),
+    })
     const encryptionAvailable = status?.encrypted ?? false
     const environmentCredentials = status?.environment_credentials ?? false
 
@@ -156,17 +165,17 @@ export function BackupDestinationsSection({ status }: { status: BackupStatus | u
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>{t('pages.backups.destinations.columns.name')}</th>
-                                <th>{t('pages.backups.destinations.columns.type')}</th>
-                                <th>{t('pages.backups.destinations.columns.target')}</th>
-                                <th>{t('pages.backups.destinations.columns.credentials')}</th>
-                                <th>{t('pages.backups.destinations.columns.keeps')}</th>
-                                <th>{t('pages.backups.destinations.columns.status')}</th>
+                                <SortableHeader {...sorting.header('name')}>{t('pages.backups.destinations.columns.name')}</SortableHeader>
+                                <SortableHeader {...sorting.header('type')}>{t('pages.backups.destinations.columns.type')}</SortableHeader>
+                                <SortableHeader {...sorting.header('target')}>{t('pages.backups.destinations.columns.target')}</SortableHeader>
+                                <SortableHeader {...sorting.header('credentials')}>{t('pages.backups.destinations.columns.credentials')}</SortableHeader>
+                                <SortableHeader {...sorting.header('keeps')}>{t('pages.backups.destinations.columns.keeps')}</SortableHeader>
+                                <SortableHeader {...sorting.header('status')}>{t('pages.backups.destinations.columns.status')}</SortableHeader>
                                 <th>{t('common.actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {destinations.map((destination) => (
+                            {sorting.rows.map((destination) => (
                                 <tr key={destination.id}>
                                     <td><strong>{destination.name}</strong></td>
                                     <td>{t(`pages.backups.destinations.kind.${destination.kind}`)}</td>

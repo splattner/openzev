@@ -1921,6 +1921,8 @@ Every other test file that used to construct a percentage tariff via `Tariff.per
 
 ### Frontend
 
+Tariff overview rows sort within categories by name, actual unit (`kWh`, `month`, `year`), lowest numeric CHF rate and validity start. Applies stays a plain heading for multi-line schedules and descriptions. Effective percentage rates and dynamic averages use their raw summaries; unavailable rates stay last. Detail actions retain series/version identity. See [management-page sorting](2026-04-frontend-management-page-design.md#72-information-architecture-rules).
+
 - Tariff management page behaviors and invoice detail rendering
 - Build and type checks (`npm run build`)
 

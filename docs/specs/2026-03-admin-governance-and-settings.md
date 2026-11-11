@@ -402,6 +402,8 @@ Template: `TEMPLATE_NAME = "invoices/invoice_pdf.html"` — editable by admins v
 
 ## 9. Frontend
 
+Record tables for VAT, OAuth providers, accounts, access credentials and communities use the shared sorting contract in [management-page design §7.2](2026-04-frontend-management-page-design.md#72-information-architecture-rules). Sorting uses raw values (numbers, dates and identities); actions remain attached to their original records and are not sortable.
+
 ### 9.1 AppSettings provider
 
 **File:** `frontend/src/lib/appSettings.tsx`

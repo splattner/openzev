@@ -66,11 +66,25 @@ describe('sortMeteringPoints', () => {
         expect(points.map((p) => p.id)).toEqual(before)
     })
 
-    it('reads an unknown or removed sort from the URL as the default, meter ID', () => {
+    it('reverses IDs and dates, and keeps missing locations last', () => {
+        expect(ids('-meter_id')).toEqual(['m10', 'm3', 'm2', 'm1'])
+        expect(ids('-last_reading')).toEqual(['m10', 'm3', 'm2', 'm1'])
+        expect(ids('-location')).toEqual(['m3', 'm10', 'm2', 'm1'])
+    })
+
+    it('sorts by the current holder name with locale collation and missing holders last', () => {
+        const names = new Map([['m3', 'Zürcher'], ['m2', 'Äberli']])
+        expect(sortMeteringPoints(points, 'holder', names, 'de-CH').map(p => p.id)).toEqual(['m2', 'm3', 'm1', 'm10'])
+        expect(sortMeteringPoints(points, '-holder', names, 'de-CH').map(p => p.id)).toEqual(['m3', 'm2', 'm10', 'm1'])
+        expect(readMeteringPointSort('-holder')).toBe('-holder')
+    })
+
+    it('leaves missing or invalid URL sorts unselected while retaining meter-ID order', () => {
         expect(readMeteringPointSort('location')).toBe('location')
-        expect(readMeteringPointSort('attention')).toBe('meter_id')
-        expect(readMeteringPointSort('nonsense')).toBe('meter_id')
-        expect(readMeteringPointSort(null)).toBe('meter_id')
+        for (const value of ['attention', 'nonsense', null]) {
+            expect(readMeteringPointSort(value)).toBeUndefined()
+            expect(ids(readMeteringPointSort(value))).toEqual(['m1', 'm2', 'm3', 'm10'])
+        }
     })
 })
 
@@ -134,6 +148,29 @@ describe('MeteringPointsList', () => {
         point('m2', { building: 'b1' }),
         point('m3', { building: 'b2' }),
     ]
+
+    it('leaves default headings unmarked and selects ascending meter-ID order on the first click', () => {
+        const onChangeSort = vi.fn()
+        const view = render({ points, onChangeSort })
+        const header = view.querySelector('th')!
+        expect(view.querySelector('th[aria-sort]')).toBeNull()
+        expect(header.querySelector('span[aria-hidden]')?.textContent).toBe('')
+        act(() => header.querySelector('button')!.click())
+        expect(onChangeSort).toHaveBeenCalledWith('meter_id')
+    })
+
+    it('connects the headings to URL sorting and keeps single-row building headers plain', () => {
+        const onChangeSort = vi.fn()
+        const view = render({ points, sort: '-meter_id', onChangeSort })
+        const tables = view.querySelectorAll('table')
+        const headers = tables[0].querySelectorAll('th')
+        expect(headers[0].getAttribute('aria-sort')).toBe('descending')
+        act(() => headers[0].querySelector('button')!.click())
+        expect(onChangeSort).toHaveBeenLastCalledWith('meter_id')
+        act(() => headers[1].querySelector('button')!.click())
+        expect(onChangeSort).toHaveBeenLastCalledWith('holder')
+        expect(tables[1].querySelector('th button, th[aria-sort]')).toBeNull()
+    })
 
     it('shows the location under the meter ID only when there is one', () => {
         const view = render({ points })

@@ -103,6 +103,25 @@
     display: none;
   }
 
+  .doc-wide:has(.sortable-header) {
+    display: block;
+  }
+
+  .doc-wide:has(.sortable-header) table {
+    min-width: 0;
+  }
+
+  .doc-wide:has(.sortable-header) thead tr {
+    display: flex;
+    flex-wrap: wrap;
+    background: var(--brand-deep);
+  }
+
+  .doc-wide:has(.sortable-header) tbody,
+  .doc-wide:has(.sortable-header) th:not(.sortable-header) {
+    display: none;
+  }
+
   .doc-cards {
     display: block;
     padding: 0 1rem;

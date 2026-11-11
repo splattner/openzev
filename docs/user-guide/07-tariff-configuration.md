@@ -2,6 +2,12 @@
 
 This guide covers setting up tariffs and pricing in OpenZEV.
 
+Column headings sort tariffs within their categories. Price uses the lowest
+listed CHF rate for a multi-band tariff; unavailable prices stay last. Unit sorts
+by kWh, month or year. **Applies** stays a plain heading because it can describe
+several schedules. Import
+previews retain your ticks and billing choices when you change their order.
+
 ## What is a Tariff?
 
 A **tariff** is a pricing rule that defines how to charge participants for energy.

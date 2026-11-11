@@ -79,6 +79,23 @@ async function mount(body: ReactNode) {
 }
 
 describe('DocumentsPage (invoices and credit notes carry their amounts and where they stand)', () => {
+  it('sorts document titles and numeric amounts in the table and the phone cards', async () => {
+    api.list.mockResolvedValue([
+      invoiceRow({ id: 'z', title: 'Zulu', invoice_figures: { ...invoiceRow().invoice_figures!, total_chf: '10.00' } }),
+      invoiceRow({ id: 'a', title: 'Alpha', invoice_figures: { ...invoiceRow().invoice_figures!, total_chf: '2.00' } }),
+    ])
+    const { container } = await mount(createElement(DocumentsPage))
+    const headers = Array.from(container.querySelectorAll('th'))
+    const title = headers.find(header => header.textContent?.startsWith('inbox.outbox.col.document'))!
+    const amount = headers.find(header => header.textContent?.startsWith('inbox.col.amount'))!
+    await act(async () => title.querySelector('button')!.click())
+    expect(container.querySelector('tbody tr')?.textContent).toContain('Alpha')
+    expect(container.querySelector('.doc-card strong')?.textContent).toContain('Alpha')
+    await act(async () => amount.querySelector('button')!.click())
+    expect(container.querySelector('tbody tr')?.textContent).toContain('Zulu')
+    expect(container.querySelector('.doc-card strong')?.textContent).toContain('Zulu')
+  })
+
   it('lists an invoice with what is owed and a download, and no link to a live invoice', async () => {
     api.list.mockResolvedValue([invoiceRow()])
     const { container } = await mount(createElement(DocumentsPage))

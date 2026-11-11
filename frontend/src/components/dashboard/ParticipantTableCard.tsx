@@ -1,8 +1,9 @@
+import { SortableHeader, useTableSorting } from '../tableSorting'
 import { useTranslation } from 'react-i18next'
 import { BehindMeterBadge } from '../BehindMeterBadge'
 import { dashboardKwhStat } from '../../lib/dashboardFormatting'
 import { formatPercent } from '../../lib/numbers'
-import { behindMeterHintKey } from '../../lib/supplementary'
+import { behindMeterHintKey, grossRate } from '../../lib/supplementary'
 import { NetMeteredRate } from './NetMeteredRate'
 import { OwnSystemKwh } from './OwnSystemKwh'
 import type { ZevOwnerDashboardSummary } from '../../types/api'
@@ -30,6 +31,14 @@ export function ParticipantTableCard({
     ownParticipantIds = [],
 }: ParticipantTableCardProps) {
     const { t } = useTranslation()
+    const sorting = useTableSorting(participantStats, {
+        participant: row => row.participant_name,
+        consumption: row => row.total_consumed_kwh,
+        productionExport: row => row.total_produced_kwh,
+        fromZev: row => row.from_zev_kwh,
+        fromGrid: row => row.from_grid_kwh,
+        fromZevPercent: row => row.has_behind_meter_generation ? grossRate(row.gross_energy) : row.total_consumed_kwh > 0 ? zevSharePercent(row) : null,
+    })
     return (
         <section className="card">
             <h3>{t('pages.dashboard.perParticipant')}</h3>
@@ -40,16 +49,16 @@ export function ParticipantTableCard({
                     <table className="participant-table">
                         <thead>
                             <tr>
-                                <th>{t('pages.dashboard.col.participant')}</th>
-                                <th className="numeric">{t('pages.dashboard.col.consumption')}</th>
-                                <th className="numeric">{t('pages.dashboard.col.productionExport')}</th>
-                                <th className="numeric">{t('pages.dashboard.col.fromZev')}</th>
-                                <th className="numeric">{t('pages.dashboard.col.fromGrid')}</th>
-                                <th className="numeric">{t('pages.dashboard.col.fromZevPercent')}</th>
+                                <SortableHeader {...sorting.header('participant')}>{t('pages.dashboard.col.participant')}</SortableHeader>
+                                <SortableHeader {...sorting.header('consumption')} className="numeric">{t('pages.dashboard.col.consumption')}</SortableHeader>
+                                <SortableHeader {...sorting.header('productionExport')} className="numeric">{t('pages.dashboard.col.productionExport')}</SortableHeader>
+                                <SortableHeader {...sorting.header('fromZev')} className="numeric">{t('pages.dashboard.col.fromZev')}</SortableHeader>
+                                <SortableHeader {...sorting.header('fromGrid')} className="numeric">{t('pages.dashboard.col.fromGrid')}</SortableHeader>
+                                <SortableHeader {...sorting.header('fromZevPercent')} className="numeric">{t('pages.dashboard.col.fromZevPercent')}</SortableHeader>
                             </tr>
                         </thead>
                         <tbody>
-                            {participantStats.map((participant) => {
+                            {sorting.rows.map((participant) => {
                                 const isSelected = selectedParticipantId === participant.participant_id
                                 return (
                                     <tr

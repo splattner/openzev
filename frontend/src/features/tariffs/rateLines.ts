@@ -8,6 +8,14 @@ export type RateLine = { applies: string, price: string, unit: string }
 /** Minimal translate signature used by the pure formatter (subset of i18next). */
 export type RateLineTranslate = Translate
 
+export function tariffRateUnit(series: Pick<TariffSeries, 'billing_mode'>, version: Pick<TariffVersion, 'dynamic_source' | 'periods'>): 'kWh' | 'month' | 'year' | undefined {
+    if (version.dynamic_source) return 'kWh'
+    if (series.billing_mode === 'energy' || series.billing_mode === 'percentage_of_energy') {
+        return version.periods.length ? 'kWh' : undefined
+    }
+    return series.billing_mode.endsWith('yearly_fee') ? 'year' : 'month'
+}
+
 // At least three decimals, so 0.18 lines up with 0.085; the API's five would
 // read 0.29500.
 export const kwhPrice = new Intl.NumberFormat('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 5, useGrouping: false })
@@ -103,14 +111,13 @@ export function buildRateLines(
             }
         })
     }
-    const yearly = series.billing_mode.endsWith('yearly_fee')
     const basis = series.billing_mode.startsWith('per_metering_point')
         ? 'perMeteringPoint'
         : series.billing_mode.startsWith('shared') ? 'shared' : 'perParticipant'
     return [{
         applies: t(`pages.tariffs.rateCard.${basis}`),
         price: Number(version.fixed_price_chf || 0).toFixed(2),
-        unit: t(yearly ? 'pages.tariffs.rateCard.perYear' : 'pages.tariffs.rateCard.perMonth'),
+        unit: t(tariffRateUnit(series, version) === 'year' ? 'pages.tariffs.rateCard.perYear' : 'pages.tariffs.rateCard.perMonth'),
     }]
 }
 
@@ -135,4 +142,18 @@ export function nextChange(current: RateLine[], planned: RateLine[]): NextChange
         && current.every((line, index) => line.applies === planned[index].applies && line.unit === planned[index].unit)
     if (!comparable) return { kind: 'schedule' }
     return { kind: 'prices', prices: planned.map((line) => line.price || '—').join(' / '), unit: planned[0].unit }
+}
+
+/** A multi-band row sorts by its lowest CHF rate; unknown prices stay last. */
+export function lowestTariffRate(tariff: Pick<TariffVersion, 'fixed_price_chf' | 'dynamic_source' | 'dynamic_price_summary' | 'percentage_base_summary'> & { periods: readonly Pick<TariffVersion['periods'][number], 'price_chf_per_kwh' | 'percentage'>[] }): number | null {
+    if (tariff.dynamic_source) {
+        const average = tariff.dynamic_price_summary?.average_chf_per_kwh
+        return average == null ? null : Number(average)
+    }
+    const base = tariff.percentage_base_summary?.price_chf_per_kwh
+    const values = [tariff.fixed_price_chf, ...tariff.periods.map(period => period.percentage != null
+        ? base != null ? Number(base) * Number(period.percentage) / 100 : null
+        : period.price_chf_per_kwh)]
+        .filter(value => value != null).map(Number).filter(Number.isFinite)
+    return values.length ? Math.min(...values) : null
 }

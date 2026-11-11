@@ -37,8 +37,12 @@ in it, or with everything in it, is left out; a nonempty **Needs attention** tab
 always remains visible. Below them, the search finds a meter ID, location, building
 or participant, and, when the community has more than one metering point
 type, a second row of tabs narrows to one type. A **Sort** menu orders the
-list by **Meter ID** (the default), **Location** or **Oldest reading first**
-(meters that never reported come first). The filters and the sort are kept in the page
+list by **Meter ID** (the default), **Assignment**, **Location** or **Last reading**
+(oldest first, with meters that never reported ahead of all). Each order can be reversed. You can also
+click **Meter**, **Assignment** or **Last reading** above the list, including on phones.
+No heading arrow appears until you choose an order. The first header click selects
+ascending order; click again to reverse it.
+Sorting stays within each building, and a group with one meter shows plain headings. The filters and the sort are kept in the page
 address, so a bookmark or shared link opens the same view.
 
 If a refresh fails, the last loaded list and any open form stay available.

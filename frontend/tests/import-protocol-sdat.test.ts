@@ -541,6 +541,10 @@ describe('ImportProtocolModal correction history', () => {
         expect(container.querySelector('#correction-history tbody tr')?.textContent).toContain('50.0000 kWh')
         expect(container.textContent).toContain('2 / 200')
 
+        act(() => container.querySelectorAll<HTMLButtonElement>('#correction-history th button')[4].click())
+        expect(container.querySelector('#correction-history tbody tr')?.textContent).toContain('9950.0000 kWh')
+        expect(container.querySelectorAll('#correction-history tbody tr')).toHaveLength(50)
+
         heldApi.fetchImportLog.mockResolvedValue(baseLog({ id: 'another', reading_changes: [change()] }))
         await open(baseLog({ id: 'another' }))
         await vi.waitFor(() => expect(translate).toHaveBeenCalledWith('pages.imports.protocol.correctionsRetained', { count: 1 }))

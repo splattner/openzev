@@ -239,6 +239,11 @@ route `admin/accounts/tokens`, with `admin/accounts/api-keys` and `admin/api-key
 (`AliasNavigate`). `AdminApiKeysPage` becomes `AdminCredentialsPage`: stat cards (active, expiring soon,
 revoked) unchanged in meaning; filters user, **type**, status; the table gains type, scope and owner; Revoke per
 row through the kind's admin endpoint (energy tokens: `revoke-push-token`).
+All data headings are sortable by raw values through the shared
+[sorting contract](2026-04-frontend-management-page-design.md#72-information-architecture-rules);
+Scope ordering uses the complete raw community/participant/meter text, omitting
+empty parts; an empty scope stays last in both directions. Revoke remains
+attached to the original credential.
 
 ### 7.5 i18n and accessibility
 
@@ -266,7 +271,7 @@ Frontend (`frontend/tests/`):
 | `tokens-section.test.ts` | 17 | list rows with type, access, scope and prefix; filter chips; expiring badge; empty state; rotate and manage link only on energy tokens; revoke through confirmation and the kind's endpoint; rotate shows the new token once; create API key and analytics token (scope options, participant scope, ready-made command); an administrator can pick any community and an ordinary account triggers no community lookup; impersonation shows disabled creation/rotation with explanatory tooltips, including stale creation capabilities, and preserves revocation; link to the energy data page; a ZEV-held push token is marked as operated by the community |
 | `credentials-helpers.test.ts` | 6 | counts and filters; `analyticsScopeOptions` for grants, roles, participant records, ended rows, disabled communities, the administrator's extra communities, no memberships |
 | `secret-reveal.test.ts` | 3 | shows, copies and dismisses; copy failure; caller wording and test id |
-| `admin-credentials-page.test.ts` | 5 | every kind with owner and counts; a ZEV-held push token shows the community as owner; revoke only for non-revoked; revoke as admin through the kind after confirmation; type filter reaches the server |
+| `admin-credentials-page.test.ts` | 6 | complete scope ordering; every kind with owner and counts; a ZEV-held push token shows the community as owner; revoke only for non-revoked; revoke as admin through the kind after confirmation; type filter reaches the server |
 | `account-tabs.test.ts` (14) | – | `tokens` tab, the old `?tab=api-keys` still opens it; `route-guard-matrix.test.ts` gains `/admin/accounts/tokens` |
 
 Validation: backend `ruff check .`, `manage.py check`, `makemigrations --check`, `pytest -q`; frontend `npm run lint`,

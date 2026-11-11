@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from './tableSorting'
 import { useQuery } from '@tanstack/react-query'
 import { CHART_LOCAL, CONS_COLORS } from '../lib/chartTokens'
 import { CHART_AXIS_TICK } from '../lib/chartTheme'
@@ -481,8 +482,14 @@ export function RawMeteringTable({
     const days = summaryQuery.data ?? []
     // Date + In + Reading count, plus Feed-in when the meter exports.
     const colSpan = hasOut ? 4 : 3
+    const sorting = useTableSorting(days, {
+        day: row => row.date,
+        inTotal: row => row.in_kwh,
+        outTotal: row => row.out_kwh,
+        rawReadings: row => row.readings_count,
+    })
     const pageCount = Math.max(1, Math.ceil(days.length / DAYS_PER_PAGE))
-    const visibleDays = days.slice(page * DAYS_PER_PAGE, (page + 1) * DAYS_PER_PAGE)
+    const visibleDays = sorting.rows.slice(page * DAYS_PER_PAGE, (page + 1) * DAYS_PER_PAGE)
     // Bar scale spans the whole period, not just the visible page, so a
     // day's bar stays comparable after paging (#641).
     const maxIn = Math.max(0, ...days.map((d) => Math.abs(d.in_kwh)))
@@ -505,10 +512,10 @@ export function RawMeteringTable({
                 <table className="raw-metering-days">
                     <thead>
                         <tr>
-                            <th>{t('pages.meteringData.rawTable.day')}</th>
-                            <th className="raw-metering-num">{t('pages.meteringData.rawTable.inTotal')}</th>
-                            {hasOut && <th className="raw-metering-num">{t(outReadingLabelKey(meterType, 'pages.meteringData.rawTable.productionTotal', 'pages.meteringData.rawTable.outTotal'))}</th>}
-                            <th className="raw-metering-num">{t('pages.meteringData.rawTable.rawReadings')}</th>
+                            <SortableHeader {...sorting.header('day')}>{t('pages.meteringData.rawTable.day')}</SortableHeader>
+                            <SortableHeader {...sorting.header('inTotal')} className="raw-metering-num">{t('pages.meteringData.rawTable.inTotal')}</SortableHeader>
+                            {hasOut && <SortableHeader {...sorting.header('outTotal')} className="raw-metering-num">{t(outReadingLabelKey(meterType, 'pages.meteringData.rawTable.productionTotal', 'pages.meteringData.rawTable.outTotal'))}</SortableHeader>}
+                            <SortableHeader {...sorting.header('rawReadings')} className="raw-metering-num">{t('pages.meteringData.rawTable.rawReadings')}</SortableHeader>
                         </tr>
                     </thead>
                     <tbody>

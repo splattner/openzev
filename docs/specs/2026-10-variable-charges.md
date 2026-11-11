@@ -351,7 +351,8 @@ period overview has loaded (also when the period has no invoice rows). Props: `z
   convenience: the API accepts any date that is not locked. The live "who pays what" table is the
   `POST /charges/preview/` response (debounced query) with notes for a nobody-bills date, and for
   rounding that leaves an amount `unrecovered` or `overbilled`. Field errors from a 400 are mapped
-  onto the fields.
+  onto the fields. The preview sorts by raw bearer name or numeric CHF share,
+  retaining the bearer identity and totals.
 
 ### 7.2 Readiness and invoice cockpit
 

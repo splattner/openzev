@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faMoneyBillWave, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { useMutation } from '@tanstack/react-query'
@@ -37,6 +38,12 @@ export function InvoicePaymentsCard({
 
     const payments = invoice.payments ?? []
     const outstanding = Number(invoice.outstanding_chf ?? 0)
+    const sorting = useTableSorting(payments, {
+        paidOn: row => row.paid_on,
+        amount: row => Number(row.amount_chf),
+        note: row => row.note,
+        recordedBy: row => row.created_by_name,
+    })
     const canRecord = canManage && invoice.status === 'sent'
     // Once credit notes exist the payments they were issued against are fixed.
     const hasCredits = (invoice.credits ?? []).length > 0
@@ -110,15 +117,15 @@ export function InvoicePaymentsCard({
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>{t('pages.invoiceDetail.payments.paidOn')}</th>
-                                <th className="numeric">{t('pages.invoiceDetail.payments.amount')}</th>
-                                <th>{t('pages.invoiceDetail.payments.note')}</th>
-                                <th>{t('pages.invoiceDetail.payments.recordedBy')}</th>
+                                <SortableHeader {...sorting.header('paidOn')}>{t('pages.invoiceDetail.payments.paidOn')}</SortableHeader>
+                                <SortableHeader {...sorting.header('amount')} className="numeric">{t('pages.invoiceDetail.payments.amount')}</SortableHeader>
+                                <SortableHeader {...sorting.header('note')}>{t('pages.invoiceDetail.payments.note')}</SortableHeader>
+                                <SortableHeader {...sorting.header('recordedBy')}>{t('pages.invoiceDetail.payments.recordedBy')}</SortableHeader>
                                 {canManage ? <th><span className="visually-hidden">{t('common.actions')}</span></th> : null}
                             </tr>
                         </thead>
                         <tbody>
-                            {payments.map((payment) => (
+                            {sorting.rows.map((payment) => (
                                 <tr key={payment.id}>
                                     <td>{formatShortDate(payment.paid_on, settings)}</td>
                                     <td className="numeric">{formatChfAmount(Number(payment.amount_chf))}</td>

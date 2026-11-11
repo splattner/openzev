@@ -64,7 +64,7 @@ async function settled(page: { container: HTMLElement }, text: string) {
 }
 
 const headers = (container: HTMLElement) =>
-    Array.from(container.querySelectorAll('.doc-wide th')).map((cell) => cell.textContent)
+    Array.from(container.querySelectorAll('.doc-wide th')).map((cell) => cell.querySelector('button')?.firstChild?.textContent ?? cell.textContent)
 
 describe('Outbox table', () => {
     afterEach(() => { vi.clearAllMocks(); canWrite = true })

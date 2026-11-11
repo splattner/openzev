@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
@@ -19,8 +20,13 @@ export function BackupJobDetailsModal({ job, onClose }: { job: BackupJob | null;
     const { t } = useTranslation()
     const { settings } = useAppSettings()
 
+    const manifest = job ? readManifest(job) : null
+    const sorting = useTableSorting(manifest?.zevs ?? [], {
+        communities: row => row.name,
+        records: row => Object.values(row.counts).reduce((sum, count) => sum + count, 0),
+        invoicePdfs: row => row.media.files,
+    })
     if (!job) return null
-    const manifest = readManifest(job)
     const missing = countMissingMedia(manifest)
 
     return (
@@ -75,13 +81,13 @@ export function BackupJobDetailsModal({ job, onClose }: { job: BackupJob | null;
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>{t('pages.backups.details.communities')}</th>
-                                    <th>{t('pages.backups.details.records')}</th>
-                                    <th>{t('pages.backups.details.invoicePdfs')}</th>
+                                    <SortableHeader {...sorting.header('communities')}>{t('pages.backups.details.communities')}</SortableHeader>
+                                    <SortableHeader {...sorting.header('records')}>{t('pages.backups.details.records')}</SortableHeader>
+                                    <SortableHeader {...sorting.header('invoicePdfs')}>{t('pages.backups.details.invoicePdfs')}</SortableHeader>
                                 </tr>
                             </thead>
                             <tbody>
-                                {manifest.zevs.map((zev) => (
+                                {sorting.rows.map((zev) => (
                                     <tr key={zev.id}>
                                         <td>{zev.name}</td>
                                         <td>{formatNumber(Object.values(zev.counts).reduce((sum, n) => sum + n, 0))}</td>

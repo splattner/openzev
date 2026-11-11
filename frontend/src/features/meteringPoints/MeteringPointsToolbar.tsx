@@ -16,13 +16,14 @@ type MeteringPointsToolbarProps = {
   isManagedScope: boolean
   readOnly?: boolean
   totalCount: number
+  filteredCount: number
   activeCount: number
   inactiveCount: number
   unassignedCount: number
   needsAttentionCount: number
   searchTerm: string
   view: MeteringPointView
-  sort: MeteringPointSort
+  sort?: MeteringPointSort
   typeFilter: MeteringPointTypeFilter
   /** Metering points per type, across the whole list. */
   typeCounts: Partial<Record<MeteringPoint['meter_type'], number>>
@@ -41,21 +42,23 @@ type MeteringPointsToolbarProps = {
 
 const SORT_OPTIONS: Array<{ value: MeteringPointSort; labelKey: string }> = [
   { value: 'meter_id', labelKey: 'pages.meteringPoints.sort.meterId' },
+  { value: 'holder', labelKey: 'pages.meteringPoints.columns.holder' },
   { value: 'location', labelKey: 'pages.meteringPoints.sort.location' },
-  { value: 'last_reading', labelKey: 'pages.meteringPoints.sort.lastReading' },
+  { value: 'last_reading', labelKey: 'pages.meteringPoints.columns.lastReading' },
 ]
 
 export function MeteringPointsToolbar({
   isManagedScope,
   readOnly = false,
   totalCount,
+  filteredCount,
   activeCount,
   inactiveCount,
   unassignedCount,
   needsAttentionCount,
   searchTerm,
   view,
-  sort,
+  sort = 'meter_id',
   typeFilter,
   typeCounts,
   buildings = [],
@@ -119,15 +122,16 @@ export function MeteringPointsToolbar({
         {showTypeTabs && (
           <FilterTabs label={t('pages.meteringPoints.filters.type')} tabs={typeTabs} value={typeFilter} onChange={onChangeTypeFilter} />
         )}
-        {totalCount > 1 && (
+        {filteredCount > 1 && (
           <select
             value={sort}
             onChange={(event) => onChangeSort(event.target.value as MeteringPointSort)}
             aria-label={t('pages.meteringPoints.sort.label')}
           >
-            {SORT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{t(option.labelKey)}</option>
-            ))}
+            {SORT_OPTIONS.filter(option => isManagedScope || option.value !== 'holder').flatMap((option) => [
+              <option key={option.value} value={option.value}>{t(option.labelKey)} ↑</option>,
+              <option key={`-${option.value}`} value={`-${option.value}`}>{t(option.labelKey)} ↓</option>,
+            ])}
           </select>
         )}
         {buildings.length > 1 && onChangeBuildingFilter && (

@@ -2586,6 +2586,7 @@ export const it = {
             col: {
             },
             rateCard: {
+                sortLowestRate: "Ordina per la tariffa indicata più bassa.",
                 applies: 'Applicazione',
                 price: 'Prezzo (CHF)',
                 unit: 'Unità',
@@ -3073,7 +3074,6 @@ export const it = {
                 label: 'Ordina',
                 meterId: 'ID contatore',
                 location: 'Posizione',
-                lastReading: 'Prima la lettura più vecchia',
             },
             columns: {
                 actions: 'Azioni',

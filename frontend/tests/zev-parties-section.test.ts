@@ -34,7 +34,7 @@ vi.mock('../src/lib/api/zev', () => ({
     setPartyRoleBuilding: vi.fn(),
 }))
 
-import { assignPartyRole, endPartyRole, fetchBuildings, fetchParties, fetchPartyRoles, setPartyRoleBuilding } from '../src/lib/api/zev'
+import { assignPartyRole, endPartyRole, fetchBuildings, fetchParties, fetchPartyRoles, fetchZevAccess, setPartyRoleBuilding } from '../src/lib/api/zev'
 import { ZevPartiesSection } from '../src/features/zev/ZevPartiesSection'
 import { waitForCondition } from './helpers/waitForCondition'
 
@@ -101,6 +101,23 @@ async function click(element: Element) {
 }
 
 describe('ZevPartiesSection', () => {
+    it('sorts contacts and standalone logins together with their access details', async () => {
+        vi.mocked(fetchZevAccess).mockResolvedValueOnce([{
+            id: 'grant', zev: 'z1', role: 'viewer', valid_from: '2026-01-01', valid_to: null,
+            is_active: true, granted_by: null, created_at: '',
+            user: { id: 42, email: 'aaron@example.com', first_name: 'Aaron', last_name: '', pending_invitation: false },
+        }])
+        const container = await render(true)
+        const table = container.querySelector('.people-rows table')!
+        const names = () => Array.from(table.querySelectorAll('tbody .people-row-name strong')).map(name => name.textContent)
+        expect(names()).toEqual(['Verwaltung Nord', 'Aaron'])
+        await click(table.querySelector('th button')!)
+        expect(names()).toEqual(['Aaron', 'Verwaltung Nord'])
+        expect(table.querySelector('tbody tr')?.textContent).toContain('pages.zevSettings.access.level.viewer')
+        await click(table.querySelector('th button')!)
+        expect(names()).toEqual(['Verwaltung Nord', 'Aaron'])
+    })
+
     it('shows today\'s issuer, the missing representative, landowners and other contacts', async () => {
         const container = await render(true)
         const text = container.textContent ?? ''
