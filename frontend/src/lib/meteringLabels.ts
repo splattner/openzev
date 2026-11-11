@@ -1,5 +1,6 @@
 import type { AppSettings, MeteringPoint } from '../types/api'
 import { BUSINESS_TIME_ZONE, zonedParts } from './dates'
+import type { Translate } from './translate'
 
 /**
  * The backend truncates day and month buckets at Swiss midnight and hour
@@ -106,7 +107,7 @@ export function formatMeteringTimestamp(value: string, settings: AppSettings): s
 /** Translate stored quality codes; preserve unknown codes. */
 export function conditionLabel(
     condition: string,
-    translate: (key: string, options?: Record<string, string>) => string,
+    translate: Translate,
 ): string {
     if (!condition) return translate('pages.meteringData.rawTable.conditionValid')
     if (condition === '56') return `${translate('pages.meteringData.rawTable.conditionEstimated')} (56)`

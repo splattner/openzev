@@ -15,6 +15,7 @@ import { formatTariffError, formatTariffErrorData, splitTariffBandErrors } from 
 import { useAppSettings } from '../../lib/appSettings'
 import { invalidateTariffQueries } from './invalidate'
 import type { Tariff, TariffInput, TariffPeriod, TariffPeriodInput } from '../../types/api'
+import type { Translate } from '../../lib/translate'
 
 type ConfirmOptions = {
   title: string
@@ -34,7 +35,7 @@ type TariffCrudParams = {
   queryClient: QueryClient
   pushToast: (message: string, tone?: 'success' | 'error') => void
   confirm: (options: ConfirmOptions) => void
-  t: (key: string, options?: Record<string, unknown>) => string
+  t: Translate
   /** A tariff was created or changed and its form closed: select what was saved. */
   onTariffSaved?: (saved: Tariff, kind: 'created' | 'updated') => void
   /** A band was saved and its form closed. */

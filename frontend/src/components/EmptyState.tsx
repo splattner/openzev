@@ -31,7 +31,7 @@ export function EmptyState({ titleKey, descriptionKey, descriptionOptions, note,
     return (
         <section className="card empty-state" aria-labelledby={titleId} aria-describedby={descId}>
             <h3 id={titleId}>{t(titleKey)}</h3>
-            <p id={descId} className="muted">{t(descriptionKey, descriptionOptions)}</p>
+            <p id={descId} className="muted">{descriptionOptions ? t(descriptionKey, descriptionOptions) : t(descriptionKey)}</p>
             {note && <p className="muted">{note}</p>}
             {actions?.length ? (
                 <div className="actions-row actions-row-wrap">
