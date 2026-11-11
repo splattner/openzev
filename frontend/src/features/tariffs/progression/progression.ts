@@ -8,11 +8,11 @@ import type {
     TariffProgressionVatMode,
 } from '../../../types/api'
 import { formatSeason, formatWeekdays } from '../recurrence'
+import type { Translate } from '../../../lib/translate'
 
 /** Which of the two values a progression shows. */
 export type PriceBasis = 'net' | 'gross'
 
-type Translate = (key: string, opts?: Record<string, unknown>) => string
 
 const DAY_MS = 24 * 60 * 60 * 1000
 

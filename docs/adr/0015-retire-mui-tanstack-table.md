@@ -50,7 +50,9 @@ theme.
    `@emotion/react`, `@emotion/styled`; bridge files `lib/dataGridLocale.ts`
    and `lib/dataGridTheme.ts` deleted (dataGridTheme never shipped beyond the
    Phase 1 plan — the token sweep made it unnecessary). Sole new dependency:
-   `@tanstack/react-table` v8 (pinned to ^8; v9 is a different API).
+   `@tanstack/react-table`, first v8; since v9 (explicit `tableFeatures` and
+   `useTable`, all in `components/DataTable.tsx`, which callers use through its
+   own `ColumnDef` alias).
 4. **No data-contract changes.** All ports are presentation-only: same query
    keys, same mutations, same submitted fields. The date contract of ADR 0007 is
    untouched (Phase 2 already moved pickers to civil-date strings).

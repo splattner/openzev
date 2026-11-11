@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { DataTable, type ColumnDef, type ColumnFiltersState } from '../../components/DataTable'
 import { EmptyState } from '../../components/EmptyState'
 
-interface ImportHistoryTableProps<T> {
+interface ImportHistoryTableProps<T extends Record<string, any>> {
     rows: T[]
     columns: ColumnDef<T, unknown>[]
     getRowId: (row: T) => string
@@ -13,7 +13,7 @@ interface ImportHistoryTableProps<T> {
     onNewImport?: () => void
 }
 
-export function ImportHistoryTable<T>({ rows, columns, getRowId, filters, onFiltersChange, onNewImport }: ImportHistoryTableProps<T>) {
+export function ImportHistoryTable<T extends Record<string, any>>({ rows, columns, getRowId, filters, onFiltersChange, onNewImport }: ImportHistoryTableProps<T>) {
     const { t } = useTranslation()
     const filenameFilter = filters.find((filter) => filter.id === 'filename')?.value as string | undefined ?? ''
     const sourceFilter = filters.find((filter) => filter.id === 'source')?.value as string | undefined ?? ''

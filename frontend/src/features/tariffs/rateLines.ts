@@ -1,11 +1,12 @@
 import type { TariffSeries, TariffVersion } from '../../types/api'
 import { bandName, bandWindow } from './bands'
 import { formatSeason, formatWeekdays } from './recurrence'
+import type { Translate } from '../../lib/translate'
 
 export type RateLine = { applies: string, price: string, unit: string }
 
 /** Minimal translate signature used by the pure formatter (subset of i18next). */
-export type RateLineTranslate = (key: string, opts?: Record<string, unknown>) => string
+export type RateLineTranslate = Translate
 
 // At least three decimals, so 0.18 lines up with 0.085; the API's five would
 // read 0.29500.

@@ -4,8 +4,8 @@ import { formatShortDate } from '../../lib/appSettings'
 import type { AppSettings, TariffValidationError } from '../../types/api'
 import { MONTH_KEYS } from './recurrence'
 import { FIXED_PRICE_LABELS } from './labels'
+import type { Translate } from '../../lib/translate'
 
-type Translate = (key: string, options?: Record<string, unknown>) => string
 
 export const tariffErrorKeys: Record<string, string> = {
   band_time_pair: 'bandTimePair',

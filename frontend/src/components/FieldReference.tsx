@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TemplateField, TemplateFieldGroup } from '../types/api'
+import type { Translate } from '../lib/translate'
 
 export interface FieldReferenceProps {
     groups: TemplateFieldGroup[]
@@ -193,7 +194,7 @@ function translationTokenKey(variable: string): string | null {
 }
 
 export function fieldDescription(
-    t: (key: string, options?: Record<string, string>) => string,
+    t: Translate,
     field: TemplateField,
 ): string {
     const key = translationTokenKey(field.variable)

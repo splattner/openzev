@@ -833,7 +833,7 @@ Existing suites stay green (contract: 59 tests in `test_contract_context.py`; te
 
 - **Phase 5** — MUI fully retired per ADR 0015: `ImportsPage` and
   `AdminInvoicesPage` moved to a shared TanStack-based `DataTable`
-  (`@tanstack/react-table` v8), `ActionMenu` → Mantine `Menu`,
+  (`@tanstack/react-table`, now v9), `ActionMenu` → Mantine `Menu`,
   `AuditEventDrawer` → Mantine `Drawer`, remaining `Switch`/`Tabs` → Mantine.
   Removed: `@mui/material`, `@mui/x-data-grid`, `@emotion/react`,
   `@emotion/styled`, `lib/dataGridLocale.ts`. The bundle's dedicated MUI

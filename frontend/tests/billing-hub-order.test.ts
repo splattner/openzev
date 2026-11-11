@@ -62,6 +62,7 @@ describe('billing hub information architecture', () => {
         const activeTab = container.querySelector('[role="tab"][aria-selected="true"]')!
         const panel = document.getElementById(activeTab.getAttribute('aria-controls')!)!
         expect(getComputedStyle(panel).display).toBe('grid')
-        expect(getComputedStyle(panel).gap).toBe('1rem')
+        // jsdom 31 resolves rem to px in computed styles, as browsers do.
+        expect(getComputedStyle(panel).gap).toBe('16px')
     })
 })

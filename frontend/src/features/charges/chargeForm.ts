@@ -1,4 +1,5 @@
 import type { Charge, ChargeInput, Participant } from '../../types/api'
+import type { Translate } from '../../lib/translate'
 
 /** The form's own state: strings, as typed, converted to a `ChargeInput` only when valid. */
 export type ChargeFormValues = {
@@ -66,7 +67,7 @@ export function chargeInputFrom(values: ChargeFormValues, zevId: string): Charge
 export function bearersLabel(
     charge: Pick<Charge, 'allocation' | 'participants'>,
     names: Map<string, string>,
-    t: (key: string, options?: Record<string, unknown>) => string,
+    t: Translate,
 ): string {
     if (charge.allocation === 'all_participants') return t('pages.charges.bearers.all')
     if (charge.participants.length === 1) return names.get(charge.participants[0]) ?? t('pages.charges.bearers.one')
@@ -77,8 +78,6 @@ export function bearersLabel(
 export function clampDate(day: string, min: string, max: string): string {
     return day < min ? min : day > max ? max : day
 }
-
-type Translate = (key: string, options?: Record<string, unknown>) => string
 
 /**
  * How each participation is named where one is picked or listed. A party can

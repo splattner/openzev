@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import type { ColumnDef, ColumnFiltersState } from '@tanstack/react-table'
+import type { ColumnDef, ColumnFiltersState } from '../components/DataTable'
 import { ConfirmDialog, consumeReportedError, useConfirmDialog } from '../components/ConfirmDialog'
 import { DataTable } from '../components/DataTable'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'

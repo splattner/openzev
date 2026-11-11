@@ -7,6 +7,7 @@ import { formatTariffError } from './errors'
 import { useAppSettings } from '../../lib/appSettings'
 import { invalidateTariffQueries } from './invalidate'
 import type { Tariff, TariffSeries, TariffVersion, TariffVersionInput } from '../../types/api'
+import type { Translate } from '../../lib/translate'
 
 /** Which task the versioning flow currently has open in the pane, and against what. */
 export type VersionDialog =
@@ -20,7 +21,7 @@ type Params = {
   canWrite?: boolean
   queryClient: QueryClient
   pushToast: (message: string, tone?: 'success' | 'error') => void
-  t: (key: string, options?: Record<string, unknown>) => string
+  t: Translate
   /** The task finished and its form closed: select the version or tariff it produced. */
   onSaved?: (saved: Tariff, kind: 'new-version' | 'duplicate' | 'rename') => void
 }

@@ -1,15 +1,52 @@
-import { flexRender, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, useReactTable, type ColumnDef, type ColumnFiltersState, type RowData, type SortingState } from '@tanstack/react-table'
+import {
+    columnFilteringFeature,
+    columnSizingFeature,
+    columnVisibilityFeature,
+    createFilteredRowModel,
+    createPaginatedRowModel,
+    createSortedRowModel,
+    filterFn_equalsString,
+    filterFn_includesString,
+    flexRender,
+    metaHelper,
+    rowPaginationFeature,
+    rowSortingFeature,
+    sortFn_alphanumeric,
+    sortFn_basic,
+    sortFn_datetime,
+    sortFn_text,
+    tableFeatures,
+    useTable,
+    type ColumnDef as TanStackColumnDef,
+    type ColumnFiltersState,
+    type SortingState,
+} from '@tanstack/react-table'
 import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
-declare module '@tanstack/react-table' {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    interface ColumnMeta<TData extends RowData, TValue> {
-        numeric?: boolean
-    }
-}
+const features = tableFeatures({
+    columnFilteringFeature,
+    columnSizingFeature,
+    columnVisibilityFeature,
+    rowPaginationFeature,
+    rowSortingFeature,
+    filteredRowModel: createFilteredRowModel(),
+    paginatedRowModel: createPaginatedRowModel(),
+    sortedRowModel: createSortedRowModel(),
+    // Only the comparators/filters the tables use: `sortFn: 'auto'` resolves
+    // among the sort functions, `equalsString` is named by column defs, `includesString` is
+    // what `filterFn: 'auto'` picks for a text column.
+    sortFns: { alphanumeric: sortFn_alphanumeric, basic: sortFn_basic, datetime: sortFn_datetime, text: sortFn_text },
+    filterFns: { equalsString: filterFn_equalsString, includesString: filterFn_includesString },
+    columnMeta: metaHelper<{ numeric?: boolean }>(),
+})
 
-export type { ColumnDef, ColumnFiltersState }
+type Features = typeof features
+
+/** Column definition bound to this table's feature set, so callers keep
+ *  writing `ColumnDef<Row, unknown>`. */
+export type ColumnDef<TData extends Record<string, any>, TValue = unknown> = TanStackColumnDef<Features, TData, TValue>
+export type { ColumnFiltersState }
 
 /** TanStack Table's default column size — used as a sentinel to skip
  *  explicit width when the caller hasn't set one. */
@@ -19,7 +56,7 @@ const TANSTACK_DEFAULT_SIZE = 150
  *  footer offers only prev/next, never a rows-per-page choice. */
 const PAGE_SIZE = 100
 
-interface DataTableProps<T> {
+interface DataTableProps<T extends Record<string, any>> {
     data: T[]
     columns: ColumnDef<T, unknown>[]
     getRowId?: (row: T) => string
@@ -34,7 +71,7 @@ interface DataTableProps<T> {
     pageSize?: number
 }
 
-export function DataTable<T>({
+export function DataTable<T extends Record<string, any>>({
     data,
     columns,
     getRowId,
@@ -53,8 +90,8 @@ export function DataTable<T>({
 
     // TanStack Table returns unmemoizable functions, so React Compiler skips
     // this component — safe, the table state lives in the hook itself.
-    // eslint-disable-next-line react-hooks/incompatible-library
-    const table = useReactTable({
+    const table = useTable({
+        features,
         data,
         columns,
         state: {
@@ -70,10 +107,7 @@ export function DataTable<T>({
                 onColumnFiltersChange(next)
             }
             : setInternalFilters,
-        getCoreRowModel: getCoreRowModel(),
-        getSortedRowModel: enableSorting ? getSortedRowModel() : undefined,
-        getFilteredRowModel: getFilteredRowModel(),
-        getPaginationRowModel: getPaginationRowModel(),
+        manualSorting: !enableSorting,
         getRowId,
     })
 
@@ -138,8 +172,8 @@ export function DataTable<T>({
                 <div className="data-table-footer actions-row actions-row-end muted">
                     <span aria-live="polite">
                         {t('common.pagination.range', {
-                            from: table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1,
-                            to: Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, table.getFilteredRowModel().rows.length),
+                            from: table.state.pagination.pageIndex * table.state.pagination.pageSize + 1,
+                            to: Math.min((table.state.pagination.pageIndex + 1) * table.state.pagination.pageSize, table.getFilteredRowModel().rows.length),
                             total: table.getFilteredRowModel().rows.length,
                         })}
                     </span>
@@ -153,7 +187,7 @@ export function DataTable<T>({
                     >
                         ‹
                     </button>
-                    <span>{table.getState().pagination.pageIndex + 1} / {Math.max(1, table.getPageCount())}</span>
+                    <span>{table.state.pagination.pageIndex + 1} / {Math.max(1, table.getPageCount())}</span>
                     <button
                         className="button button-secondary button-compact"
                         type="button"
