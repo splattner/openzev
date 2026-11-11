@@ -47,6 +47,12 @@
       "enabled": false
     },
     {
+      "description": "django-celery-beat 2.9.0 requires Django<6.1. Remove once it supports Django 6.1.",
+      "matchManagers": ["pip_requirements"],
+      "matchPackageNames": ["Django"],
+      "allowedVersions": "<6.1"
+    },
+    {
       "description": "typescript-eslint has no TypeScript 7 support yet; TS7 crashes typescript-estree at lint time. Matched by dep name so the typescript-native alias (TS7, used for type-checking in npm run build) is not capped.",
       "matchManagers": ["npm"],
       "matchDepNames": ["typescript"],
