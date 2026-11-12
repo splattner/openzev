@@ -55,7 +55,7 @@ describe('shared invoice presentation', () => {
     ] as const)('preserves %s wording in the plain status label with paid amount %s', async (status, paidChf, label) => {
         const { container } = await mount(createElement(InvoiceStatusBadge, { status, paidChf, variant: 'plain' }))
         expect(container.textContent).toContain(label)
-        const className = status === 'cancelled' ? 'error-text' : label === 'invoice.status.partlyPaid' ? 'badge badge-info'
+        const className = status === 'cancelled' ? 'error-text' : label === 'invoice.status.partlyPaid' ? 'invoice-status-partly-paid'
             : ['draft', 'approved', 'sent', 'paid'].includes(status) ? `invoice-status-${status}` : 'muted'
         expect(container.querySelector('span')?.className).toBe(className)
     })

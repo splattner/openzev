@@ -1145,8 +1145,8 @@ contracts are unchanged.
   text line instead (see the tariff list above). Tariff validity `scheduled` is info (the blue of
   "upcoming" elsewhere); an inactive metering point is neutral, not danger. Invoice staff tables use one quiet neutral
   tag (`INVOICE_STATUS_BADGE_CLASS`) for workflow states. Detail headers use
-  `InvoiceStatusBadge variant="plain"` text (draft/sent/paid in dark gold,
-  approved in green, cancelled in red), except partly paid (blue pill);
+  `InvoiceStatusBadge variant="plain"` text (draft and partly paid in dark gold,
+  approved, sent and paid in green, cancelled in red);
   cancelled labels also use red text in staff tables. Participants see their payment
   state instead. Issued PDFs do not print a workflow status pill.
 
@@ -1157,7 +1157,7 @@ contracts are unchanged.
 
 ### 15.4 Pages
 
-- Invoice detail: the status label (plain text, except the partly-paid pill) joins the recipient and period in the page
+- Invoice detail: the status label (plain text) joins the recipient and period in the page
   header (`.invoice-detail-meta`, with a visually-hidden "Status:" label);
   below it `.invoice-figures` holds two `.stat-grid` rows of figure tiles —
   Total (accent), Subtotal, VAT; Local, Grid, Feed-in (`aria-label` =
