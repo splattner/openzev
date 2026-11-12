@@ -207,7 +207,8 @@ export function BackupJobsSection({ status }: { status: BackupStatus | undefined
     const columns: ColumnDef<BackupJob, unknown>[] = [
         {
             id: 'created',
-            accessorFn: (job) => job.started_at ?? job.created_at,
+            accessorFn: (job) => Date.parse(job.started_at ?? job.created_at),
+            sortDescFirst: true,
             header: t('pages.backups.jobs.columns.created'),
             cell: ({ row }) => formatDateTime(row.original.started_at ?? row.original.created_at, settings),
         },

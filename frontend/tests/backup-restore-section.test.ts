@@ -339,6 +339,18 @@ describe('applying', () => {
 })
 
 describe('history', () => {
+    it('sorts restore start times chronologically across the daylight-saving fallback', async () => {
+        setup({ history: [
+            job({ id: 'older', target_zev_name: 'older', started_at: '2026-10-25T02:30:00+02:00', created_at: '2026-10-25T03:30:00+01:00' }),
+            job({ id: 'newer', target_zev_name: 'newer', started_at: null, created_at: '2026-10-25T02:10:00+01:00' }),
+        ] })
+        const container = await render()
+        const communities = () => Array.from(container.querySelectorAll('tbody tr'), (row) => row.children[1].textContent)
+        expect(communities()).toEqual(['newer', 'older'])
+        await click(button(container, 'pages.backups.restore.columns.when'))
+        expect(communities()).toEqual(['older', 'newer'])
+    })
+
     it('sorts failed restores before completed restores on the first status click', async () => {
         setup({ history: (['completed', 'running', 'queued', 'failed'] as const).map((status) => job({ id: status, status })) })
         const container = await render()

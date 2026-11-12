@@ -152,6 +152,20 @@ it.each([
     expect(document.activeElement).toBe(focused)
 })
 
+it('sorts backup start times chronologically across the daylight-saving fallback', async () => {
+    setup({ jobs: [
+        completed({ id: 'older', destination_name: 'older', started_at: '2026-10-25T02:30:00+02:00', created_at: '2026-10-25T03:30:00+01:00' }),
+        completed({ id: 'newer', destination_name: 'newer', started_at: null, created_at: '2026-10-25T02:10:00+01:00' }),
+    ] })
+    const container = await render()
+    const heading = button(container, 'pages.backups.jobs.columns.created')!
+    const table = heading.closest('table')!
+    const destinations = () => Array.from(table.querySelectorAll('tbody tr'), (row) => row.children[2].textContent)
+    expect(destinations()).toEqual(['newer', 'older'])
+    await click(heading)
+    expect(destinations()).toEqual(['older', 'newer'])
+})
+
 it('sorts backup statuses and integrity by priority on the first click', async () => {
     setup({ jobs: [
         completed({ id: 'ok', verification_ok: true }),

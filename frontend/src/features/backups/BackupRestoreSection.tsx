@@ -314,7 +314,8 @@ function RestoreHistory({ jobs, loading }: { jobs: RestoreJob[]; loading: boolea
     const columns: ColumnDef<RestoreJob, unknown>[] = [
         {
             id: 'when',
-            accessorFn: (row) => row.started_at ?? row.created_at,
+            accessorFn: (row) => Date.parse(row.started_at ?? row.created_at),
+            sortDescFirst: true,
             header: t('pages.backups.restore.columns.when'),
             cell: ({ row }) => formatDateTime(row.original.started_at ?? row.original.created_at, settings),
         },
