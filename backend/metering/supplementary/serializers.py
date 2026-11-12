@@ -87,6 +87,9 @@ class SupplementarySourceSerializer(serializers.ModelSerializer):
             "synced_through", "covers_from", "reconciliation", "push_token_prefix", "push_token_created_at",
             "push_token_last_used_at", "live_last_seen_at", "created_at", "updated_at",
         ]
+        # DRF 3.18 turns the model's conditional UniqueConstraints into validators that make their condition
+        # fields required; _check_conflicts() already answers those clashes, with the right message.
+        validators = []
         extra_kwargs = {
             # Set from the request; only an admin acting on a participant's behalf names one.
             "participant": {"required": False},
