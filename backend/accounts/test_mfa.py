@@ -426,6 +426,7 @@ class MfaThrottleTests(TestCase):
         class _FakeRequest:
             data = {"mfa_token": "not-a-real-token"}
             META = {"REMOTE_ADDR": "203.0.113.5"}
+            headers = {}
 
         key = throttle.get_cache_key(_FakeRequest(), None)
         self.assertIn("203.0.113.5", key)
