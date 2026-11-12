@@ -53,6 +53,12 @@
       "allowedVersions": "<6.1"
     },
     {
+      "description": "botocore 1.44.1+ requires python-dateutil<3. Remove once botocore supports dateutil 4.",
+      "matchManagers": ["pip_requirements"],
+      "matchPackageNames": ["python-dateutil"],
+      "allowedVersions": "<3.0.0"
+    },
+    {
       "description": "typescript-eslint has no TypeScript 7 support yet; TS7 crashes typescript-estree at lint time. Matched by dep name so the typescript-native alias (TS7, used for type-checking in npm run build) is not capped.",
       "matchManagers": ["npm"],
       "matchDepNames": ["typescript"],
