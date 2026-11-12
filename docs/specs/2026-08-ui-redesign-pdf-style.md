@@ -1222,8 +1222,8 @@ contracts are unchanged.
     never reported leads); an unknown value in the URL reads as meter ID.
     Applied after filtering; the groups keep the order within each building.
   - Narrow sheets (container width ≤43rem, independent of viewport/sidebar width): the row is two columns (title, actions) with
-    the holder and last reading beneath; the details stack. Headers are visually
-    clipped rather than hidden from assistive technology.
+    the holder and last reading beneath; the details stack. Sortable headings stay
+    visible; the Actions header remains visually hidden and available to assistive technology.
 - Imports: the start sheet uses `.card-header` (title + actions) with the
   description below; "Delete imports" is the quiet destructive button.
 - Feasibility: the system sheet's mode select moved out of the `h3` into a

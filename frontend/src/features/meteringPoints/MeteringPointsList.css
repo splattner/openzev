@@ -419,7 +419,7 @@
   }
 
   .metering-point-columns th:not(.sortable-header) {
-    display: none;
+    position: absolute;
   }
 
   .metering-point-row {

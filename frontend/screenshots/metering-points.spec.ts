@@ -69,7 +69,7 @@ for (const width of [1440, 400]) {
     const attention = page.getByRole('button', { name: /^Handlungsbedarf/ })
     await expect(attention).toBeVisible()
     const count = Number((await attention.innerText()).match(/\d+/)![0])
-    const attentionRows = page.locator('.metering-point-row').filter({ has: page.locator('.metering-quality-issue, .metering-holder-issue') })
+    const attentionRows = page.locator('.metering-point-row').filter({ has: page.locator('.metering-point-last .issue-text, .metering-point-holder .issue-text') })
     await expect(attentionRows).toHaveCount(count)
     await attention.click()
     await expect(page).toHaveURL(/view=attention/)
