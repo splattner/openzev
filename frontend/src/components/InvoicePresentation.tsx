@@ -41,7 +41,7 @@ export function InvoiceStatusBadge({ status, paidChf, variant = 'badge' }: {
         : status ? t(`invoice.status.${status}`) : ''
     if (status === 'cancelled') return <span className="error-text">{label}</span>
     if (variant === 'plain') {
-        const className = partlyPaid ? 'badge badge-info'
+        const className = partlyPaid ? 'invoice-status-partly-paid'
             : ['draft', 'approved', 'sent', 'paid'].includes(status) ? `invoice-status-${status}` : 'muted'
         return <span className={className}>{label}</span>
     }

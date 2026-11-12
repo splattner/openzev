@@ -452,9 +452,8 @@ For a flagged invoice with a stored PDF, the document is labelled as a stored
 draft whose changes are not yet included, or as the issued original. A failed or
 cancelled recalculation leaves that label intact; a successful new draft has no
 open review flag and therefore no pending-changes label.
-Staff detail status text is dark gold for draft/sent/paid and green for approved.
-Cancelled labels use red text for staff and participants; only partly
-paid keeps its blue pill in the detail header.
+Staff detail status text is dark gold for draft and partly paid, and green for
+approved, sent and paid. Cancelled labels use red text for staff and participants.
 German sent-status labels consistently read **Versandt**.
 
 Cancel and full-reversal responses clear cached open `reading_impacts` before

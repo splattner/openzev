@@ -466,9 +466,10 @@ the invoice. Read-only users receive no instruction to generate a document.
 ![Invoice detail page](screenshots/08b-invoice-detail.png)
 
 The page header names the invoice and, next to the recipient and the billing
-period, its current **status** as plain text, with **Cancelled** in red error text and
-**Partly paid** kept as a blue pill (a participant sees whether
-payment is due, overdue or paid instead). The invoice PDF itself no longer prints
+period, its current **status** as plain text: draft and **Partly paid** in dark
+gold, approved, sent and paid in green, and **Cancelled** in red error text
+(a participant sees whether payment is due, overdue or paid
+instead). The invoice PDF itself no longer prints
 a status line; only a draft or cancelled document carries a plain **Draft** or
 **Cancelled** marking. Below it, two rows of figure tiles summarise the invoice the way its
 PDF does:
