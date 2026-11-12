@@ -12,7 +12,7 @@ click==8.5.1
 click-didyoumean==0.3.1
 click-plugins==1.1.1.2
 click-repl==0.4.1
-coverage==7.17.2
+coverage==7.17.3
 cron-descriptor==1.4.5
 cryptography==50.0.2  # direct: Fernet encryption of the TOTP secret at rest (ADR 0021)
 cssselect2==0.10.1
