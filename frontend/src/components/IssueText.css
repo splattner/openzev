@@ -31,6 +31,8 @@
   border-radius: var(--radius-sm);
 }
 
-:is(a, button).issue-text:is(:hover, :focus-visible) {
+:is(a, button).issue-text > span {
   text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
 }

@@ -8,16 +8,17 @@
   color: var(--interactive);
   font-size: 0.82rem;
   font-weight: 600;
-  text-decoration: none;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
   cursor: pointer;
 }
 
 .table-inline-link:hover {
   color: var(--interactive-hover);
-  text-decoration: underline;
 }
 
-.plain-feedback a:not(.button) {
+.plain-feedback a:not(.button):not(.issue-text) {
   text-decoration: underline;
   text-underline-offset: 0.15em;
 }
