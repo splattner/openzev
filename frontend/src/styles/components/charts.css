@@ -46,13 +46,12 @@
   display: block;
 }
 
+/* Highlight-only hover, no click — default cursor. */
 .energy-flow-link {
   transition: fill-opacity 200ms, stroke-opacity 200ms;
-  cursor: pointer;
 }
 
 .energy-flow-node {
-  cursor: pointer;
   transition: opacity 200ms;
 }
 
