@@ -2,8 +2,8 @@ amqp==5.4.2
 asgiref==3.13.0
 attrs==26.1.0
 billiard==4.3.2
-boto3==1.44.1  # direct: S3-compatible backup destinations (SPEC-2026-09-backup-and-restore)
-botocore==1.44.1
+boto3==1.44.2  # direct: S3-compatible backup destinations (SPEC-2026-09-backup-and-restore)
+botocore==1.44.2
 brotli==1.2.1
 cbor2==6.2.1
 celery==5.7.0
@@ -30,7 +30,7 @@ execnet==2.1.2
 factory_boy==3.3.3
 Faker==40.54.0
 fonttools==4.68.0
-gunicorn==27.0.0
+gunicorn==27.0.1
 inflection==0.5.1
 iniconfig==2.3.1
 iso3166==3.0.0
@@ -68,7 +68,7 @@ qrcode==8.2
 redis==8.1.0
 referencing==0.37.0
 rpds-py==2026.9.1
-ruff==0.17.4
+ruff==0.17.5
 s3transfer==0.19.3
 six==1.17.0
 sqlparse==0.6.1
