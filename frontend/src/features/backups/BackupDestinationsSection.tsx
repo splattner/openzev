@@ -73,7 +73,7 @@ function DestinationActionsCell({ row }: CellContext<BackupDestination, unknown>
 }
 
 export function BackupDestinationsSection({ status }: { status: BackupStatus | undefined }) {
-    const { t } = useTranslation()
+    const { t, i18n } = useTranslation()
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
@@ -180,20 +180,27 @@ export function BackupDestinationsSection({ status }: { status: BackupStatus | u
     // rather than letting the admin find out from a rejected save.
     const secretDisabled = !encryptionAvailable
 
+    const collator = new Intl.Collator(i18n?.language, { numeric: true })
+    const compareText: ColumnDef<BackupDestination>['sortFn'] = (left, right, id) =>
+        collator.compare(left.getValue<string>(id) ?? '', right.getValue<string>(id) ?? '')
+
     const columns: ColumnDef<BackupDestination, unknown>[] = [
         {
             accessorKey: 'name',
+            sortFn: compareText,
             header: t('pages.backups.destinations.columns.name'),
             cell: ({ row }) => <strong>{row.original.name}</strong>,
         },
         {
             accessorKey: 'kind',
+            sortFn: compareText,
             header: t('pages.backups.destinations.columns.type'),
             cell: ({ row }) => t(`pages.backups.destinations.kind.${row.original.kind}`),
         },
         {
             id: 'target',
             accessorFn: destinationTarget,
+            sortFn: compareText,
             header: t('pages.backups.destinations.columns.target'),
             cell: ({ row }) => (
                 <span style={{ display: 'inline-block', minWidth: '12rem', overflowWrap: 'anywhere' }}>
@@ -203,7 +210,8 @@ export function BackupDestinationsSection({ status }: { status: BackupStatus | u
         },
         {
             id: 'credentials',
-            accessorFn: (destination) => destination.kind === 's3' ? destination.credential_mode : '',
+            accessorKey: 'credential_mode',
+            sortFn: compareText,
             header: t('pages.backups.destinations.columns.credentials'),
             cell: ({ row }) => row.original.kind === 's3'
                 ? t(`pages.backups.destinations.credentialMode.${row.original.credential_mode}`)
@@ -211,7 +219,7 @@ export function BackupDestinationsSection({ status }: { status: BackupStatus | u
         },
         {
             id: 'keeps',
-            accessorKey: 'retention_count',
+            accessorFn: (destination) => destination.retention_count > 0 ? destination.retention_count : Number.MAX_SAFE_INTEGER,
             header: t('pages.backups.destinations.columns.keeps'),
             meta: { numeric: true },
             cell: ({ row }) => row.original.retention_count > 0

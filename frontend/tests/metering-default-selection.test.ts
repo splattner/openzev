@@ -172,6 +172,19 @@ describe('metering gap selection', () => {
     }
     const drawer = () => document.querySelector('[role="dialog"]')
 
+    it('sorts status worst severity first on the first click', async () => {
+        state.meters = [meter('green'), meter('red'), meter('yellow')]
+        state.qualityPoints = (['green', 'red', 'yellow'] as const).map(severity => ({
+            ...point, id: severity, meter_id: `CH-${severity}`, severity,
+        }))
+        const view = await renderChart('/metering/quality', 'quality')
+        const button = Array.from(view.container.querySelectorAll<HTMLButtonElement>('th button'))
+            .find(button => button.textContent?.startsWith('meteringDataQuality.status'))!
+        await act(async () => button.click())
+        expect(Array.from(view.container.querySelectorAll('tbody tr'), row => row.children[0].textContent))
+            .toEqual(['CH-red', 'CH-yellow', 'CH-green'])
+    })
+
     it('sorts Missing Days by total duration, including points without gaps', async () => {
         state.meters = [meter('long'), meter('short'), meter('complete')]
         const gap = (duration_days: number) => ({ start_date: '2026-10-02', end_date: '2026-10-04', duration_days })

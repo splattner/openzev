@@ -946,7 +946,7 @@ remain chronological.
 Action columns are not sortable. Status sorts by rank (failed, queued, running,
 completed) on the first click; backup integrity sorts failed, checking, never,
 ok, then rows without an applicable check. Numeric columns sort descending on
-the first click. Retention sorts by the stored count (zero means keep all).
+the first click. Unlimited retention (zero) sorts above finite retention counts.
 The restore-history Backup column compares `source_created_at` as timestamps,
 newest first on the first click, with undated sources last in either direction.
 
@@ -1318,12 +1318,12 @@ the dev worker.
 - Not verified against a real object store, as before; the beat process itself was not
   left running to watch a schedule fire.
 
-### Frontend (134 tests, phases 1, 3 and 4 plus fail-closed encryption policy and status recovery)
+### Frontend (135 tests, phases 1, 3 and 4 plus fail-closed encryption policy and status recovery)
 
 - `tests/backup-helpers.test.ts` (17) — the payload contract: a blank edit never
   wipes a secret, a clear is explicit, switching kind clears the other kind's
   fields; target formatting; manifest reading; polling and download rules.
-- `tests/backup-settings-section.test.ts` (37) — action focus during pending destination tests and backup checks; chronological start-time sorting across daylight-saving changes; status and integrity priority sorting; independent destination,
+- `tests/backup-settings-section.test.ts` (38) — action focus during pending destination tests and backup checks; natural destination-name and unlimited-retention sorting; chronological start-time sorting across daylight-saving changes; status and integrity priority sorting; independent destination,
   schedule, job and restore access during status loading/failure; status retry,
   cached refetch failure, and the encryption banner in its four states
   (encrypted; plaintext warning where permitted; "cannot run"

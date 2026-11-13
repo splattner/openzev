@@ -1,4 +1,3 @@
-import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Switch } from '@mantine/core'
@@ -307,9 +306,13 @@ export function BackupRestoreSection({ status }: { status?: BackupStatus } = {})
 }
 
 function RestoreHistory({ jobs, loading }: { jobs: RestoreJob[]; loading: boolean }) {
-    const { t } = useTranslation()
+    const { t, i18n } = useTranslation()
     const { settings } = useAppSettings()
     if (loading || jobs.length === 0) return null
+
+    const collator = new Intl.Collator(i18n?.language, { numeric: true })
+    const compareText: ColumnDef<RestoreJob>['sortFn'] = (left, right, id) =>
+        collator.compare(left.getValue<string>(id) ?? '', right.getValue<string>(id) ?? '')
 
     const columns: ColumnDef<RestoreJob, unknown>[] = [
         {
@@ -322,6 +325,7 @@ function RestoreHistory({ jobs, loading }: { jobs: RestoreJob[]; loading: boolea
         {
             id: 'community',
             accessorFn: (row) => row.target_zev_name || row.target_zev_id,
+            sortFn: compareText,
             header: t('pages.backups.restore.community'),
         },
         {
@@ -336,7 +340,7 @@ function RestoreHistory({ jobs, loading }: { jobs: RestoreJob[]; loading: boolea
         },
         {
             id: 'kind',
-            accessorFn: (row) => row.dry_run ? 0 : 1,
+            accessorFn: (row) => Number(row.dry_run),
             header: t('pages.backups.restore.columns.kind'),
             cell: ({ row }) => (
                 <>

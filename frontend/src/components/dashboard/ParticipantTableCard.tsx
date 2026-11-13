@@ -68,12 +68,14 @@ export function ParticipantTableCard({
     onSelect,
     ownParticipantIds = NO_IDS,
 }: ParticipantTableCardProps) {
-    const { t } = useTranslation()
+    const { t, i18n } = useTranslation()
+    const collator = useMemo(() => new Intl.Collator(i18n?.language, { numeric: true }), [i18n?.language])
 
     const columns = useMemo<ColumnDef<ParticipantRow, unknown>[]>(() => [
         {
             id: 'participant',
             accessorFn: (participant) => participant.participant_name || '',
+            sortFn: (left, right) => collator.compare(left.original.participant_name || '', right.original.participant_name || ''),
             header: t('pages.dashboard.col.participant'),
             cell: ParticipantNameCell,
         },
@@ -140,7 +142,7 @@ export function ParticipantTableCard({
                     : formatPercent(zevSharePercent(participant))
             },
         },
-    ], [t])
+    ], [t, collator])
 
     return (
         <section className="card">

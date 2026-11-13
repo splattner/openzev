@@ -107,7 +107,7 @@ function JobActionsCell({ row }: CellContext<BackupJob, unknown>) {
 }
 
 export function BackupJobsSection({ status }: { status: BackupStatus | undefined }) {
-    const { t } = useTranslation()
+    const { t, i18n } = useTranslation()
     const { settings } = useAppSettings()
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
@@ -204,6 +204,10 @@ export function BackupJobsSection({ status }: { status: BackupStatus | undefined
     const canStart =
         !!selectedDestination && (scope === 'instance' || !!zevId) && !startMutation.isPending && !blocked
 
+    const collator = new Intl.Collator(i18n?.language, { numeric: true })
+    const compareText: ColumnDef<BackupJob>['sortFn'] = (left, right, id) =>
+        collator.compare(left.getValue<string>(id) ?? '', right.getValue<string>(id) ?? '')
+
     const columns: ColumnDef<BackupJob, unknown>[] = [
         {
             id: 'created',
@@ -215,6 +219,7 @@ export function BackupJobsSection({ status }: { status: BackupStatus | undefined
         {
             id: 'scope',
             accessorFn: (job) => job.scope === 'zev' ? job.zev_name || 'zev' : 'instance',
+            sortFn: compareText,
             header: t('pages.backups.jobs.columns.scope'),
             cell: ({ row }) => {
                 const job = row.original
@@ -235,6 +240,7 @@ export function BackupJobsSection({ status }: { status: BackupStatus | undefined
         {
             id: 'destination',
             accessorFn: (job) => job.destination_name,
+            sortFn: compareText,
             header: t('pages.backups.jobs.columns.destination'),
             cell: ({ row }) => row.original.destination_name || '—',
         },

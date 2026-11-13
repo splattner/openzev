@@ -152,6 +152,23 @@ it.each([
     expect(document.activeElement).toBe(focused)
 })
 
+it('keeps natural destination names and unlimited retention sorting after conversion', async () => {
+    setup({ destinations: [
+        { ...disk, id: 'ten', name: 'Group 10', retention_count: 5 },
+        { ...disk, id: 'all', name: 'Änne', retention_count: 0 },
+        { ...disk, id: 'two', name: 'Group 2', retention_count: 14 },
+    ] })
+    const container = await render()
+    const heading = button(container, 'pages.backups.destinations.columns.keeps')!
+    const table = heading.closest('table')!
+    const names = () => Array.from(table.querySelectorAll('tbody tr'), row => row.children[0].textContent)
+    expect(names()).toEqual(['Änne', 'Group 2', 'Group 10'])
+    await click(heading)
+    expect(names()).toEqual(['Änne', 'Group 2', 'Group 10'])
+    await click(heading)
+    expect(names()).toEqual(['Group 10', 'Group 2', 'Änne'])
+})
+
 it('sorts backup start times chronologically across the daylight-saving fallback', async () => {
     setup({ jobs: [
         completed({ id: 'older', destination_name: 'older', started_at: '2026-10-25T02:30:00+02:00', created_at: '2026-10-25T03:30:00+01:00' }),

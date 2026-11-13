@@ -1251,6 +1251,8 @@ tab controls and content. An empty filtered result links permitted readers
 to `/metering/points`; only admins and managers can add points. Points without
 readings appear as Missing.
 
+The Status header sorts worst severity first (red, yellow, green) on its first click.
+
 The Missing Days header sorts by the sum of `gaps[].duration_days` (zero for
 no gaps), descending on the first click. `frontend/tests/metering-default-selection.test.ts`
 covers total days versus gap count and points without gaps.
