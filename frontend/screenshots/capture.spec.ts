@@ -126,6 +126,18 @@ test.describe('User Guide Screenshots', () => {
     await screenshotFull(page, '02-dashboard')
   })
 
+  test('02d-dashboard-completed-checks', async ({ page }) => {
+    await navigateTo(page, '/')
+    const checks = page.locator('.overview-period-verified').first()
+    const metering = checks.getByText('Messdaten', { exact: true })
+    await expect(checks).toBeVisible()
+    await expect(checks).not.toHaveAttribute('open')
+    await expect(metering).toBeHidden()
+    await checks.locator('summary').click()
+    await expect(metering).toBeVisible()
+    await screenshotFull(page, '02d-dashboard-completed-checks')
+  })
+
   // 02c — Manager Energy balance (the former dashboard statistics surface)
   test('02c-energy-balance', async ({ page }) => {
     await navigateTo(page, '/dashboard')

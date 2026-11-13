@@ -611,8 +611,9 @@ These pages define the current management-page reference set.
 - Query keys: readiness, readiness list, and attention
 - Pattern: setup guidance followed by period cards with primary actions and
   invoice alerts. Running periods are informational (`ended: false`). Native
-  period disclosures show pending steps with linked titles, status badges, and
-  explicit open actions, followed by a compact vertical OK/done checklist.
+  period disclosures show pending steps with linked titles, issue text, and
+  explicit open actions. A separate, initially collapsed **Checked and complete**
+  disclosure holds the compact vertical OK/done checklist.
   Completed history uses exact-date rows with explicit
   **Open invoices** buttons, without repeated completed labels.
 

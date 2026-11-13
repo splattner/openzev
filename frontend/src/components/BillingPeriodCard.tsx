@@ -52,7 +52,7 @@ export function BillingPeriodCard({ entry }: { entry: PeriodCardEntry }) {
     )
 
     const pendingSteps = detailSteps.filter(isOpenStep)
-    // A community that never uses one-off charges has nothing to verify under them.
+    // Hide completed charges when this period has none.
     const completedSteps = detailSteps.filter(
         (step) => !isOpenStep(step) && !(step.key === 'charges' && step.count === 0),
     )
@@ -81,7 +81,7 @@ export function BillingPeriodCard({ entry }: { entry: PeriodCardEntry }) {
             <Link className={`button button-${emphasizeAction ? 'primary' : 'secondary'}`} to={destination}>
                 {actionLabel}
             </Link>
-            {(detailSteps.length > 0 || alerts.length > 0 || (primary?.key === 'paid' && overdue > 0)) && (
+            {(pendingSteps.length > 0 || alerts.length > 0 || (primary?.key === 'paid' && overdue > 0)) && (
                 <Disclosure className="overview-period-details" summary={t('pages.overview.cards.details')}>
                     <ul className="overview-period-pending">
                         {primary?.key === 'paid' && overdue > 0 && detail && <li>{detail}</li>}
@@ -107,19 +107,18 @@ export function BillingPeriodCard({ entry }: { entry: PeriodCardEntry }) {
                             </li>
                         ))}
                     </ul>
-                    {completedSteps.length > 0 && (
-                        <div className="overview-period-verified">
-                            <p className="overview-detail-label">{t('pages.overview.cards.verified')}</p>
-                            <ul>
-                                {completedSteps.map((step) => (
-                                    <li key={step.key}>
-                                        <span aria-hidden="true" className="overview-step-check">✓</span>
-                                        <span>{t(`pages.dashboard.cockpit.stepLabels.${step.key}`)}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
+                </Disclosure>
+            )}
+            {completedSteps.length > 0 && (
+                <Disclosure className="overview-period-details overview-period-verified" summary={t('pages.overview.cards.verified')}>
+                    <ul>
+                        {completedSteps.map((step) => (
+                            <li key={step.key}>
+                                <span aria-hidden="true" className="overview-step-check">✓</span>
+                                <span>{t(`pages.dashboard.cockpit.stepLabels.${step.key}`)}</span>
+                            </li>
+                        ))}
+                    </ul>
                 </Disclosure>
             )}
         </article>

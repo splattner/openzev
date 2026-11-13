@@ -1368,8 +1368,14 @@ in the disclosure remain muted. Routine and resolved readiness steps stay neutra
 Linked warning text is underlined at rest. Pending steps use plain text and
 receive severity colours only when they need attention. Their titles and
 explicit open actions link to the relevant workflow, even
-when multiple steps share a destination. OK/done steps share a compact vertical checklist under
-**Checked and complete**, without repeated status or detail sentences. No backend English `detail` or `label` is rendered.
+when multiple steps share a destination. On rendered period cards, OK/done steps
+appear in a separate, initially collapsed **Checked and complete** disclosure as a
+compact vertical checklist, without repeated status or detail sentences. The two
+disclosures open independently; pending details are omitted when there are no
+pending detail steps or invoice alerts. Completed checks omit charges when their
+count is zero; actionable charge steps remain visible even with a zero count.
+Cards retained only for invoice alerts still expose completed checks when no
+readiness steps remain open. No backend English `detail` or `label` is rendered.
 
 Running periods (`ended: false`) never expose readiness actions or warnings.
 They appear below open cards as a **Current billing period** card that says in words that the period is still open, with no status badge; a real invoice alert can
@@ -1389,7 +1395,9 @@ whether it contains one wrapping message or two short messages. The card grid us
 use plus/minus. `overview-period-cards.test.ts` covers exact-date grouping,
 historical alerts, ordering, running periods, independent community notices,
 invoice deduplication, backend-selected actions, delivery count deduplication,
-severity colours in primary and secondary positions, and neutral routine steps.
+severity colours in primary and secondary positions, neutral routine steps,
+independent disclosure toggling, completed-only checks, and zero-count charges
+(hidden when completed, actionable when a draft needs regeneration).
 `billing-hubs.test.ts` covers community-notice severity.
 `billing-presentation.spec.ts` checks rendered warning and community-notice link
 colours and persistent underlines at desktop and narrow widths.
