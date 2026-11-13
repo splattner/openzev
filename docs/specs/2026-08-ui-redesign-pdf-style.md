@@ -890,7 +890,7 @@ Existing suites stay green (contract: 59 tests in `test_contract_context.py`; te
   `--brand-pale` 4.10:1 → `--ink-soft` 8.9:1), admin pending-emails KPI and
   data-quality yellow label (gold on light 2.50/2.33:1 → `--warning-800`,
   matching the green/red sibling pattern), email-log pending pill (white on
-  gold 2.50:1 → `warning-800` fill ~6.4:1), and the impersonation banner's
+  gold 2.50:1 → `warning-800` fill ~6.4:1), and the former impersonation banner's
   gold border (2.33:1 < 3:1 non-text → `--warning-300`). A live axe-core
   sweep (WCAG 2.0/2.1 A+AA, 11 pages × EN/DE/FR/IT) then found two serious
   issues: the scrollable field-reference asides on both admin template
@@ -990,11 +990,22 @@ contracts are unchanged.
   alone, centred, with the account name as `aria-label` and `title`, and
   expands the sidebar before opening. Focus, Escape and outside-click behave
   as before.
-- `header.top-nav` (outside `main`) holds `.mobile-bar` and the impersonation
-  banner. On phones (≤768px) `.mobile-bar` is a sticky white app bar with a
-  hairline, the menu button and the lockup; on desktop it is hidden, so an
-  ordinary session has no top band. The impersonation banner is a full-width
-  warning strip with its stop button at the right.
+- `header.top-nav` (outside `main`) holds `.mobile-bar` and the notification bell.
+  On phones (≤768px) `.mobile-bar` is a sticky white app bar with a hairline,
+  the menu button and the lockup; on desktop it is hidden.
+  During impersonation, `.shell > .impersonation-banner` is a sticky, full-width
+  gold strip above both sidebar and content (`--gold` background, `--brand-ink`
+  text, 3rem high), with its stop button on the right. The sidebar and mobile
+  app bar sit below it; long account names truncate visually but remain
+  available as text and a tooltip. Like the content, the strip is inert and
+  dimmed by the full-viewport scrim while the mobile navigation drawer is open.
+  The shell and content use `100dvh`;
+  `.content-main` and its focused descendants use `scroll-margin-top` to clear
+  sticky chrome: the strip height plus 0.75rem on desktop, and an additional
+  3.5rem for the mobile app bar on phones. Browser regressions in
+  `screenshots/layout-overflow.spec.ts` cover focus clearance with and without
+  impersonation, full-width positioning with either sidebar width, and the inert
+  strip under the drawer scrim.
 - `.content-main` has a maximum width and is centred. Language selection is a
   segmented control (`.language-selector-options`).
 

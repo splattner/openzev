@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { API_BASE, getAdminToken, navigateTo } from './helpers'
+import { API_BASE, getAdminToken, impersonateDemoParticipant, navigateTo } from './helpers'
 
 const PROBE_PREFIX = 'Layout Probe '
 const PROBE_COUNT = 10
@@ -100,6 +100,57 @@ async function prepareFocusPage(page: Page, width = 1366) {
   })
   await navigateTo(page, '/account')
 }
+
+for (const impersonating of [false, true]) {
+  test(`phone keyboard focus clears sticky headers when impersonating=${impersonating}`, async ({ page }) => {
+    await impersonateDemoParticipant(page, { requireSentInvoice: true })
+    if (!impersonating) {
+      // Keep the same participant content while exercising the ordinary shell.
+      await page.route('**/auth/me/', async route => {
+        const response = await route.fetch()
+        await route.fulfill({ response, json: { ...await response.json(), impersonated_by: null } })
+      })
+    }
+    await page.setViewportSize({ width: 400, height: 600 })
+    await navigateTo(page, '/me/documents')
+    await expect(page.locator('.impersonation-banner')).toHaveCount(impersonating ? 1 : 0)
+    const first = page.locator('.doc-cards button').first()
+    await page.locator('.doc-cards button').nth(1).focus()
+    await first.evaluate(el => window.scrollBy(0, el.getBoundingClientRect().top - 8))
+    await page.keyboard.press('Shift+Tab')
+    await expect(first).toBeFocused()
+    const header = (await page.locator('.top-nav').boundingBox())!
+    expect((await first.boundingBox())!.y).toBeGreaterThanOrEqual(header.y + header.height)
+  })
+}
+
+test('the identity strip spans the shell and is covered by the open phone drawer scrim', async ({ page }) => {
+  await impersonateDemoParticipant(page)
+  await prepareFocusPage(page)
+  const banner = page.locator('.shell > .impersonation-banner')
+  for (const collapsed of [true, false]) {
+    if (!collapsed) await page.locator('.sidebar-collapse-button').click()
+    const box = (await banner.boundingBox())!
+    expect(box.x).toBe(0)
+    expect(box.width).toBe(await page.evaluate(() => document.documentElement.clientWidth))
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+    expect((await banner.boundingBox())!.y).toBe(0)
+    await page.evaluate(() => window.scrollTo(0, 0))
+  }
+  await page.setViewportSize({ width: 400, height: 600 })
+  await page.locator('.mobile-menu-button').click()
+  await expect(banner).toHaveAttribute('inert', '')
+  const stop = banner.locator('button')
+  await stop.evaluate(el => el.focus())
+  await expect(stop).not.toBeFocused()
+  const box = (await stop.boundingBox())!
+  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.classList.contains('sidebar-overlay'), point)).toBe(true)
+  await page.mouse.click(point.x, point.y)
+  await expect(banner).not.toHaveAttribute('inert')
+  await stop.focus()
+  await expect(stop).toBeFocused()
+})
 
 test('breakpoint changes preserve body focus outside navigation', async ({ page }) => {
   await prepareFocusPage(page, 400)

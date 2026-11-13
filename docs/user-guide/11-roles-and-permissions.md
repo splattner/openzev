@@ -170,9 +170,12 @@ A manager or admin can revoke any printed link; see
 
 ## Admin Impersonation
 
-Admins can act as an active non-admin account. The banner identifies the account
-in use. Select **Stop** to return to your admin account. If that session has
-expired, sign in again. This does not sign the other account out on other devices.
+Admins can act as an active non-admin account. A gold strip at the top identifies
+the account and stays visible while scrolling. Select **Stop** to return to your
+admin account. If your admin session has expired, sign in again. This does not
+sign the other account out on other devices.
+
+![Impersonation while viewing participant documents](screenshots/08l-my-documents.png)
 
 While impersonating, you cannot create credentials, rotate tokens, change account security
 settings, or connect a new energy data source. Token creation and rotation buttons and energy-data

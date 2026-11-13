@@ -2,10 +2,16 @@
    The sidebar is deep forest: sage text, white for what is current. */
 
 .shell {
+  /* Shared height for the identity strip and the shell's sticky offsets. */
+  --shell-banner-height: 0px;
   display: grid;
   grid-template-columns: 14rem minmax(0, 1fr);
-  min-height: 100vh;
+  min-height: 100dvh;
   transition: grid-template-columns 0.2s ease;
+}
+
+.shell:has(> .impersonation-banner) {
+  --shell-banner-height: 3rem;
 }
 
 .shell.shell-collapsed {
@@ -21,9 +27,9 @@
   background: var(--sidebar-bg);
   color: var(--sidebar-text);
   transition: padding 0.2s ease;
-  height: 100dvh;
+  height: calc(100dvh - var(--shell-banner-height));
   position: sticky;
-  top: 0;
+  top: var(--shell-banner-height);
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -404,7 +410,12 @@
   display: none;
 }
 
+/* Workspace column: top navigation and page content. */
+
 .content {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - var(--shell-banner-height));
   padding: 2rem 2rem 2.5rem;
 }
 
@@ -421,6 +432,11 @@
 .content-main:focus,
 .page-header h1:focus {
   outline: none;
+}
+
+.content-main,
+.content-main :focus {
+  scroll-margin-top: calc(var(--shell-banner-height) + 0.75rem);
 }
 
 /* First tab stop; off screen until focused. Above the mobile drawer (200),
@@ -448,8 +464,7 @@
   transform: none;
 }
 
-/* Banner above the page: the phone's app bar, and the impersonation notice
-   on any width. Empty on a desktop session. */
+/* The phone's app bar and the notification bell. */
 
 .top-nav {
   display: grid;
@@ -459,27 +474,37 @@
   margin-inline: auto;
 }
 
-.top-nav:has(.impersonation-banner) {
-  margin-bottom: 1.25rem;
-}
-
 .mobile-bar {
   display: none;
 }
 
 .impersonation-banner {
+  grid-column: 1 / -1;
+  min-width: 0;
+  position: sticky;
+  top: 0;
+  z-index: 151;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.5rem 1rem;
-  border: 1px solid var(--warning-300);
-  background: var(--warning-100);
-  color: var(--warning-800);
-  border-radius: var(--radius-md);
-  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  gap: 1rem;
+  height: var(--shell-banner-height);
+  background: var(--gold);
+  color: var(--brand-ink);
+  padding: 0.5rem 1rem;
   font-size: 0.875rem;
   font-weight: 500;
+}
+
+.impersonation-banner > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.impersonation-banner > button {
+  flex-shrink: 0;
 }
 
 .user-menu {
@@ -555,16 +580,7 @@
   color: var(--text-body);
 }
 
-/* The workspace column: the banner (top-nav) above the page. */
-
-.content {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-}
-
-
-/* The notification bell sits in the banner: on a desktop session it is the only thing there,
+/* The notification bell sits in the header: on a desktop session it is the only thing there,
    right-aligned; on a phone it joins the app bar (see responsive.css). */
 
 .top-nav > .notification-bell {
