@@ -118,6 +118,28 @@ describe('Billing hub interactions', () => {
         expect(container.querySelector('.error-banner')).toBeNull()
     })
 
+    it('colours community notices by severity', async () => {
+        api.readiness.mockResolvedValue([])
+        const { container } = await mount(() => createElement(BillingPeriodsPage, {
+            attentionQuery: { refetch: vi.fn(), isLoading: false, isError: false, data: [
+                {
+                    id: 'email_failed:1', type: 'email_failed', label: 'API fallback',
+                    invoice_id: '1', invoice_number: 'INV-1', recipient: 'anna@example.com',
+                    link: '/billing/invoices/1',
+                },
+                {
+                    id: 'participant_validity:1', type: 'participant_validity', label: 'API fallback',
+                    participant_id: '1', participant_name: 'Anna', valid_to: '2026-12-31',
+                    link: '/participants?focus=1&field=valid_to',
+                },
+            ] },
+        }))
+        const notices = container.querySelector('.overview-community-notices')!
+        expect(notices.querySelectorAll('li')).toHaveLength(2)
+        expect(notices.querySelector('a[href="/billing/invoices/1"]')?.closest('li')?.classList.contains('overview-period-issue')).toBe(true)
+        expect(notices.querySelector('a[href="/participants?focus=1&field=valid_to"]')?.closest('li')?.classList.contains('overview-period-caution')).toBe(true)
+    })
+
     it('does not declare periods completed when the alert query failed', async () => {
         const refetch = vi.fn()
         api.readiness.mockResolvedValue([{

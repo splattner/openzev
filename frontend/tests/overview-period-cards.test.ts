@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BillingPeriodCard } from '../src/components/BillingPeriodCard'
 import { groupPeriodCards, primaryPeriodStep } from '../src/features/overview/periodCards'
-import type { AttentionItem, ReadinessPeriod } from '../src/types/api'
+import type { AttentionItem, ReadinessPeriod, ReadinessStep } from '../src/types/api'
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({
     t: (key: string, values?: { count?: number }) => `${key}${values?.count === undefined ? '' : `:${values.count}`}`,
@@ -34,6 +34,65 @@ function render(entry: Parameters<typeof BillingPeriodCard>[0]['entry']) {
 }
 
 describe('Overview period cards', () => {
+    it.each<[ReadinessStep['key'], ReadinessStep['status'], string, ReadinessPeriod['next_action']]>([
+        ['data_corrections', 'warn', 'caution', 'review_data_corrections'],
+        ['metering', 'warn', 'caution', 'fix_metering'],
+        ['charges', 'todo', 'caution', 'generate'],
+        ['charges', 'warn', 'caution', 'generate'],
+        ['assignments', 'warn', 'issue', 'fix_assignments'],
+        ['tariffs', 'warn', 'issue', 'fix_tariffs'],
+        ['tariffs', 'todo', 'issue', 'fix_tariffs'],
+        ['generation_conflicts', 'warn', 'issue', 'review_generation_conflicts'],
+    ])('applies severity to primary and non-primary %s steps (%s)', (key, status, tone, action) => {
+        const readiness = period()
+        const step: ReadinessStep = { key, status, count: 2, link: '/fix' }
+        readiness.steps = [step]
+        readiness.next_action = action
+        const primary = render({ period: readiness.period, readiness, alerts: [] })
+        expect(primary.querySelector(`.overview-period-lead.overview-period-${tone}`)).not.toBeNull()
+        expect(primary.querySelector('.overview-period-card > a')?.classList.contains(
+            status === 'warn' ? 'button-secondary' : 'button-primary',
+        )).toBe(true)
+        readiness.next_action = 'none'
+        const secondary = render({ period: readiness.period, readiness, alerts: [] })
+        expect(secondary.querySelector(status === 'warn'
+            ? `.overview-period-warning.overview-period-${tone} a[href="/fix"]`
+            : `.overview-period-pending .overview-period-${tone}`)).not.toBeNull()
+    })
+
+    it.each<[ReadinessStep['key'], ReadinessPeriod['next_action']]>([
+        ['generated', 'generate'],
+        ['approved', 'approve'],
+        ['sent', 'send'],
+        ['paid', 'track_payments'],
+    ])('leaves the routine %s step neutral as the primary action', (key, action) => {
+        const readiness = period()
+        readiness.steps = [{ key, status: 'todo', count: 1, total: 2, link: '/billing/invoices' }]
+        readiness.next_action = action
+        const container = render({ period: readiness.period, readiness, alerts: [] })
+        expect(container.querySelector('.overview-period-lead')).not.toBeNull()
+        expect(container.querySelector('.overview-period-issue, .overview-period-caution')).toBeNull()
+        expect(container.querySelector('.overview-period-card > a')?.classList.contains('button-primary')).toBe(true)
+    })
+
+    it.each<[ReadinessStep['key'], ReadinessStep['status']]>([
+        ['generated', 'todo'],
+        ['approved', 'todo'],
+        ['sent', 'todo'],
+        ['paid', 'todo'],
+        ['approved', 'done'],
+        ['metering', 'ok'],
+        ['tariffs', 'ok'],
+        ['charges', 'done'],
+    ])('leaves the routine or resolved %s step (%s) neutral in the disclosure', (key, status) => {
+        const readiness = period()
+        readiness.steps = [{ key, status, count: 1, total: 2 }]
+        readiness.next_action = 'none'
+        const container = render({ period: readiness.period, readiness, alerts: [] })
+        expect(container.textContent).toContain(`pages.dashboard.cockpit.stepLabels.${key}`)
+        expect(container.querySelector('.overview-period-issue, .overview-period-caution')).toBeNull()
+    })
+
     it('merges alerts by both dates and restores historical periods absent from readiness', () => {
         const quarter = period('2026-06-01', '2026-08-31')
         const result = groupPeriodCards([quarter], [alert('invoice_overdue')])
@@ -103,6 +162,10 @@ describe('Overview period cards', () => {
         expect(container.querySelectorAll('details li')).toHaveLength(1)
         expect(container.querySelector('.overview-period-work')?.textContent).toContain('pages.overview.cards.overdue:1')
         expect(container.querySelector('.overview-period-work')?.textContent).toContain('pages.overview.cards.failed:1')
+        expect(container.querySelector('.overview-period-caution')?.textContent).toContain('pages.overview.cards.overdue:1')
+        expect(container.querySelector('.overview-period-issue')?.textContent).toContain('pages.overview.cards.failed:1')
+        expect(container.querySelectorAll('.overview-period-pending .muted')).toHaveLength(2)
+        expect(container.querySelector('.overview-period-card > a')?.classList.contains('button-secondary')).toBe(true)
         expect(container.textContent).not.toContain('DO NOT RENDER')
         expect(container.textContent).toContain('Juni')
         expect(container.textContent).not.toContain('→')
@@ -120,6 +183,10 @@ describe('Overview period cards', () => {
         const container = render(groupPeriodCards([readiness], []).open[0])
         expect(container.querySelector('.overview-period-card > a')?.textContent).toBe('pages.dashboard.cockpit.nextActionLabels.review_generation_conflicts')
         expect(container.querySelector('.overview-period-warning a')?.getAttribute('href')).toBe('/metering/quality')
+        expect(container.querySelector('.overview-period-lead.overview-period-issue')?.textContent).toContain('stepDetails.conflictsWarn')
+        const warning = container.querySelector('a[href="/metering/quality"]')!
+        expect(warning.textContent).toContain('stepDetails.meteringWarn')
+        expect(warning.closest('p')?.classList.contains('overview-period-caution')).toBe(true)
         expect(container.querySelector('a[href="/unavailable"]')).toBeNull()
     })
 

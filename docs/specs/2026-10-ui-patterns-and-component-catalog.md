@@ -535,8 +535,10 @@ usage guidance; badge shape and palette do not change.
 **Shipped (phase 6).** `components/IssueText` is the shared form of the
 reference treatment: coloured text with a warning icon, a link (`to`), a button
 (`onClick`) or plain text when the user may not act. The sweep applied §10.1 to
-the Overview period cards (no status pills; overdue, failed and warning steps
-read as red text; the running period and the caught-up card carry no badge; the
+the Overview period cards (no status pills; warning colours follow the
+[invoice lifecycle severity rules](2026-03-invoice-lifecycle-and-communication.md#94-manager-overview-and-billing-email-delivery);
+routine and resolved steps stay neutral; warning links stay underlined;
+the running period and the caught-up card carry no badge; the
 completed-periods disclosure carries no count), the metering-point list ("No
 current assignment" opens the assignment dialog for writers; data-quality
 issues link to the quality view; a healthy point is not green), the tariff list

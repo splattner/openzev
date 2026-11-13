@@ -1238,8 +1238,9 @@ contracts are unchanged.
 - Admin accounts: the filter panel is no longer a sheet. Admin invoices: the
   delete action is compact (quiet destructive).
 - Overview: period cards (`.overview-period-card`) are plain sheets like the
-  current-period row, without a coloured top edge; the status pill carries
-  the tone.
+  current-period row, without a coloured top edge or status pill. Warning colours
+  follow the [invoice lifecycle severity rules](2026-03-invoice-lifecycle-and-communication.md#94-manager-overview-and-billing-email-delivery).
+  Routine and resolved workflow steps stay neutral; warning links stay underlined.
 - Login: §7.5.
 
 ### 15.5 Documents

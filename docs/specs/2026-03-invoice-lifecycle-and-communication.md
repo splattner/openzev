@@ -1358,8 +1358,16 @@ because approval still happens in Billing. Other readiness warnings remain
 visible with their resolution links. Delivery-failure counts use the maximum
 of readiness and attention counts, not their sum. Expanded details retain
 other steps and group alerts by invoice ID, so one invoice with two issues has
-one detail row. Pending detail steps appear first, a step that needs attention in red issue text rather than a status badge;
-both their titles and explicit open actions link to the relevant workflow, even
+one detail row. Readiness steps use consistent severity colours in every position:
+red for missing tariff coverage (including `todo`), unassigned readings
+and generation conflicts; dark gold (`--warning-800`) for correction review,
+metering gaps, unassigned charges and stale drafts (`charges: todo`).
+Overdue and participant-validity notices use dark gold; delivery-failure notices
+use red. Period summaries use the same colours; invoice-level alert descriptions
+in the disclosure remain muted. Routine and resolved readiness steps stay neutral.
+Linked warning text is underlined at rest. Pending steps use plain text and
+receive severity colours only when they need attention. Their titles and
+explicit open actions link to the relevant workflow, even
 when multiple steps share a destination. OK/done steps share a compact vertical checklist under
 **Checked and complete**, without repeated status or detail sentences. No backend English `detail` or `label` is rendered.
 
@@ -1380,7 +1388,11 @@ whether it contains one wrapping message or two short messages. The card grid us
 ≤700px. No arrow decorations appear in period dates or actions; disclosures
 use plus/minus. `overview-period-cards.test.ts` covers exact-date grouping,
 historical alerts, ordering, running periods, independent community notices,
-invoice deduplication, backend-selected actions and delivery count deduplication.
+invoice deduplication, backend-selected actions, delivery count deduplication,
+severity colours in primary and secondary positions, and neutral routine steps.
+`billing-hubs.test.ts` covers community-notice severity.
+`billing-presentation.spec.ts` checks rendered warning and community-notice link
+colours and persistent underlines at desktop and narrow widths.
 The former `/billing/periods` route still redirects to Overview.
 
 `InvoicesPage` renders its standalone title and `InvoicesContent`; the Billing

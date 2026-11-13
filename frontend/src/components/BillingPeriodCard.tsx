@@ -4,6 +4,16 @@ import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { Disclosure } from './Disclosure'
 import { groupInvoiceAlerts, isOpenStep, primaryPeriodStep, type PeriodCardEntry } from '../features/overview/periodCards'
 import { attentionText, stepDetailText } from '../features/overview/readinessPresentation'
+import type { ReadinessStep } from '../types/api'
+
+function stepSeverityClass(step: ReadinessStep): string {
+    const needsAttention = step.status === 'warn' || (
+        step.status === 'todo' && (step.key === 'tariffs' || step.key === 'charges')
+    )
+    if (!needsAttention) return ''
+    return ['assignments', 'tariffs', 'generation_conflicts'].includes(step.key)
+        ? 'overview-period-issue' : 'overview-period-caution'
+}
 
 export function BillingPeriodCard({ entry }: { entry: PeriodCardEntry }) {
     const { t, i18n } = useTranslation()
@@ -19,7 +29,8 @@ export function BillingPeriodCard({ entry }: { entry: PeriodCardEntry }) {
     const warnings = period.ended === false ? [] : (readiness?.steps ?? []).filter(
         (step) => step.status === 'warn' && step !== primary,
     )
-    const tone = overdue ? 'danger' : failed || warnings.length || primary?.status === 'warn' ? 'warning' : 'info'
+    const emphasizeAction = Boolean(primary?.link) && !overdue && !failed
+        && warnings.length === 0 && primary?.status !== 'warn'
     const invoicesUrl = `/billing/invoices?period_start=${period.start}&period_end=${period.end}`
     const destination = primary?.link || alerts[0]?.link || invoicesUrl
     const actionLabel = primary?.link && readiness
@@ -54,20 +65,20 @@ export function BillingPeriodCard({ entry }: { entry: PeriodCardEntry }) {
                 <p className="overview-period-range muted">{format(period.start)} – {format(period.end)}</p>
             </header>
             <div className="overview-period-work">
-                {detail && !(primary?.key === 'paid' && overdue) ? <p className={`overview-period-lead${primary?.status === 'warn' ? ' overview-period-issue' : ''}`}>{detail}</p> : null}
+                {detail && primary && !(primary.key === 'paid' && overdue) ? <p className={`overview-period-lead ${stepSeverityClass(primary)}`}>{detail}</p> : null}
                 {!detail && primary && readiness ? (
                     <p className="overview-period-lead">{t(`pages.dashboard.cockpit.nextActionLabels.${readiness.next_action}`)}</p>
                 ) : null}
-                {overdue > 0 && <p className="overview-period-lead overview-period-issue">{t('pages.overview.cards.overdue', { count: overdue })}</p>}
+                {overdue > 0 && <p className="overview-period-lead overview-period-caution">{t('pages.overview.cards.overdue', { count: overdue })}</p>}
                 {failed > 0 && <p className="overview-period-lead overview-period-issue">{t('pages.overview.cards.failed', { count: failed })}</p>}
                 {warnings.map((step) => (
-                    <p key={step.key} className="overview-period-warning overview-period-issue">
+                    <p key={step.key} className={`overview-period-warning ${stepSeverityClass(step)}`}>
                         {step.link ? <Link to={step.link}>{stepDetailText(step, t) || t(`pages.dashboard.cockpit.stepLabels.${step.key}`)}</Link>
                             : stepDetailText(step, t) || t(`pages.dashboard.cockpit.stepLabels.${step.key}`)}
                     </p>
                 ))}
             </div>
-            <Link className={`button button-${tone === 'info' && primary?.link ? 'primary' : 'secondary'}`} to={destination}>
+            <Link className={`button button-${emphasizeAction ? 'primary' : 'secondary'}`} to={destination}>
                 {actionLabel}
             </Link>
             {(detailSteps.length > 0 || alerts.length > 0 || (primary?.key === 'paid' && overdue > 0)) && (
@@ -83,7 +94,7 @@ export function BillingPeriodCard({ entry }: { entry: PeriodCardEntry }) {
                                         </Link>
                                     ) : <strong>{t(`pages.dashboard.cockpit.stepLabels.${step.key}`)}</strong>}
                                 </div>
-                                <span className={step.status === 'warn' ? 'overview-period-issue' : 'muted'}>{stepDetailText({ ...step, failed: 0 }, t) || t(`pages.dashboard.cockpit.statusLabels.${step.status}`)}</span>
+                                <span className={stepSeverityClass(step) || 'muted'}>{stepDetailText({ ...step, failed: 0 }, t) || t(`pages.dashboard.cockpit.statusLabels.${step.status}`)}</span>
                                 {step.link && (
                                     <Link className="overview-step-action" to={step.link}>{t('pages.dashboard.cockpit.openStep')}</Link>
                                 )}

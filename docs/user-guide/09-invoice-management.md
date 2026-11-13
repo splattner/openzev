@@ -7,6 +7,11 @@ This guide covers generating, reviewing, and managing invoices for participants.
 The manager **Overview** groups billing work into one card per period, oldest
 open period first. Each card shows the period status, the server-selected next
 action, overdue invoices and failed deliveries, and any additional warnings.
+Gold text highlights items to review: corrected meter data, data gaps, outdated
+drafts, charges without a recipient, overdue payments and participant validity
+notices. Red highlights delivery failures, missing tariff coverage, unassigned
+readings, and generation conflicts. Routine steps such as approval and sending
+stay neutral.
 Open **Period details** to see the remaining workflow steps and the compact
 **Checked and complete** checklist. Steps that open an actionable page link to
 it; a step that merely waits on an upstream one has no link. Data problems

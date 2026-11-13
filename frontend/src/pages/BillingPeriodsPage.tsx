@@ -44,7 +44,9 @@ export function BillingPeriodsPage({ attentionQuery }: { attentionQuery?: Attent
                 <section className="card overview-community-notices">
                     <h3>{t('pages.overview.cards.communityNotices')}</h3>
                     <ul>{community.map((item) => (
-                        <li key={item.id}><Link to={item.link}>{attentionText(item, t, format)}</Link></li>
+                        <li key={item.id} className={item.type === 'email_failed' ? 'overview-period-issue' : 'overview-period-caution'}>
+                            <Link to={item.link}>{attentionText(item, t, format)}</Link>
+                        </li>
                     ))}</ul>
                 </section>
             )}

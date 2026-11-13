@@ -51,8 +51,21 @@
   color: var(--danger-700);
 }
 
-.overview-period-issue a {
+.overview-period-caution {
+  color: var(--warning-800);
+}
+
+.overview-period-issue a,
+.overview-period-caution a {
   color: inherit;
+}
+
+.overview-period-issue a,
+.overview-period-caution a,
+.overview-step-link {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
 }
 
 .overview-period-warning {
@@ -77,9 +90,6 @@
 
 .overview-step-link {
   font-weight: 700;
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.18em;
 }
 
 .overview-step-action {
