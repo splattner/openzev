@@ -2,6 +2,20 @@
 
 Welcome to the OpenZEV user documentation. This guide covers everything you need to operate and manage energy communities (ZEVs) with OpenZEV.
 
+## Sorting tables
+
+Most record tables let you sort by clicking a column heading—for example,
+**Participant** in Energy balance or Billing, and **Document** in Documents.
+Click again to reverse the direction, and once more to restore the original
+order. Sorts use the underlying values, so amounts are ordered numerically.
+An arrow shows the selected sort direction.
+Action columns cannot be sorted.
+
+Sort controls appear only with at least two filtered rows. Filtering down to
+one row preserves the selected order for when more rows return. On phones,
+sortable headings remain above the record cards. Calculation layouts such as
+invoice line items and the hour/minute readings grid keep their fixed order.
+
 ## Getting Started
 
 - **[Getting Started](01-getting-started.md)** — Demo and production installation (Docker Compose, Kubernetes), creating the first admin account, and demo accounts

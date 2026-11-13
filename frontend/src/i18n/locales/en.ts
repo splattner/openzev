@@ -2597,6 +2597,7 @@ export const en = {
             col: {
             },
             rateCard: {
+                sortLowestRate: "Sort by the lowest listed rate.",
                 applies: 'Applies',
                 price: 'Price (CHF)',
                 unit: 'Unit',
@@ -3084,7 +3085,6 @@ export const en = {
                 label: 'Sort',
                 meterId: 'Meter ID',
                 location: 'Location',
-                lastReading: 'Oldest reading first',
             },
             columns: {
                 actions: 'Actions',

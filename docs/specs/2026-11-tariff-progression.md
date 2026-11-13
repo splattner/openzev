@@ -485,7 +485,8 @@ no cache. Fetched dynamic prices are read, not written (§5.4a).
 - **Fixed fees** (`ProgressionFixedFees.tsx`): grouped by unit, a table of series
   with scope, current amount, and the version history; `community` rows are
   labelled as the amount the community pays, split by headcount or weight. Not
-  added up anywhere.
+  added up anywhere. Names, scope, shown version start and current numeric amount
+  are sortable within each unit group; net/gross and date changes refresh sort values.
 - States: loading skeleton; no tariffs for this energy type (message offering
   the other types); 422 `too_many_bands` (narrow the range); request error.
   Request errors use `formatTariffError` to translate recognized codes and

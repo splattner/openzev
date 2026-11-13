@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -67,6 +68,15 @@ export function BackupJobsSection({ status }: { status: BackupStatus | undefined
     const zevs = zevsQuery.data ?? []
     const jobs = jobsQuery.data ?? []
 
+    const sorting = useTableSorting(jobs, {
+        created: row => row.started_at ?? row.created_at,
+        scope: row => row.zev_name || row.scope,
+        destination: row => row.destination_name,
+        status: row => row.status,
+        size: row => row.archive_bytes,
+        encryption: row => Number(row.encrypted),
+        integrity: row => row.verification_ok === null ? null : Number(row.verification_ok),
+    })
     // The status card (last backup, encryption) reads different data than the
     // list, so refresh it once running work has finished.
     const wasActive = useRef(false)
@@ -215,18 +225,18 @@ export function BackupJobsSection({ status }: { status: BackupStatus | undefined
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>{t('pages.backups.jobs.columns.created')}</th>
-                                <th>{t('pages.backups.jobs.columns.scope')}</th>
-                                <th>{t('pages.backups.jobs.columns.destination')}</th>
-                                <th>{t('pages.backups.jobs.columns.status')}</th>
-                                <th>{t('pages.backups.jobs.columns.size')}</th>
-                                <th>{t('pages.backups.jobs.columns.encryption')}</th>
-                                <th>{t('pages.backups.jobs.columns.integrity')}</th>
+                                <SortableHeader {...sorting.header('created')}>{t('pages.backups.jobs.columns.created')}</SortableHeader>
+                                <SortableHeader {...sorting.header('scope')}>{t('pages.backups.jobs.columns.scope')}</SortableHeader>
+                                <SortableHeader {...sorting.header('destination')}>{t('pages.backups.jobs.columns.destination')}</SortableHeader>
+                                <SortableHeader {...sorting.header('status')}>{t('pages.backups.jobs.columns.status')}</SortableHeader>
+                                <SortableHeader {...sorting.header('size')}>{t('pages.backups.jobs.columns.size')}</SortableHeader>
+                                <SortableHeader {...sorting.header('encryption')}>{t('pages.backups.jobs.columns.encryption')}</SortableHeader>
+                                <SortableHeader {...sorting.header('integrity')}>{t('pages.backups.jobs.columns.integrity')}</SortableHeader>
                                 <th>{t('common.actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {jobs.map((job) => (
+                            {sorting.rows.map((job) => (
                                 <tr key={job.id}>
                                     <td>{formatDateTime(job.started_at ?? job.created_at, settings)}</td>
                                     <td>

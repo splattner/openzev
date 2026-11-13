@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faFilePdf, faHandHoldingDollar } from '@fortawesome/free-solid-svg-icons'
 import { useMutation } from '@tanstack/react-query'
@@ -37,6 +38,15 @@ export function InvoiceCreditsCard({
     const [refunding, setRefunding] = useState<Credit | null>(null)
 
     const credits = invoice.credits ?? []
+    const sorting = useTableSorting(credits, {
+        number: row => row.credit_number,
+        date: row => row.created_at,
+        type: row => row.kind,
+        amount: row => Number(row.amount_chf),
+        remaining: row => Number(row.remaining_chf),
+        statusCol: row => row.status,
+        reasonCol: row => row.reason,
+    })
     const canCorrect = canCorrectInvoice(invoice, canManage) && !invoice.needs_data_review
 
     const refundMutation = useMutation({
@@ -73,18 +83,18 @@ export function InvoiceCreditsCard({
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>{t('pages.invoiceDetail.credits.number')}</th>
-                                <th>{t('pages.invoiceDetail.credits.date')}</th>
-                                <th>{t('pages.invoiceDetail.credits.type')}</th>
-                                <th className="numeric">{t('pages.invoiceDetail.credits.amount')}</th>
-                                <th className="numeric">{t('pages.invoiceDetail.credits.remaining')}</th>
-                                <th>{t('pages.invoiceDetail.credits.statusCol')}</th>
-                                <th>{t('pages.invoiceDetail.credits.reasonCol')}</th>
+                                <SortableHeader {...sorting.header('number')}>{t('pages.invoiceDetail.credits.number')}</SortableHeader>
+                                <SortableHeader {...sorting.header('date')}>{t('pages.invoiceDetail.credits.date')}</SortableHeader>
+                                <SortableHeader {...sorting.header('type')}>{t('pages.invoiceDetail.credits.type')}</SortableHeader>
+                                <SortableHeader {...sorting.header('amount')} className="numeric">{t('pages.invoiceDetail.credits.amount')}</SortableHeader>
+                                <SortableHeader {...sorting.header('remaining')} className="numeric">{t('pages.invoiceDetail.credits.remaining')}</SortableHeader>
+                                <SortableHeader {...sorting.header('statusCol')}>{t('pages.invoiceDetail.credits.statusCol')}</SortableHeader>
+                                <SortableHeader {...sorting.header('reasonCol')}>{t('pages.invoiceDetail.credits.reasonCol')}</SortableHeader>
                                 <th><span className="visually-hidden">{t('common.actions')}</span></th>
                             </tr>
                         </thead>
                         <tbody>
-                            {credits.map((credit) => (
+                            {sorting.rows.map((credit) => (
                                 <tr key={credit.id}>
                                     <td>{credit.credit_number}</td>
                                     <td>{formatShortDate(credit.created_at.slice(0, 10), settings)}</td>

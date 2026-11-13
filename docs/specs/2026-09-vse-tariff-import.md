@@ -541,7 +541,9 @@ Three steps in one `FormModal` (`size="xl"`):
    tables to the candidates `isValidInYear`. Choosing a year resets the ticks
    to `recommendedKeys` of the visible rows, and "Select standard tariffs" and
    the selectable total also count only visible rows, so nothing hidden is ever
-   imported. The filter resets to "All years" on every new preview.
+   imported. The filter resets to "All years" on every new preview. Column sorting
+   stays within categories and retains candidate keys, ticks and edited billing modes.
+   Price uses the lowest raw numeric band/fixed rate; unavailable prices stay last.
 3. **Result** — created, skipped and failed, then Close. Created tariffs
    retain their apply-time dynamic-source warnings under the corresponding row.
 

@@ -60,6 +60,22 @@ const stepStates = (row: HTMLElement) => Object.fromEntries([...row.querySelecto
     .map((step) => [step.dataset.step, step.dataset.state]))
 
 describe('invoice period row layout', () => {
+    it('sorts participants and raw amounts while leaving row actions attached to their participant', async () => {
+        const { container } = mount([
+            { ...base, participant_id: 'z', participant_name: 'Zürcher', invoice: { ...invoice, id: 'ten', total_chf: '10.00' } },
+            { ...base, participant_id: 'a', participant_name: 'Äberli', invoice: { ...invoice, id: 'two', total_chf: '2.00' } },
+        ])
+        const sort = async (column: number) => act(async () => container.querySelectorAll('th')[column].querySelector('button')!.click())
+        const names = () => rowsOf(container).map(row => row.querySelector('strong')?.textContent)
+        await sort(0)
+        expect(names()).toEqual(['Äberli', 'Zürcher'])
+        await sort(2)
+        expect(names()).toEqual(['Zürcher', 'Äberli'])
+        await sort(2)
+        expect(names()).toEqual(['Äberli', 'Zürcher'])
+        expect(rowsOf(container)[0].querySelector('a')?.getAttribute('href')).toContain('two')
+    })
+
     it('states the four columns the page keeps', () => {
         const { container } = mount([base])
         expect([...container.querySelectorAll('thead th')].map((th) => th.textContent)).toEqual([
@@ -70,7 +86,7 @@ describe('invoice period row layout', () => {
         ])
         expect(rowsOf(container)[0].children).toHaveLength(4)
         // The header names the currency, so amounts read as plain numbers;
-        // the card layout, which hides the header, shows it inline.
+        // the card layout also shows it beside each amount.
         expect(rowsOf(container)[0].children[2].querySelector('.invoice-row-currency')?.textContent).toBe('CHF ')
         expect(rowsOf(container)[0].children[2].textContent).toBe('CHF 12.30')
         // The legend explains the step icons once, below the rows.

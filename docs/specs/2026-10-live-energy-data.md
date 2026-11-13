@@ -711,6 +711,8 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
 
 ## 7. Frontend
 
+`LivePointsTable` sorts by meter identity, holder, signed `meter_power_w`, numeric `age_s` and raw live state. The current order also applies to the phone cards; the sortable headings remain visible above them. Source connections, disclosure state and refresh behavior are unchanged. See the shared [sorting contract](2026-04-frontend-management-page-design.md#72-information-architecture-rules).
+
 ### 7.1 My energy system and its cards
 
 - `frontend/src/lib/live.ts` (next to `lib/supplementary.ts`): `useLiveEnergy(zevId)` wraps `useQuery({ queryKey: queryKeys.live.snapshot(zevId),

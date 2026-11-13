@@ -412,12 +412,14 @@
 }
 
 @container (max-width: 43rem) {
-  .metering-point-list > thead {
+  .metering-point-columns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+  }
+
+  .metering-point-columns th:not(.sortable-header) {
     position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
   }
 
   .metering-point-row {

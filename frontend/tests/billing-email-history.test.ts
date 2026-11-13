@@ -50,7 +50,7 @@ async function render() {
 }
 
 function historyButtons() {
-    return Array.from(container.querySelectorAll<HTMLButtonElement>('.billing-workflow-table button'))
+    return Array.from(container.querySelectorAll<HTMLButtonElement>('.billing-workflow-table tbody button'))
 }
 
 function modalTitle() {

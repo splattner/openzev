@@ -97,6 +97,10 @@ const BUCKET_COUNT_LABEL_KEY: Record<'day' | 'hour' | 'month', string> = {
  * column ascending brings the red rows to the top (#648). */
 const SEVERITY_RANK: Record<DataQualitySeverity, number> = { red: 0, yellow: 1, green: 2 }
 
+function totalGapDays(mp: MeteringPointDataQuality): number {
+    return mp.gaps.reduce((sum, gap) => sum + gap.duration_days, 0)
+}
+
 /** The active Data Quality severity filter from `?quality_severity=`, or
  * `'all'` if absent/invalid — a URL is never trusted input (#648). */
 export function readSeverityFilter(searchParams: URLSearchParams): DataQualitySeverity | 'all' {
@@ -513,14 +517,14 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
         },
         {
             id: 'gaps',
+            accessorFn: totalGapDays,
             header: t('meteringDataQuality.gaps'),
-            enableSorting: false,
             cell: (ctx) => {
                 const mp = ctx.row.original
                 if (mp.gaps.length === 0) {
                     return <span style={{ color: 'var(--success-600)' }}>{t('meteringDataQuality.noGaps')}</span>
                 }
-                const days = t('meteringDataQuality.gapDays', { count: mp.gaps.reduce((sum, gap) => sum + gap.duration_days, 0) })
+                const days = t('meteringDataQuality.gapDays', { count: totalGapDays(mp) })
                 return (
                     <button
                         type="button"
@@ -848,9 +852,6 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
 
                                         <div className="table-card">
                                             <DataTable
-                                                // Remounts on filter change so pagination/sort state (internal
-                                                // to DataTable) doesn't strand the viewer on a now-empty page.
-                                                key={severityFilter}
                                                 data={qualityRows}
                                                 columns={qualityColumns}
                                                 getRowId={(row) => row.id}

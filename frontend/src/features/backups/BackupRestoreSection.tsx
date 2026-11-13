@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Switch } from '@mantine/core'
@@ -306,6 +307,13 @@ export function BackupRestoreSection({ status }: { status?: BackupStatus } = {})
 function RestoreHistory({ jobs, loading }: { jobs: RestoreJob[]; loading: boolean }) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
+    const sorting = useTableSorting(jobs, {
+        when: row => row.started_at ?? row.created_at,
+        community: row => row.target_zev_name || row.target_zev_id,
+        backup: row => row.source_created_at,
+        kind: row => Number(row.dry_run),
+        status: row => row.status,
+    })
     if (loading || jobs.length === 0) return null
 
     return (
@@ -315,15 +323,15 @@ function RestoreHistory({ jobs, loading }: { jobs: RestoreJob[]; loading: boolea
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>{t('pages.backups.restore.columns.when')}</th>
-                            <th>{t('pages.backups.restore.community')}</th>
-                            <th>{t('pages.backups.restore.columns.backup')}</th>
-                            <th>{t('pages.backups.restore.columns.kind')}</th>
-                            <th>{t('pages.backups.jobs.columns.status')}</th>
+                            <SortableHeader {...sorting.header('when')}>{t('pages.backups.restore.columns.when')}</SortableHeader>
+                            <SortableHeader {...sorting.header('community')}>{t('pages.backups.restore.community')}</SortableHeader>
+                            <SortableHeader {...sorting.header('backup')}>{t('pages.backups.restore.columns.backup')}</SortableHeader>
+                            <SortableHeader {...sorting.header('kind')}>{t('pages.backups.restore.columns.kind')}</SortableHeader>
+                            <SortableHeader {...sorting.header('status')}>{t('pages.backups.jobs.columns.status')}</SortableHeader>
                         </tr>
                     </thead>
                     <tbody>
-                        {jobs.map((row) => (
+                        {sorting.rows.map((row) => (
                             <tr key={row.id}>
                                 <td>{formatDateTime(row.started_at ?? row.created_at, settings)}</td>
                                 <td>{row.target_zev_name || row.target_zev_id}</td>

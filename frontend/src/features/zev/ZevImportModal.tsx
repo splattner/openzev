@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { faUpload, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -37,6 +38,11 @@ export function ZevImportModal({ isOpen, onClose, onImported }: ZevImportModalPr
   const [name, setName] = useState('')
   const [fatalError, setFatalError] = useState<string | null>(null)
   const [entryErrors, setEntryErrors] = useState<ImportEntryError[]>([])
+  const sorting = useTableSorting(entryErrors, {
+    section: row => row.section,
+    entry: row => row.label,
+    detail: row => Object.values(row.errors).flat().join(' '),
+  })
   const [totalErrors, setTotalErrors] = useState(0)
   const [imported, setImported] = useState<ZevArchiveImportResult | null>(null)
 
@@ -210,13 +216,13 @@ export function ZevImportModal({ isOpen, onClose, onImported }: ZevImportModalPr
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>{t('zevTransfer.errorSection')}</th>
-                    <th>{t('zevTransfer.errorEntry')}</th>
-                    <th>{t('zevTransfer.errorDetail')}</th>
+                    <SortableHeader {...sorting.header('section')}>{t('zevTransfer.errorSection')}</SortableHeader>
+                    <SortableHeader {...sorting.header('entry')}>{t('zevTransfer.errorEntry')}</SortableHeader>
+                    <SortableHeader {...sorting.header('detail')}>{t('zevTransfer.errorDetail')}</SortableHeader>
                   </tr>
                 </thead>
                 <tbody>
-                  {entryErrors.map((entry, index) => (
+                  {sorting.rows.map((entry, index) => (
                     <tr key={`${entry.section}-${entry.position}-${index}`}>
                       <td>{t(`zevTransfer.sections.${entry.section}`)}</td>
                       <td>

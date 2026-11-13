@@ -88,6 +88,15 @@ completion must not select or reopen anything (`useWriteScope`, reference spec ย
 - Historical rows are grey but readable, with explicit historical context. They
   stay accessible and can expose permitted corrections: past does not mean
   disabled, and a genuinely disabled record or action says why.
+- Category tables offer raw-value header sorting while retaining category and
+  current/upcoming/history groups. Multi-band price order uses the lowest known
+  CHF rate (effective percentage prices and dynamic averages included), with
+  missing prices last; its tooltip explains this choice. Unit sorts the actual
+  `kWh`, `month` or `year` unit, independent of fee allocation; a bandless energy
+  tariff has no unit and stays last. Applies is a plain heading because its
+  multi-line schedules and percentage descriptions have no single ordering.
+  Sort headings remain available above phone cards. Opening a row still selects
+  its original version.
 - Plain validity dates, not rounded validity pills. No tariff, fee, band or
   version totals unless they help a concrete task (reference spec ยง10.1).
   Warnings beside the name stay: a gap, a failed price fetch.

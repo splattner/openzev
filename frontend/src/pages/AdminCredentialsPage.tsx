@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../components/tableSorting'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PageSkeleton } from '../components/PageSkeleton'
@@ -43,6 +44,16 @@ export function AdminCredentialsPage({ embedded = false }: { embedded?: boolean 
     const usersQuery = useQuery({ queryKey: queryKeys.auth.users(), queryFn: fetchUsers })
 
     const credentials = credentialsQuery.data ?? []
+    const sorting = useTableSorting(credentials, {
+        colName: row => row.name,
+        colType: row => row.kind,
+        colOwner: row => row.owner?.email || row.owner?.username || row.scope.zev_name,
+        colPrefix: row => row.prefix,
+        colScope: scopeText,
+        colStatus: row => row.status,
+        colLastUsed: row => row.last_used_at,
+        colExpires: row => row.expires_at,
+    })
     const users = usersQuery.data ?? []
 
     const revokeMutation = useMutation({
@@ -87,10 +98,10 @@ export function AdminCredentialsPage({ embedded = false }: { embedded?: boolean 
         return t('pages.adminCredentials.ownerZev', { zev: credential.scope.zev_name ?? '' })
     }
 
-    function scopeText(credential: AdminAccessCredential): string {
+    function scopeText(credential: AdminAccessCredential): string | undefined {
         const { scope } = credential
         const parts = [scope.zev_name, scope.participant_name, scope.meter_id].filter(Boolean)
-        return parts.length ? parts.join(' · ') : '—'
+        return parts.join(' · ') || undefined
     }
 
     return (
@@ -157,19 +168,19 @@ export function AdminCredentialsPage({ embedded = false }: { embedded?: boolean 
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>{t('pages.adminCredentials.colName')}</th>
-                                <th>{t('pages.adminCredentials.colType')}</th>
-                                <th>{t('pages.adminCredentials.colOwner')}</th>
-                                <th>{t('pages.adminCredentials.colPrefix')}</th>
-                                <th>{t('pages.adminCredentials.colScope')}</th>
-                                <th>{t('pages.adminCredentials.colStatus')}</th>
-                                <th>{t('pages.adminCredentials.colLastUsed')}</th>
-                                <th>{t('pages.adminCredentials.colExpires')}</th>
+                                <SortableHeader {...sorting.header('colName')}>{t('pages.adminCredentials.colName')}</SortableHeader>
+                                <SortableHeader {...sorting.header('colType')}>{t('pages.adminCredentials.colType')}</SortableHeader>
+                                <SortableHeader {...sorting.header('colOwner')}>{t('pages.adminCredentials.colOwner')}</SortableHeader>
+                                <SortableHeader {...sorting.header('colPrefix')}>{t('pages.adminCredentials.colPrefix')}</SortableHeader>
+                                <SortableHeader {...sorting.header('colScope')}>{t('pages.adminCredentials.colScope')}</SortableHeader>
+                                <SortableHeader {...sorting.header('colStatus')}>{t('pages.adminCredentials.colStatus')}</SortableHeader>
+                                <SortableHeader {...sorting.header('colLastUsed')}>{t('pages.adminCredentials.colLastUsed')}</SortableHeader>
+                                <SortableHeader {...sorting.header('colExpires')}>{t('pages.adminCredentials.colExpires')}</SortableHeader>
                                 <th />
                             </tr>
                         </thead>
                         <tbody>
-                            {credentials.map((credential) => {
+                            {sorting.rows.map((credential) => {
                                 const status = statusLabel(credential)
                                 return (
                                     <tr key={`${credential.kind}:${credential.id}`}>
@@ -182,7 +193,7 @@ export function AdminCredentialsPage({ embedded = false }: { embedded?: boolean 
                                         </td>
                                         <td>{ownerText(credential)}</td>
                                         <td><code>{credential.prefix}</code></td>
-                                        <td>{scopeText(credential)}</td>
+                                        <td>{scopeText(credential) ?? '—'}</td>
                                         <td><span className={status.className}>{status.label}</span></td>
                                         <td>
                                             {credential.last_used_at

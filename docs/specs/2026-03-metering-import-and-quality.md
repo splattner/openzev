@@ -1251,6 +1251,14 @@ tab controls and content. An empty filtered result links permitted readers
 to `/metering/points`; only admins and managers can add points. Points without
 readings appear as Missing.
 
+The Missing Days header sorts by the sum of `gaps[].duration_days` (zero for
+no gaps), descending on the first click. `frontend/tests/metering-default-selection.test.ts`
+covers total days versus gap count and points without gaps.
+
+Import previews and skipped-row details provide raw-value header sorting. Retained corrections sort over the complete loaded array before their 50-row pagination; Values sorts by numeric `new_energy`, and source row/interval identities and truncation warnings remain intact.
+
+Frontend raw daily totals support header sorting over the complete loaded period before pagination (date, numeric import/export and reading count); expanded day identity is retained. The fixed hour/minute grid and server-paginated held-reading stream keep their chronological layout. The shared sorting behavior is specified in [management-page design §7.2](2026-04-frontend-management-page-design.md#72-information-architecture-rules).
+
 **Gap details:** the Missing Days column shows **Complete** for points without
 gaps and, for every point with gaps (including a single range), a button whose
 text is the pluralized total of `duration_days` (`gapDays`, e.g. "7 days") and

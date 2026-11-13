@@ -2586,6 +2586,7 @@ export const fr = {
             col: {
             },
             rateCard: {
+                sortLowestRate: "Trier selon le tarif indiqué le plus bas.",
                 applies: 'Application',
                 price: 'Prix (CHF)',
                 unit: 'Unité',
@@ -3073,7 +3074,6 @@ export const fr = {
                 label: 'Trier',
                 meterId: 'ID compteur',
                 location: 'Emplacement',
-                lastReading: "Relevé le plus ancien d'abord",
             },
             columns: {
                 actions: 'Actions',

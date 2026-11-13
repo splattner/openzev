@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
     faArrowRight,
@@ -161,6 +162,13 @@ export function ParticipantCardsSection({
 }: ParticipantCardsSectionProps) {
     const { t } = useTranslation()
 
+    const sorting = useTableSorting(filteredParticipants, {
+        participant: row => row.displayName,
+        address: row => row.address,
+        validity: row => row.participant.valid_from,
+        status: row => row.issues.length,
+        allocationWeight: row => Number(row.participant.allocation_weight || '1'),
+    })
     // Use all current memberships, not just the visible rows.
     const currentTotalWeight = participantCards.reduce(
         (sum, { participant, validityState }) => validityState === 'current'
@@ -217,20 +225,18 @@ export function ParticipantCardsSection({
                 <table role="table">
                     <thead role="rowgroup">
                         <tr role="row">
-                            <th role="columnheader" scope="col">{t('pages.participants.col.participant')}</th>
-                            <th role="columnheader" scope="col">{t('pages.participants.col.address')}</th>
-                            <th role="columnheader" scope="col">{t('pages.participants.col.validity')}</th>
-                            <th role="columnheader" scope="col">{t('pages.participants.col.status')}</th>
-                            <th role="columnheader" scope="col" className="numeric" title={t('pages.participants.weightShareHint')}>
-                                {t('pages.participants.form.allocationWeight')}
-                            </th>
+                            <SortableHeader {...sorting.header('participant')} role="columnheader" scope="col">{t('pages.participants.col.participant')}</SortableHeader>
+                            <SortableHeader {...sorting.header('address')} role="columnheader" scope="col">{t('pages.participants.col.address')}</SortableHeader>
+                            <SortableHeader {...sorting.header('validity')} role="columnheader" scope="col">{t('pages.participants.col.validity')}</SortableHeader>
+                            <SortableHeader {...sorting.header('status')} role="columnheader" scope="col">{t('pages.participants.col.status')}</SortableHeader>
+                            <SortableHeader {...sorting.header('allocationWeight')} role="columnheader" scope="col" className="numeric" title={t('pages.participants.weightShareHint')}>{t('pages.participants.form.allocationWeight')}</SortableHeader>
                             <th role="columnheader" scope="col" className="invoice-actions-cell">
                                 <span className="visually-hidden">{t('pages.participants.col.actions')}</span>
                             </th>
                         </tr>
                     </thead>
                     <tbody role="rowgroup">
-                        {filteredParticipants.map(({ participant, issues, roles, validityState, displayName, address }) => {
+                        {sorting.rows.map(({ participant, issues, roles, validityState, displayName, address }) => {
                             const isCurrent = validityState === 'current'
                             const weight = Number(participant.allocation_weight || '1')
                             const formattedWeight = formatNumber(weight, { maxDecimals: 4 })

@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { faPlus, faFloppyDisk } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { useQuery } from '@tanstack/react-query'
@@ -81,6 +82,10 @@ function ChargeForm({ isPending, zevId, charge, participants, minDate, maxDate, 
         queryFn: () => previewCharge(settledInput!),
         enabled: settledInput !== null,
         retry: false,
+    })
+    const sorting = useTableSorting(preview.data?.bearers ?? [], {
+        participant: row => row.name,
+        share: row => Number(row.share_chf),
     })
     const showErrors = submitted
     const labels = useMemo(
@@ -221,12 +226,12 @@ function ChargeForm({ isPending, zevId, charge, participants, minDate, maxDate, 
                                 <table className="data-table">
                                     <thead>
                                         <tr>
-                                            <th>{t('pages.charges.preview.participant')}</th>
-                                            <th className="numeric">{t('pages.charges.preview.share')}</th>
+                                            <SortableHeader {...sorting.header('participant')}>{t('pages.charges.preview.participant')}</SortableHeader>
+                                            <SortableHeader {...sorting.header('share')} className="numeric">{t('pages.charges.preview.share')}</SortableHeader>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {preview.data.bearers.map((bearer) => (
+                                        {sorting.rows.map((bearer) => (
                                             <tr key={bearer.participant}>
                                                 <td>{labels.get(bearer.participant) ?? bearer.name}</td>
                                                 <td className="numeric">{formatChf(Number(bearer.share_chf))}</td>

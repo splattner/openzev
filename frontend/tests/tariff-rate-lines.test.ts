@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { buildRateLines, formatBandSchedule, type RateLineTranslate } from '../src/features/tariffs/rateLines'
+import { buildRateLines, formatBandSchedule, lowestTariffRate, tariffRateUnit, type RateLineTranslate } from '../src/features/tariffs/rateLines'
 import type { TariffSeries, TariffVersion } from '../src/types/api'
 
 vi.mock('react-i18next', () => ({
@@ -51,6 +51,28 @@ function mockT(key: string, opts?: Record<string, unknown>): string {
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const t: RateLineTranslate = mockT
+
+it('uses kWh only for rendered energy bands or dynamic prices and shares fee units across allocations', () => {
+    expect(tariffRateUnit(energySeries(), energyVersion([]))).toBeUndefined()
+    expect(tariffRateUnit(energySeries(), energyVersion([period('flat')]))).toBe('kWh')
+    expect(tariffRateUnit(energySeries({ billing_mode: 'percentage_of_energy' }), energyVersion([period('flat')]))).toBe('kWh')
+    expect(tariffRateUnit(energySeries(), energyVersion([], { dynamic_source: 'source' }))).toBe('kWh')
+    for (const billing_mode of ['monthly_fee', 'per_metering_point_monthly_fee', 'shared_monthly_fee'] as const) {
+        expect(tariffRateUnit({ billing_mode }, energyVersion([]))).toBe('month')
+    }
+    for (const billing_mode of ['yearly_fee', 'per_metering_point_yearly_fee', 'shared_yearly_fee'] as const) {
+        expect(tariffRateUnit({ billing_mode }, energyVersion([]))).toBe('year')
+    }
+})
+
+it('sorts multi-band prices by the lowest raw rate and leaves unknown prices missing', () => {
+    expect(lowestTariffRate({ periods: [{ price_chf_per_kwh: '10' }, { price_chf_per_kwh: '2' }] })).toBe(2)
+    expect(lowestTariffRate({ fixed_price_chf: '20', periods: [] })).toBe(20)
+    expect(lowestTariffRate({ periods: [{ price_chf_per_kwh: null, percentage: '0' }], percentage_base_summary: { price_chf_per_kwh: '0.3', dynamic_status: null, reference_date: '2026-01-01' } })).toBe(0)
+    expect(lowestTariffRate({ periods: [{ price_chf_per_kwh: null, percentage: '65' }] })).toBeNull()
+    expect(lowestTariffRate({ periods: [{ price_chf_per_kwh: null, percentage: '65' }], percentage_base_summary: { price_chf_per_kwh: '0.3', dynamic_status: null, reference_date: '2026-01-01' } })).toBeCloseTo(0.195)
+    expect(lowestTariffRate({ periods: [] })).toBeNull()
+})
 
 function energySeries(overrides: Partial<TariffSeries> = {}): TariffSeries {
     return {

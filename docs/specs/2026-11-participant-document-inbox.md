@@ -285,6 +285,8 @@ Decision for this spec, to be honoured by #793:
 
 ### 7.1 Participant *My documents* page
 
+Document tables provide column sorting by raw title, community, delivery timestamp, amount and status; the outbox adds recipient sorting and preserves each broadcast group. The first recipient’s name is the outbox recipient key. The same ordered records feed desktop rows and phone cards, with headings visible above cards. Downloads and withdrawal actions retain their record identity. See [management-page design §7.2](2026-04-frontend-management-page-design.md#72-information-architecture-rules).
+
 **Files:** `frontend/src/pages/DocumentsPage.tsx`, `frontend/src/features/inbox/DocumentsList.tsx`, `documentPresentation.ts`, and the shared `DocumentCards.css`.
 
 - Route `/me/documents` (participant shell, nav entry *My documents* (the only place for invoices since 6b), also for a former participant, who reads what it was sent, and for a manager, viewer or admin who holds a participation in any community: the entry sits in the *Personal* block of the management navigation, below the Setup group, with *My metering points*, the route admits the management shells, and the page keeps only the account's own rows, so what the outbox shows for everyone is not mixed in); *My invoices* (`MyInvoicesPage.tsx`) was kept in phases 1–5 and removed in 6b: its figures moved into this list (below) and `/me/invoices` redirects here.

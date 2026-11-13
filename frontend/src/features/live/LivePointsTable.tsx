@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Disclosure } from '../../components/Disclosure'
@@ -49,6 +50,13 @@ function ConnectNote({ point }: { point: LivePoint }) {
 export function LivePointsTable({ points }: { points: LivePoint[] }) {
     const { t } = useTranslation()
     const power = usePointPower()
+    const sorting = useTableSorting(points, {
+        meter: row => row.meter_id ?? row.target,
+        holder: row => row.participant_name,
+        power: row => row.meter_power_w,
+        age: row => row.age_s,
+        state: row => row.live_state,
+    })
     const quiet = points.filter((point) => point.target === 'metering_point' && point.live_state !== 'fresh').length
     return (
         <section className="card">
@@ -65,15 +73,15 @@ export function LivePointsTable({ points }: { points: LivePoint[] }) {
                     <table className="participant-table live-points-table">
                         <thead>
                             <tr>
-                                <th>{t('live.points.meter')}</th>
-                                <th>{t('live.points.holder')}</th>
-                                <th className="numeric">{t('live.points.power')}</th>
-                                <th className="numeric">{t('live.points.age')}</th>
-                                <th>{t('live.points.state')}</th>
+                                <SortableHeader {...sorting.header('meter')}>{t('live.points.meter')}</SortableHeader>
+                                <SortableHeader {...sorting.header('holder')}>{t('live.points.holder')}</SortableHeader>
+                                <SortableHeader {...sorting.header('power')} className="numeric">{t('live.points.power')}</SortableHeader>
+                                <SortableHeader {...sorting.header('age')} className="numeric">{t('live.points.age')}</SortableHeader>
+                                <SortableHeader {...sorting.header('state')}>{t('live.points.state')}</SortableHeader>
                             </tr>
                         </thead>
                         <tbody>
-                            {points.map((point) => (
+                            {sorting.rows.map((point) => (
                                 <tr key={pointKey(point)}>
                                     <td className="live-meter-cell"><PointName point={point} /></td>
                                     <td>{point.participant_name ?? t('live.points.zevOperated')}</td>
@@ -87,7 +95,7 @@ export function LivePointsTable({ points }: { points: LivePoint[] }) {
                 </div>
                 {/* On a phone the columns would hide the one thing the table is for (the kW), so each point is a small card. */}
                 <ul className="live-points-list">
-                    {points.map((point) => (
+                    {sorting.rows.map((point) => (
                         <li key={pointKey(point)}>
                             <div className="live-points-list-head">
                                 <strong><PointName point={point} /></strong>

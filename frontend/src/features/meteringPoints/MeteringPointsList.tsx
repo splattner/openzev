@@ -1,13 +1,16 @@
+import { SortableHeader } from '../../components/tableSorting'
 import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { todayBusinessIso } from '../../lib/dates'
 import type { AppSettings, MeteringPoint, MeteringPointAssignment } from '../../types/api'
 import { MeteringPointRow, type ConfirmOptions } from './MeteringPointRow'
 import { MeteringPointTypeLegend } from './MeteringPointTypeLegend'
-import type { BuildingGroup, MeteringPointHealth } from './useMeteringPointForms'
+import type { BuildingGroup, MeteringPointHealth, MeteringPointSort, MeteringPointSortColumn } from './useMeteringPointForms'
 
 type MeteringPointsListProps = {
   meteringPoints: MeteringPoint[]
+  sort?: MeteringPointSort
+  onChangeSort?: (sort: MeteringPointSort) => void
   assignmentsByMeteringPoint: Map<string, MeteringPointAssignment[]>
   participantNameById: Map<string, string>
   healthByMeteringPoint: Map<string, MeteringPointHealth>
@@ -39,6 +42,8 @@ type MeteringPointsListProps = {
 
 export function MeteringPointsList({
   meteringPoints,
+  sort,
+  onChangeSort,
   assignmentsByMeteringPoint,
   participantNameById,
   healthByMeteringPoint,
@@ -101,6 +106,10 @@ export function MeteringPointsList({
   )
 
   const sheetClass = `metering-sheet${isManagedScope ? ' metering-sheet-holders' : ''}`
+  const sortHeader = (column: MeteringPointSortColumn, count: number) => ({
+    direction: sort === column ? 'asc' as const : sort === `-${column}` ? 'desc' as const : false as const,
+    onSort: count > 1 && onChangeSort ? () => onChangeSort(sort === column ? `-${column}` : column) : undefined,
+  })
   const renderTable = (points: MeteringPoint[], buildingId?: string) => (
     <table className="metering-point-list" role="table"
       aria-labelledby={buildingId ? `metering-building-${buildingId}` : undefined}
@@ -108,9 +117,9 @@ export function MeteringPointsList({
     >
       <thead role="rowgroup">
         <tr className="metering-point-columns" role="row">
-          <th scope="col" role="columnheader">{t('pages.meteringPoints.columns.meter')}</th>
-          {isManagedScope && <th scope="col" role="columnheader">{t('pages.meteringPoints.columns.holder')}</th>}
-          <th scope="col" role="columnheader">{t('pages.meteringPoints.columns.lastReading')}</th>
+          <SortableHeader {...sortHeader('meter_id', points.length)} scope="col" role="columnheader">{t('pages.meteringPoints.columns.meter')}</SortableHeader>
+          {isManagedScope && <SortableHeader {...sortHeader('holder', points.length)} scope="col" role="columnheader">{t('pages.meteringPoints.columns.holder')}</SortableHeader>}
+          <SortableHeader {...sortHeader('last_reading', points.length)} scope="col" role="columnheader">{t('pages.meteringPoints.columns.lastReading')}</SortableHeader>
           <th scope="col" role="columnheader"><span className="visually-hidden">{t('pages.meteringPoints.columns.actions')}</span></th>
         </tr>
       </thead>

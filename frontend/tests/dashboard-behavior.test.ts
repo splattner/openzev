@@ -293,6 +293,22 @@ async function renderProfile(relation: 'participant' | 'manager', client?: Query
 }
 
 describe('dashboard behavior preservation', () => {
+    it('sorts the per-participant table by name and numeric consumption', async () => {
+        mockState.relation = 'manager'
+        mockState.summary = managerSummary()
+        const container = await renderDashboard()
+        const table = container.querySelector('.participant-table')!
+        const names = () => Array.from(table.querySelectorAll('.participant-select')).map(button => button.textContent)
+        const sort = async (column: number) => act(async () => table.querySelectorAll('th')[column].querySelector('button')!.click())
+        await sort(0)
+        await sort(0)
+        expect(names()).toEqual(['Bob', 'Alice'])
+        await sort(1)
+        expect(names()).toEqual(['Alice', 'Bob'])
+        await sort(1)
+        expect(names()).toEqual(['Bob', 'Alice'])
+    })
+
     it('manager sees the per-participant breakdown table and no metering migration card', async () => {
         mockState.relation = 'manager'
         mockState.summary = managerSummary()

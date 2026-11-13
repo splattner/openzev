@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../components/tableSorting'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
@@ -164,6 +165,11 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
 
     const accounts = usersQuery.data
     const visibleAccounts = useMemo(() => filterAccounts(accounts ?? [], filters), [accounts, filters])
+    const sorting = useTableSorting(visibleAccounts, {
+        account: row => accountDisplayName(row),
+        communities: row => row.memberships.length,
+        security: row => row.mfa_methods.length,
+    })
     const stats = useMemo(() => accountStats(accounts ?? []), [accounts])
 
     function roleLabel(role: UserRole) {
@@ -366,14 +372,14 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                 <table>
                     <thead>
                         <tr>
-                            <th>{t('pages.accounts.col.account')}</th>
-                            <th>{t('pages.accounts.col.communities')}</th>
-                            <th>{t('pages.accounts.col.security')}</th>
+                            <SortableHeader {...sorting.header('account')}>{t('pages.accounts.col.account')}</SortableHeader>
+                            <SortableHeader {...sorting.header('communities')}>{t('pages.accounts.col.communities')}</SortableHeader>
+                            <SortableHeader {...sorting.header('security')}>{t('pages.accounts.col.security')}</SortableHeader>
                             <th>{t('pages.accounts.col.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {visibleAccounts.map((account) => {
+                        {sorting.rows.map((account) => {
                             const isSelf = account.id === currentUser?.id
                             const menuItems = [
                                 ...(canImpersonateAccount(account)

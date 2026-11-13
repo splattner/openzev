@@ -538,6 +538,10 @@ with access shown and changed **on each person's row** — there is no separate 
   shown elsewhere (e.g. a participant given read-only access, with a "Participant" badge) and
   bare logins with access that belong to no party (named by their account name, else their
   email; no "Login only" tag since #1224).
+- **Other people** table: name and access-entry count headings sort contacts and
+  standalone logins together using the shared
+  [sorting contract](2026-04-frontend-management-page-design.md#72-information-architecture-rules).
+  Expanded forms and access actions retain their person identity.
 - **Other people** header (`.people-rows-header`): the title and hint, "Give access" (secondary) and
   "Add contact" (primary), the only primary action of the tab. "Give access" opens `GiveAccessForm`
   (an inline form with its own heading, above the table; opened from a row's "Give access" /

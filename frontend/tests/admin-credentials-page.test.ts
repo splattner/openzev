@@ -50,6 +50,25 @@ async function mount() {
 }
 
 describe('AdminCredentialsPage', () => {
+    it('sorts the complete scope naturally, keeps empty scopes last, and retains row actions', async () => {
+        credentialsApi.fetchAllCredentials.mockResolvedValue([
+            row({ id: 'bob', name: 'Bob', scope: { ...noScope, zev_name: 'Community', participant_name: 'Bob', meter_id: 'Meter 1' } }),
+            row({ id: 'ten', name: 'Ten', scope: { ...noScope, zev_name: 'Community', participant_name: 'Alice', meter_id: 'Meter 10' } }),
+            row({ id: 'two', name: 'Two', scope: { ...noScope, zev_name: 'Community', participant_name: 'Alice', meter_id: 'Meter 2' } }),
+            row({ id: 'empty', name: 'Empty', scope: { ...noScope, zev_name: '', participant_name: '', meter_id: '' } }),
+            row({ id: 'missing', name: 'Missing' }),
+        ])
+        const { container } = await mount()
+        const header = [...container.querySelectorAll('th')].find(th => th.textContent?.startsWith('pages.adminCredentials.colScope'))!
+        const names = () => [...container.querySelectorAll('tbody tr')].map(tr => tr.querySelector('td')!.textContent)
+        await click(header.querySelector('button')!)
+        expect(names()).toEqual(['Two', 'Ten', 'Bob', 'Empty', 'Missing'])
+        await click(header.querySelector('button')!)
+        expect(names()).toEqual(['Bob', 'Ten', 'Two', 'Empty', 'Missing'])
+        await click(container.querySelector<HTMLButtonElement>('tbody button')!)
+        expect(dialog()!.textContent).toContain('Bob')
+    })
+
     it('lists every kind with owner, type and scope, and counts them by status', async () => {
         const { container } = await mount()
 

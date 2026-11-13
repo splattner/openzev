@@ -11,7 +11,7 @@ const api = vi.hoisted(() => ({
     readiness: vi.fn(),
     history: vi.fn(),
 }))
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }) }))
 vi.mock('../src/lib/managedZev', () => {
     const context = { useManagedZev: () => ({
         selectedZevId: 'z1', selectedZev: { id: 'z1', name: 'ZEV', start_date: '2025-01-01', billing_interval: 'monthly' },

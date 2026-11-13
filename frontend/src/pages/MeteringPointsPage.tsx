@@ -191,6 +191,7 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                     isManagedScope={isManagedScope}
                     readOnly={readOnly}
                     totalCount={scopedMeteringPoints.length}
+                    filteredCount={meteringPoints.length}
                     activeCount={activeCount}
                     inactiveCount={inactiveCount}
                     unassignedCount={unassignedCount}
@@ -275,6 +276,8 @@ function MeteringPointsView({ canWrite, canDeleteData }: { canWrite: boolean; ca
                     <MeteringPointsList
                         settings={settings}
                         meteringPoints={meteringPoints}
+                        sort={sort}
+                        onChangeSort={setSort}
                         assignmentsAvailable={assignmentsQuery.data !== undefined}
                         assignmentsByMeteringPoint={filteredAssignmentsByMeteringPoint}
                         participantNameById={participantNameById}

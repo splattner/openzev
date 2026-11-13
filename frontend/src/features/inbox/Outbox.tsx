@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faDownload, faEllipsis, faFileArrowUp, faPaperPlane } from '@fortawesome/free-solid-svg-icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -113,6 +114,12 @@ export function Outbox() {
     const status = statusOf(entry)
     return status.standing !== null || status.withoutAccount > 0
   })
+  const sorting = useTableSorting(entries, {
+    document: row => row.documents[0].title,
+    participant: row => row.documents[0].participant_name,
+    delivered: row => row.documents[0].delivered_at,
+    status: row => statusOf(row).standing ?? (statusOf(row).withoutAccount > 0 ? 'no_account' : null),
+  })
   const isGroup = (entry: OutboxEntry) => entry.documents.length > 1
   const years = issueYears(today)
   const filtered = !!(participantId || kind || year)
@@ -225,15 +232,15 @@ export function Outbox() {
             <table className="billing-workflow-table">
               <thead>
                 <tr>
-                  <th scope="col">{t('inbox.outbox.col.document')}</th>
-                  <th scope="col">{t('inbox.outbox.col.participant')}</th>
-                  <th scope="col">{t('inbox.outbox.col.delivered')}</th>
-                  {showStatus && <th scope="col">{t('inbox.outbox.col.status')}</th>}
+                  <SortableHeader {...sorting.header('document')} scope="col">{t('inbox.outbox.col.document')}</SortableHeader>
+                  <SortableHeader {...sorting.header('participant')} scope="col">{t('inbox.outbox.col.participant')}</SortableHeader>
+                  <SortableHeader {...sorting.header('delivered')} scope="col">{t('inbox.outbox.col.delivered')}</SortableHeader>
+                  {showStatus && <SortableHeader {...sorting.header('status')} scope="col">{t('inbox.outbox.col.status')}</SortableHeader>}
                   <th scope="col" className="doc-actions-col">{t('inbox.outbox.col.actions')}</th>
                 </tr>
               </thead>
               <tbody>
-                {entries.map((entry) => {
+                {sorting.rows.map((entry) => {
                   const document = entry.documents[0]
                   return (
                     <tr key={entry.key}>
@@ -265,7 +272,7 @@ export function Outbox() {
             </table>
           </div>
           <ul className="doc-cards">
-            {entries.map((entry) => {
+            {sorting.rows.map((entry) => {
               const document = entry.documents[0]
               return (
                 <li key={entry.key} className="doc-card">

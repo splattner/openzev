@@ -1,3 +1,5 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
+import { lowestTariffRate } from './rateLines'
 import { formatTariffError } from './errors'
 import { useAppSettings } from '../../lib/appSettings'
 import { useMemo, useState, type FormEvent } from 'react'
@@ -101,13 +103,17 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
         [preview, year],
     )
 
-    const grouped = useMemo(() => {
-        const candidates = visible
-        return CATEGORY_ORDER.map((category) => ({
-            category,
-            candidates: candidates.filter((candidate) => candidate.category === category),
-        })).filter((group) => group.candidates.length > 0)
-    }, [visible])
+    const sorting = useTableSorting(visible, {
+        tariff: candidate => candidate.name,
+        price: lowestTariffRate,
+        billingMode: candidate => modeByKey[candidate.key] ?? candidate.billing_mode,
+        validity: candidate => candidate.valid_from,
+        status: candidate => candidate.status,
+    })
+    const grouped = CATEGORY_ORDER.map(category => ({
+        category,
+        candidates: sorting.rows.filter(candidate => candidate.category === category),
+    })).filter(group => group.candidates.length > 0)
 
     const selectable = useMemo(() => visible.filter(isSelectable), [visible])
 
@@ -266,11 +272,11 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
                                     <thead>
                                         <tr>
                                             <th aria-label={t('pages.tariffs.import.columns.select')} />
-                                            <th>{t('pages.tariffs.import.columns.tariff')}</th>
-                                            <th>{t('pages.tariffs.import.columns.price')}</th>
-                                            <th>{t('pages.tariffs.import.columns.billingMode')}</th>
-                                            <th>{t('pages.tariffs.import.columns.validity')}</th>
-                                            <th>{t('pages.tariffs.import.columns.status')}</th>
+                                            <SortableHeader {...sorting.header('tariff', group.candidates.length)}>{t('pages.tariffs.import.columns.tariff')}</SortableHeader>
+                                            <SortableHeader {...sorting.header('price', group.candidates.length)}>{t('pages.tariffs.import.columns.price')}</SortableHeader>
+                                            <SortableHeader {...sorting.header('billingMode', group.candidates.length)}>{t('pages.tariffs.import.columns.billingMode')}</SortableHeader>
+                                            <SortableHeader {...sorting.header('validity', group.candidates.length)}>{t('pages.tariffs.import.columns.validity')}</SortableHeader>
+                                            <SortableHeader {...sorting.header('status', group.candidates.length)}>{t('pages.tariffs.import.columns.status')}</SortableHeader>
                                         </tr>
                                     </thead>
                                     <tbody>

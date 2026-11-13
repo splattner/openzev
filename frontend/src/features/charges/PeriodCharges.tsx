@@ -35,7 +35,7 @@ type PeriodChargesProps = {
  * within the period; once an invoice of it is approved the list is read-only.
  */
 export function PeriodCharges({ zevId, periodStart, periodEnd, periodLocked }: PeriodChargesProps) {
-    const { t } = useTranslation()
+    const { t, i18n } = useTranslation()
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
     const { settings } = useAppSettings()
@@ -67,6 +67,15 @@ export function PeriodCharges({ zevId, periodStart, periodEnd, periodLocked }: P
         () => participantLabels(participants, (day) => formatShortDate(day, settings), t),
         [participants, settings, t],
     )
+    const collator = useMemo(() => new Intl.Collator(i18n.language), [i18n.language])
+    // Keep name changes in the table data so TanStack refreshes cached sort values.
+    const charges = useMemo(() => {
+        const names = new Map(participants.map(participant => [participant.id, participant.display_name || participant.full_name]))
+        return (chargesQuery.data ?? []).map(charge => ({
+            ...charge,
+            bearerNames: charge.participants.map(id => names.get(id) || id).sort(collator.compare),
+        }))
+    }, [chargesQuery.data, participants, collator])
 
     // A dialog belongs to one period of one community: never let it survive a change.
     useEffect(() => {
@@ -135,7 +144,7 @@ export function PeriodCharges({ zevId, periodStart, periodEnd, periodLocked }: P
             onConfirm: () => consumeReportedError(deleteMutation.mutateAsync({ charge, scope })),
         })
 
-    const columns = useMemo<ColumnDef<Charge, unknown>[]>(() => [
+    const columns = useMemo<ColumnDef<(typeof charges)[number], unknown>[]>(() => [
         {
             id: 'charge_date',
             accessorKey: 'charge_date',
@@ -157,8 +166,18 @@ export function PeriodCharges({ zevId, periodStart, periodEnd, periodLocked }: P
         },
         {
             id: 'bearers',
+            accessorKey: 'bearerNames',
+            sortDescFirst: false,
+            sortFn: ({ original: left }, { original: right }) => {
+                const allocation = collator.compare(left.allocation, right.allocation)
+                if (allocation) return allocation
+                for (let index = 0; index < Math.min(left.bearerNames.length, right.bearerNames.length); index++) {
+                    const order = collator.compare(left.bearerNames[index], right.bearerNames[index])
+                    if (order) return order
+                }
+                return left.bearerNames.length - right.bearerNames.length
+            },
             header: t('pages.charges.columns.bearers'),
-            enableSorting: false,
             cell: ({ row }) => bearersLabel(row.original, participantNames, t),
         },
         {
@@ -200,9 +219,7 @@ export function PeriodCharges({ zevId, periodStart, periodEnd, periodLocked }: P
             },
         },
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    ], [t, settings, participantNames, canEdit, scope])
-
-    const charges = chargesQuery.data ?? []
+    ], [t, settings, participantNames, canEdit, scope, collator])
 
     return (
         <section className="period-charges" aria-labelledby="period-charges-title">

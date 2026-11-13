@@ -696,6 +696,8 @@ Only admins see the maintenance link to `/admin/dynamic-sources?source=<id>`.
 
 `AdminDynamicSourcesPanel` presents source operations and global KPIs,
 uses the shared responsive stat grid and labels reuse counts as platform-wide.
+The Platform usage (`reuse`) column sorts by `linked_tariff_count + linked_zev_count`, descending
+first, with equal totals tied (`frontend/tests/dynamic-sources.test.ts`).
 The optional `source` query filters the table, survives reload, and has a
 Show all sources control that removes only `source`, preserving query/hash.
 Unknown IDs show “Source not found.” Initial loading/failure uses
@@ -784,7 +786,9 @@ positive coverage and maintenance-link permissions.
   columns as fit, 9.5rem minimum), so the pane shows them two by two.
   The interval table has one "Validity" column (`intervalLabel`, sorted by its
   start): `01.10.2026 00:00 – 00:15`, with the end's date repeated only when it
-  falls on another day than the start.
+  falls on another day than the start. Price uses a numeric CHF accessor, so
+  decimal and negative values sort numerically; covered by
+  `dynamic-price-history-paging.test.ts`.
 - **`AdminDynamicSourcesPanel`** — routed as `/admin/dynamic-sources` in the
   Admin Overview hub. It displays global source/point/reuse/failure KPIs and a
   `DataTable` with current fetch state, last error/time and reuse counts. Its

@@ -1662,6 +1662,8 @@ Public consumption rechecks eligibility before issuing auth cookies.
 
 ## 9. Frontend routing and access control
 
+The participant, community-people, account and community record tables provide column sorting through `useTableSorting` and `SortableHeader`, retaining existing row actions, permissions and responsive cards. The shared defaults and deliberate exceptions are specified in [management-page design §7.2](2026-04-frontend-management-page-design.md#72-information-architecture-rules).
+
 The app root (`App.tsx`) mounts `AppRoutes` through a data router
 (`createBrowserRouter([{ path: '*', element: <AppRoutes /> }])` +
 `RouterProvider`), not `BrowserRouter`. `ZevSettingsPage` relies on this for

@@ -23,6 +23,7 @@ import {
 } from '@tanstack/react-table'
 import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { SortableHeader } from './tableSorting'
 
 const features = tableFeatures({
     columnFilteringFeature,
@@ -112,6 +113,8 @@ export function DataTable<T extends Record<string, any>>({
     })
 
     const rows = table.getRowModel().rows
+    const filteredRowCount = table.getFilteredRowModel().rows.length
+    const showSortControls = enableSorting && filteredRowCount > 1
 
     return (
         <div className="data-table">
@@ -121,26 +124,15 @@ export function DataTable<T extends Record<string, any>>({
                         {table.getHeaderGroups().map((headerGroup) => (
                             <tr key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => {
-                                    const canSort = enableSorting && header.column.getCanSort()
+                                    const canSort = showSortControls && header.column.getCanSort()
                                     const dir = header.column.getIsSorted()
-                                    const ariaSort: 'ascending' | 'descending' | 'none' | undefined =
-                                        canSort ? (dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none') : undefined
                                     return (
-                                        <th key={header.id} aria-sort={ariaSort} style={{ width: header.getSize() !== TANSTACK_DEFAULT_SIZE ? header.getSize() : undefined }}>
-                                            {header.isPlaceholder ? null : canSort ? (
-                                                <button
-                                                    type="button"
-                                                    className="data-table-sort"
-                                                    onClick={header.column.getToggleSortingHandler()}
-                                                    aria-label={typeof header.column.columnDef.header === 'string' ? header.column.columnDef.header : undefined}
-                                                >
-                                                    {flexRender(header.column.columnDef.header, header.getContext())}
-                                                    <span aria-hidden="true">{dir === 'asc' ? '▲' : dir === 'desc' ? '▼' : ''}</span>
-                                                </button>
-                                            ) : (
-                                                flexRender(header.column.columnDef.header, header.getContext())
-                                            )}
-                                        </th>
+                                        <SortableHeader key={header.id} direction={dir}
+                                            onSort={!header.isPlaceholder && canSort ? header.column.getToggleSortingHandler() : undefined}
+                                            primary={header.column.getSortIndex() === 0}
+                                            style={{ width: header.getSize() !== TANSTACK_DEFAULT_SIZE ? header.getSize() : undefined }}>
+                                            {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                                        </SortableHeader>
                                     )
                                 })}
                             </tr>
@@ -173,8 +165,8 @@ export function DataTable<T extends Record<string, any>>({
                     <span aria-live="polite">
                         {t('common.pagination.range', {
                             from: table.state.pagination.pageIndex * table.state.pagination.pageSize + 1,
-                            to: Math.min((table.state.pagination.pageIndex + 1) * table.state.pagination.pageSize, table.getFilteredRowModel().rows.length),
-                            total: table.getFilteredRowModel().rows.length,
+                            to: Math.min((table.state.pagination.pageIndex + 1) * table.state.pagination.pageSize, filteredRowCount),
+                            total: filteredRowCount,
                         })}
                     </span>
                     <span className="flex-1" />

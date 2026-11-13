@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../../components/tableSorting'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../../lib/appSettings'
 import { formatChfAmount } from '../../../lib/numbers'
@@ -17,8 +18,14 @@ type Props = {
  */
 export function ProgressionFixedFees({ fees, day, basis, settings }: Props) {
     const { t } = useTranslation()
+    const sorting = useTableSorting(fees, {
+        name: fee => fee.name,
+        scope: fee => fee.scope,
+        since: fee => feeVersionOn(fee, day).valid_from,
+        amount: fee => Number(valueOf({ net: feeVersionOn(fee, day).amount_net, gross: feeVersionOn(fee, day).amount_gross }, basis)),
+    })
     if (fees.length === 0) return null
-    const groups = groupFees(fees)
+    const groups = groupFees(sorting.rows)
 
     return (
         <section className="card tariff-progression-fees" aria-labelledby="tariff-progression-fees-title">
@@ -32,10 +39,10 @@ export function ProgressionFixedFees({ fees, day, basis, settings }: Props) {
                         <caption>{t(`pages.tariffs.progression.fees.${unit}`)}</caption>
                         <thead>
                             <tr>
-                                <th scope="col">{t('pages.tariffs.progression.fees.name')}</th>
-                                <th scope="col">{t('pages.tariffs.progression.fees.scope')}</th>
-                                <th scope="col">{t('pages.tariffs.progression.fees.since')}</th>
-                                <th scope="col" className="numeric">{t(`pages.tariffs.progression.fees.amount.${unit}`)}</th>
+                                <SortableHeader {...sorting.header('name', groups[unit].length)} scope="col">{t('pages.tariffs.progression.fees.name')}</SortableHeader>
+                                <SortableHeader {...sorting.header('scope', groups[unit].length)} scope="col">{t('pages.tariffs.progression.fees.scope')}</SortableHeader>
+                                <SortableHeader {...sorting.header('since', groups[unit].length)} scope="col">{t('pages.tariffs.progression.fees.since')}</SortableHeader>
+                                <SortableHeader {...sorting.header('amount', groups[unit].length)} scope="col" className="numeric">{t(`pages.tariffs.progression.fees.amount.${unit}`)}</SortableHeader>
                             </tr>
                         </thead>
                         <tbody>

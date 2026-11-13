@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faDownload } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
@@ -110,6 +111,13 @@ export function DocumentsList({ documents, showCommunity }: { documents: readonl
   // Status only earns its column when a row has something to say, as for the amount.
   const showStatus = documents.some(hasStatus)
 
+  const sorting = useTableSorting(documents, {
+    document: row => row.title,
+    community: row => row.zev_name,
+    delivered: row => row.delivered_at,
+    amount: row => row.invoice_figures || row.credit_figures ? Number(row.invoice_figures?.total_chf ?? row.credit_figures?.amount_chf) : null,
+    status: row => row.invoice_figures?.status ?? row.credit_figures?.status ?? documentStanding(row),
+  })
   const meta = (document: DeliveredDocument) =>
     [
       t(`inbox.kind.${document.kind}`),
@@ -135,16 +143,16 @@ export function DocumentsList({ documents, showCommunity }: { documents: readonl
         <table className="billing-workflow-table">
           <thead>
             <tr>
-              <th scope="col">{t('inbox.outbox.col.document')}</th>
-              {showCommunity && <th scope="col">{t('inbox.col.community')}</th>}
-              <th scope="col">{t('inbox.outbox.col.delivered')}</th>
-              {showAmount && <th scope="col" className="numeric">{t('inbox.col.amount')}</th>}
-              {showStatus && <th scope="col">{t('inbox.outbox.col.status')}</th>}
+              <SortableHeader {...sorting.header('document')} scope="col">{t('inbox.outbox.col.document')}</SortableHeader>
+              {showCommunity && <SortableHeader {...sorting.header('community')} scope="col">{t('inbox.col.community')}</SortableHeader>}
+              <SortableHeader {...sorting.header('delivered')} scope="col">{t('inbox.outbox.col.delivered')}</SortableHeader>
+              {showAmount && <SortableHeader {...sorting.header('amount')} scope="col" className="numeric">{t('inbox.col.amount')}</SortableHeader>}
+              {showStatus && <SortableHeader {...sorting.header('status')} scope="col">{t('inbox.outbox.col.status')}</SortableHeader>}
               <th scope="col">{t('inbox.outbox.col.actions')}</th>
             </tr>
           </thead>
           <tbody>
-            {documents.map((document) => (
+            {sorting.rows.map((document) => (
               <tr key={document.id}>
                 <td>
                   <FontAwesomeIcon icon={KIND_ICON[document.kind]} fixedWidth aria-hidden="true" />{' '}
@@ -162,7 +170,7 @@ export function DocumentsList({ documents, showCommunity }: { documents: readonl
         </table>
       </div>
       <ul className="doc-cards">
-        {documents.map((document) => (
+        {sorting.rows.map((document) => (
           <li key={document.id} className="doc-card">
             <div className="doc-card-head">
               <strong><FontAwesomeIcon icon={KIND_ICON[document.kind]} fixedWidth aria-hidden="true" /> {document.title}</strong>

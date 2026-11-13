@@ -911,6 +911,8 @@ conflicts as such in the output.
 
 ## 7. Frontend
 
+Destination, job, restore-history and manifest-community tables provide column sorting via the shared [management-page contract](2026-04-frontend-management-page-design.md#72-information-architecture-rules). Numeric sizes/counts and raw timestamps are sortable; actions and the restore plan’s deliberately ordered section summary are not reordered.
+
 ### 7.1 System Settings — `backup` tab
 
 **File:** `frontend/src/pages/AdminSystemSettingsPage.tsx`

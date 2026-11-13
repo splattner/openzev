@@ -191,13 +191,17 @@ td.tariff-table-valid {
     white-space: normal;
   }
 
+  .invoice-rows.tariff-list .tariff-table thead tr {
+    background: var(--brand-deep);
+  }
+
   /* The band opens the sheet, as on the wide table. */
   .table-card.invoice-rows.tariff-list > table:first-child {
     margin-top: calc(-1 * var(--sheet-pad-block));
   }
 
   /* Out of sight, not out of the accessibility tree. */
-  .tariff-table thead th:not(:first-child) {
+  .tariff-table thead th:not(:first-child, .sortable-header) {
     position: absolute;
     width: 1px;
     height: 1px;

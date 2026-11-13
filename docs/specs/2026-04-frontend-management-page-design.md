@@ -6,7 +6,7 @@
 - Type: Change
 - Owners: Core maintainers
 - Created: 2026-04-05
-- Updated: 2026-11-01
+- Updated: 2026-11-12
 - Target Release: Ongoing baseline
 - Related Issues: n/a
 - Related ADRs: n/a
@@ -104,6 +104,7 @@ defined by shared frontend primitives and CSS contracts.
 | `frontend/src/components/EmailLogsModal.tsx` | `EmailLogsModal` | Uses `FormModal` for delivery history with retry actions and semantic status badges. |
 | `frontend/src/components/PeriodSelector.tsx` | `PeriodSelector` | Billing-interval navigation and optional custom ranges. Callers own period URL state and the aligned navigation floor. `compact` (whole periods) renders labelled chevron buttons around a one-line trigger naming the period via `billingPeriodName` (`lib/billingPeriod.ts`), with the exact dates in its tooltip and menu; the year's other names sit invisibly in the same cell so the trigger keeps a stable width. A whole-period selector (`allowCustomRange={false}`) steps from any range to the nearest whole periods (`adjacentBillingPeriod`); in `compact` mode a range that is not a whole period keeps its dates under a warning badge (`common.periodSelector.notBillingPeriod`), elsewhere under the **Custom** info badge. |
 | `frontend/src/components/YearPicker.tsx` | `YearPicker` | Native year control with `years`, `value`, `onChange`, optional `disabled`, required translated `label`, optional `id`, `visibleLabel` (default true), and `className`. It generates an associated id when omitted; hidden labels use `aria-label`. Range/default/rollover policy stays with the caller. |
+| `frontend/src/components/tableSorting.tsx` | `SortableHeader`, `useTableSorting` | Shared accessible headings and raw-value TanStack sorting for record tables with custom row/card markup; contract and coverage in §7.2. |
 | `frontend/src/components/InvoicePresentation.tsx` | `InvoiceLink`, `InvoiceStatusBadge`, `InvoiceAmount`, `InvoicePdfCell`, `InvoiceActionButton`, `InvoiceRowActions` | Typed invoice cells/actions shared by period rows, own invoices, and the admin DataTable. `InvoiceStatusBadge` supports `variant="plain"` for the detail header; its default badge presentation remains for tables. `InvoiceActionButton`/`InvoiceRowActions` take `variant` (`primary` default, `secondary` outlined where a page-level primary action leads). `InvoiceAmount` takes `currency` (default true); `false` drops "CHF" for a column whose header names it. Callers own row models, eligibility and permission checks; no shared pagination layer. |
 | `frontend/src/components/PageHeader.tsx` | `PageHeader` | Page title (`h1`, `tabIndex={-1}`: the focus target after navigation, not a tab stop), a plain-text `title`, optional `eyebrow`, `scopeNote` (access label after the eyebrow, e.g. a viewer's read-only access; not in the tab title), `description` and `actions`. Sets `document.title` through `useDocumentTitle` (`frontend/src/lib/useDocumentTitle.ts`): `app.documentTitleScoped` ("Billing · Muster ZEV – OpenZEV") when the eyebrow is text, else `app.documentTitle`. Keep it outside data/scope state branches. Embedded pages use the host page title. |
 | `frontend/src/components/Notice.tsx` | `Notice` | Errors use `alert`, warnings use `status`; optional role override and retry with busy feedback. |
@@ -449,6 +450,42 @@ when the rows span more than one page (`table.getPageCount() > 1`);
 single-page tables hide it entirely instead of showing permanently disabled
 pagination buttons.
 
+Show sort controls only when the filtered result contains at least two rows,
+regardless of pagination. Otherwise render plain headers without `aria-sort`,
+retaining the sort state for when more rows return. If a focused sort button
+disappears, focus moves to its header; focus outside the button is unchanged.
+Only the primary sorted column has `aria-sort`, including during Shift-click
+multi-sort. Data columns should normally be sortable, using meaningful accessor
+values rather than formatted labels. Disable sorting for action and selection columns.
+
+Custom record tables use `components/tableSorting.tsx` for the same header,
+ARIA and focus behavior. `useTableSorting(data, accessors)` sorts raw numbers
+numerically and text with the UI locale's `Intl.Collator`, including natural
+number order (`Group 2` before `Group 10`). Missing/non-finite values stay last
+in either direction. Directional arrows appear only for active sorts and are
+hidden from accessible names; unsorted headings have no icon.
+Custom tables cycle through both directions and source order, one column at a
+time; `DataTable` also supports Shift-click multi-sort. Lookup-backed accessors
+refresh when their names or other dependencies change.
+
+Sort the complete loaded result before client-side pagination and within
+existing groups. Apply the two-row threshold to each rendered table. On narrow
+layouts, sortable headings stay above the record cards. Sorting preserves
+selection, group membership, source-row labels, row actions and downloads;
+it does not change permissions or API queries.
+
+Page-specific keys are documented with their features: [tariff overview](2026-10-tariff-split-view.md),
+[metering points](2026-03-metering-point-management.md),
+[documents](2026-11-participant-document-inbox.md) and
+[credentials](2026-10-tokens-and-keys.md).
+
+Exceptions: the hour/minute readings grid is a time matrix; tariff composition
+tables, public invoice lines, applied-credit statements, restore-plan
+sections and field/feature reference tables keep their explanatory order.
+Server-paginated audit and held-reading histories keep chronological order rather
+than offering a misleading sort over only the loaded page. Those two record
+tables require API ordering before sortable headings can be enabled.
+
 Current examples:
 
 - `frontend/src/pages/ImportsPage.tsx`
@@ -628,6 +665,16 @@ These pages define the current management-page reference set.
 
 - Build and type checks: `npm run build`
 - Lint: `npm run lint`
+- `frontend/tests/data-table.test.ts`: zero/one-row headers, accessor sorting,
+  action columns, primary-column ARIA state during multi-sort, retained sorting
+  through filtering, pagination-independent controls, table sorting opt-out,
+  and focus when a sort button disappears.
+- `frontend/tests/table-sorting.test.ts`: numeric/locale/natural-name sorting,
+  indicators, missing values, source-order restoration, live lookups and filtered focus.
+  Dashboard, invoice-row and participant-document tests cover the actual columns;
+  `screenshots/table-sorting.spec.ts` exercises dashboard, invoice, document and
+  numeric tariff sorting, plus metering-point URL sorting within the first building
+  at 1440px and 400px, including console errors and page overflow.
 - `frontend/screenshots/field-geometry.spec.ts`: real-browser geometry, neutral
   border and label/helper spacing parity, native checkbox sizing, VAT and modal
   fields, calendar/autocomplete interaction above modals, keyboard focus,

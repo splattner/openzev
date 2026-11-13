@@ -124,6 +124,31 @@
     white-space: nowrap;
   }
 
+  .invoice-rows thead:has(.sortable-header) {
+    position: static;
+    display: block;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+  }
+
+  .invoice-rows thead:has(.sortable-header) tr {
+    display: flex;
+    flex-wrap: wrap;
+    background: var(--brand-deep);
+  }
+
+  .invoice-rows thead:has(.sortable-header) th {
+    display: none;
+  }
+
+  .invoice-rows thead th.sortable-header {
+    display: block;
+    width: auto;
+  }
+
   .invoice-rows tbody tr {
     display: grid;
     grid-template:
@@ -150,8 +175,7 @@
     padding-bottom: calc(var(--sheet-pad-block) + 0.2rem);
   }
 
-  /* No band to meet the sheet's top: the cards start at its inset, their
-     dividers still run edge to edge. */
+  /* Stacked rows keep the sheet's top inset; dividers run edge to edge. */
   .table-card.invoice-rows > table:first-child {
     margin-top: 0;
   }

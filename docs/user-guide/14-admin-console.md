@@ -83,6 +83,8 @@ ZEV, and how many currently have a failed fetch. The table lists every
 source with its protocol version, billed component/product, current fetch
 status, last fetch time, stored point count, and how many tariffs/ZEVs
 reuse it.
+Click **Platform usage** to sort by the combined number of tariff and
+community links, largest first; equal totals keep their existing order.
 
 From a tariff's details, **Manage source in platform admin**
 opens this tab filtered to that source. **Show all sources** returns to the

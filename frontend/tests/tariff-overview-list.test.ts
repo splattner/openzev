@@ -34,6 +34,50 @@ async function list(selected: { seriesKey: string, versionId: string } | null = 
 }
 
 describe('TariffOverview', () => {
+    it('sorts actual units independently of fee allocation', async () => {
+        const tariffs = (['monthly_fee', 'per_metering_point_yearly_fee', 'shared_monthly_fee'] as const)
+            .map((billing_mode, index) => ({ ...series, name: `Fee ${index}`, billing_mode, versions: [{ ...current, id: `fee-${index}`, billing_mode }] }))
+        const groups = tariffOverview(tariffs, TODAY)
+        const { container } = await renderWithProviders(createElement(TariffOverview, { groups, settings, selected: null, onOpenDetail: vi.fn() }), cleanups)
+        const unit = container.querySelector<HTMLButtonElement>('th.tariff-table-unit button')!
+        const names = () => [...container.querySelectorAll('.tariff-select')].map(button => button.textContent)
+        await act(async () => unit.click())
+        expect(names()).toEqual(['Fee 0', 'Fee 2', 'Fee 1'])
+        await act(async () => unit.click())
+        expect(names()).toEqual(['Fee 1', 'Fee 0', 'Fee 2'])
+    })
+
+    it('keeps applicability plain for tariffs with the same billing mode and different schedules', async () => {
+        const tariffs = ['Night', 'Day'].map((label, index): TariffSeries => ({
+            ...series, name: label, billing_mode: 'energy', versions: [{
+                ...current, id: label, billing_mode: 'energy', fixed_price_chf: null,
+                periods: [{ id: label, tariff: label, period_type: 'band', label, price_chf_per_kwh: '0.2', percentage: null,
+                    time_from: index ? '08:00' : '18:00', time_to: index ? '18:00' : '23:00', weekdays: '', months: '' }],
+            }],
+        }))
+        const groups = tariffOverview(tariffs, TODAY)
+        const { container } = await renderWithProviders(createElement(TariffOverview, { groups, settings, selected: null, onOpenDetail: vi.fn() }), cleanups)
+        const descriptions = [...container.querySelectorAll('td.tariff-table-applies')].map(td => td.textContent)
+        expect(descriptions[0]).toContain('Night 18:00–23:00')
+        expect(descriptions[1]).toContain('Day 08:00–18:00')
+        expect(container.querySelector('th.tariff-table-applies button, th.tariff-table-applies[aria-sort]')).toBeNull()
+    })
+
+    it('sorts raw prices within categories and keeps each detail action attached to its tariff', async () => {
+        const cheap = { ...series, name: 'Zulu', versions: [{ ...current, id: 'cheap', fixed_price_chf: '2' }] }
+        const onOpenDetail = vi.fn()
+        const groups = tariffOverview([series, cheap], TODAY)
+        const { container } = await renderWithProviders(createElement(TariffOverview, { groups, settings, selected: null, onOpenDetail }), cleanups)
+        const table = container.querySelector('.tariff-table')!
+        const header = table.querySelector<HTMLButtonElement>('th.numeric button')!
+        await act(async () => header.click())
+        expect([...table.querySelectorAll('.tariff-select')].map(button => button.textContent)).toEqual(['Grid', 'Zulu'])
+        await act(async () => header.click())
+        expect([...table.querySelectorAll('.tariff-select')].map(button => button.textContent)).toEqual(['Zulu', 'Grid'])
+        await act(async () => table.querySelector<HTMLButtonElement>('.tariff-select')!.click())
+        expect(onOpenDetail).toHaveBeenCalledWith(cheap, 'cheap')
+    })
+
     it('groups by what is in force, what is coming and, folded, what has ended', async () => {
         const upcomingOnly = { ...series, name: 'Soon', versions: [next] } as unknown as TariffSeries
         const pastOnly = { ...series, name: 'Old', versions: [past] } as unknown as TariffSeries

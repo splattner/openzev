@@ -1,3 +1,4 @@
+import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -42,9 +43,17 @@ export function CorrectionHistory({ log, focusOnLoad, period }: {
     const unavailable = !detail
     const changes = detail?.reading_changes ?? []
     const truncated = (detail?.result_counts ?? log.result_counts)?.reading_changes_truncated === true
+    const sorting = useTableSorting(changes, {
+        meter: change => change.meter_id,
+        interval: change => change.timestamp,
+        direction: change => change.direction,
+        kind: change => change.kind,
+        values: change => Number(change.new_energy),
+        document: change => change.source_document_id,
+    })
     const pageCount = Math.max(1, Math.ceil(changes.length / CHANGE_PAGE_SIZE))
     const currentPage = Math.min(page, pageCount - 1)
-    const visibleChanges = changes.slice(currentPage * CHANGE_PAGE_SIZE, (currentPage + 1) * CHANGE_PAGE_SIZE)
+    const visibleChanges = sorting.rows.slice(currentPage * CHANGE_PAGE_SIZE, (currentPage + 1) * CHANGE_PAGE_SIZE)
     const metadataOnly = changes.length > 0 && changes.every((change) => change.kind === 'metadata')
 
     useEffect(() => {
@@ -114,12 +123,12 @@ export function CorrectionHistory({ log, focusOnLoad, period }: {
                                 <table className="data-table correction-history-table">
                                     <thead>
                                         <tr>
-                                            <th>{t('pages.imports.protocol.corrections.meter')}</th>
-                                            <th>{t('pages.imports.protocol.corrections.interval')}</th>
-                                            <th>{t('pages.imports.protocol.corrections.direction')}</th>
-                                            <th>{t('pages.imports.protocol.corrections.kind')}</th>
-                                            <th>{t('pages.imports.protocol.corrections.values')}</th>
-                                            <th>{t('pages.imports.protocol.corrections.document')}</th>
+                                            <SortableHeader {...sorting.header('meter')}>{t('pages.imports.protocol.corrections.meter')}</SortableHeader>
+                                            <SortableHeader {...sorting.header('interval')}>{t('pages.imports.protocol.corrections.interval')}</SortableHeader>
+                                            <SortableHeader {...sorting.header('direction')}>{t('pages.imports.protocol.corrections.direction')}</SortableHeader>
+                                            <SortableHeader {...sorting.header('kind')}>{t('pages.imports.protocol.corrections.kind')}</SortableHeader>
+                                            <SortableHeader {...sorting.header('values')}>{t('pages.imports.protocol.corrections.values')}</SortableHeader>
+                                            <SortableHeader {...sorting.header('document')}>{t('pages.imports.protocol.corrections.document')}</SortableHeader>
                                         </tr>
                                     </thead>
                                     <tbody>

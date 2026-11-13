@@ -649,7 +649,17 @@ python -m pytest -q
   `frontend/tests/metering-draft-scope.test.ts`.
 - Assignment date-range picker with overlap/containment feedback
 - Lists support status, attention, search, type and building filters, with sort and filters stored
-  in the URL, including same-page navigation.
+  in the URL, including same-page navigation. Clickable Meter, Assignment and Last reading
+  headings share the menu's `sort` parameter: `meter_id`, `location`, `holder`, `last_reading`,
+  or a `-` prefix to reverse direction. Without a valid explicit `sort`, rows use
+  ascending meter-ID order but headers have no arrow or `aria-sort`. The first header
+  click selects ascending order; later clicks reverse it. Explicit `sort=meter_id`
+  stays in the URL so its selected header survives reloads. ID/name collation follows the UI language with numeric
+  IDs ordered naturally. Holder uses the latest-starting current assignment's raw name.
+  Unavailable names/locations sort last; oldest-reading order still starts with never-reported
+  meters. Groups retain building identity and sorted rows within them. Single-row groups have
+  plain headers; phone headings remain visible. The menu hides when fewer than two filtered
+  rows remain. Covered by `metering-points-list.test.ts` and `screenshots/table-sorting.spec.ts`.
 - Attention covers active inventory with confirmed missing/incomplete data or readings without a
   current assignment. Unavailable quality/assignment responses are not confirmed problems; cached
   results remain usable and failed requests offer retry. Inactive points can remain billable through
