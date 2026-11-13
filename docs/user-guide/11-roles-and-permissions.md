@@ -384,7 +384,7 @@ Audit logs are visible to **admins** (all events, **Platform → Overview →
 Audit log**) and to **managers** for their own communities (scoped events,
 **Setup → Settings → Audit log**).
 
-Each event is named in your language ("Rechnung genehmigen", "Dokument zugestellt")
+Each event is named in your language ("Rechnung freigeben", "Dokument zugestellt")
 with what it concerned and who did it; events that were refused or failed carry
 a status label.
 Search, category, actor, status and a date range narrow the list in one

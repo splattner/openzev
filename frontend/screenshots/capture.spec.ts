@@ -362,6 +362,17 @@ test.describe('User Guide Screenshots', () => {
     await screenshotFull(page, '07b-tariff-versions')
   })
 
+  test('07c-tariff-split-key', async ({ page }) => {
+    await navigateTo(page, '/tariffs')
+    await page.getByRole('button', { name: 'Neuer Tarif' }).first().click()
+    const pane = page.locator('.detail-pane')
+    await pane.getByLabel('Name', { exact: true }).fill('Verwaltungskosten')
+    await pane.getByLabel('Abrechnungsmodus').selectOption('shared_monthly_fee')
+    await pane.locator('input[type="number"]').fill('90')
+    await pane.getByLabel('Aufteilungsschlüssel').selectOption('weight')
+    await screenshotViewport(page, '07c-tariff-split-key')
+  })
+
   // 07e — The same tariff with the scheduled change folded to its line, the way the
   // pane opens from the list's current row.
   test('07e-tariff-scheduled-change', async ({ page }) => {
@@ -383,7 +394,7 @@ test.describe('User Guide Screenshots', () => {
     await pane.getByLabel('Name', { exact: true }).fill('Netzstrom HT/NT')
     const bands = pane.locator('.tariff-draft-bands')
     for (const [type, price, from, to] of [['high', '0.2850', '06:00', '22:00'], ['low', '0.1950', '22:00', '06:00']]) {
-      await bands.getByRole('button', { name: 'Band hinzufügen' }).click()
+      await bands.getByRole('button', { name: 'Tarifperiode hinzufügen' }).click()
       const editor = bands.locator('.tariff-draft-band-editor')
       await editor.locator('select').first().selectOption(type)
       await editor.locator('input[type="number"]').fill(price)
@@ -392,7 +403,7 @@ test.describe('User Guide Screenshots', () => {
         await editor.getByRole('spinbutton', { name: 'Stunde' }).nth(index).click()
         await page.keyboard.type(time.replace(':', ''))
       }
-      await editor.getByRole('button', { name: 'Band übernehmen' }).click()
+      await editor.getByRole('button', { name: 'Tarifperiode übernehmen' }).click()
     }
     await expect(bands.locator('.tariff-period-row')).toHaveCount(2)
     await screenshotFull(page, '07f-tariff-create-bands')

@@ -115,7 +115,6 @@
 
   "after1_b": "Immagini",
   "after2_b": "Firmati", "after2_t": "manifest di release e attestazioni SBOM",
-  "after3_b": "Database", "after3_t": "PostgreSQL in produzione; SQLite per sviluppo e test",
 
   "stack_eyebrow": "Sotto il cofano",
   "stack_title": "Lo stack tecnologico",

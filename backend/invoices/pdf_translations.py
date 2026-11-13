@@ -8,7 +8,7 @@ INVOICE_TRANSLATIONS: dict[str, dict] = {
         "status": "Status",
         "status_values": {
             "draft": "Entwurf",
-            "approved": "Genehmigt",
+            "approved": "Freigegeben",
             "sent": "Versendet",
             "paid": "Bezahlt",
             "cancelled": "Storniert",

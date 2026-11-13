@@ -115,7 +115,6 @@
 
   "after1_b": "Images",
   "after2_b": "Signed", "after2_t": "release manifests and SBOM attestations",
-  "after3_b": "Databases", "after3_t": "PostgreSQL for production; SQLite for development and tests",
 
   "stack_eyebrow": "Under it",
   "stack_title": "The stack",

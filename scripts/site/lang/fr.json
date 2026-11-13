@@ -115,7 +115,6 @@
 
   "after1_b": "Images",
   "after2_b": "Signés", "after2_t": "manifestes de release et attestations SBOM",
-  "after3_b": "Bases de données", "after3_t": "PostgreSQL en production ; SQLite pour le développement et les tests",
 
   "stack_eyebrow": "Sous le capot",
   "stack_title": "La pile technique",
