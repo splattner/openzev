@@ -3187,7 +3187,6 @@ export const de = {
                 allocationModeCommunity: 'Gemeinschaft',
                 allocationModeHint: 'Bei Gemeinschaft werden Energie und Gebühren dieses Messpunkts anteilig nach Gewichtung auf alle Teilnehmer verteilt, statt allein dem zugewiesenen Teilnehmer verrechnet zu werden.',
             },
-            removeAssignment: 'Entfernen',
             deleteTitle: 'Messpunkt löschen',
             deleteMessage: "Messpunkt \"{{meterId}}\" und seine {{assignmentCount}} Zuordnung(en) löschen? Entfernen Sie zuerst die Messwerte und verbundenen Energiequellen.",
             deleteConfirm: 'Messpunkt löschen',

@@ -3198,7 +3198,6 @@ export const en = {
                 allocationModeCommunity: 'Community',
                 allocationModeHint: 'Community splits this meter\'s energy and fees across every participant by their allocation weight, instead of billing the assigned participant alone.',
             },
-            removeAssignment: 'Remove',
             deleteTitle: 'Delete Metering Point',
             deleteMessage: "Delete metering point \"{{meterId}}\" and its {{assignmentCount}} assignment(s)? Remove reading history and connected energy sources first.",
             deleteConfirm: 'Delete Metering Point',

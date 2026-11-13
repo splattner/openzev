@@ -302,23 +302,10 @@
 .metering-point-actions {
   flex-wrap: nowrap;
   justify-content: flex-end;
-  gap: 0.125rem;
 }
 
 .metering-assignment-actions {
   justify-content: flex-end;
-}
-
-/* The row's own controls recede; the primary one is the holder's "Assign". */
-
-.metering-point-actions .button-secondary {
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-}
-
-.metering-point-actions .button-secondary:hover:not(:disabled) {
-  background: var(--brand-pale);
 }
 
 .metering-detail-grid {

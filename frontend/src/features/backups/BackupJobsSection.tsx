@@ -94,7 +94,7 @@ function JobActionsCell({ row }: CellContext<BackupJob, unknown>) {
             {hasFile(job) && (
                 <button
                     type="button"
-                    className="button button-secondary button-compact"
+                    className="button button-danger button-compact"
                     disabled={actions.deleting}
                     onClick={() => actions.deleteFile(job)}
                 >

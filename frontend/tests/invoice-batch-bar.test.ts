@@ -136,7 +136,7 @@ describe('invoice batch actions', () => {
         // The promoted action never repeats inside the overflow menu.
         const menuButton = [...container.querySelectorAll('button')].find((button) =>
             button.getAttribute('aria-label') === 'pages.invoices.moreBatchActions')!
-        expect(menuButton.getAttribute('title')).toBe('pages.invoices.moreBatchActions')
+        expect(menuButton.classList.contains('button-icon')).toBe(true)
         expect(menuButton.textContent).toBe('')
         act(() => menuButton.click())
         await waitForCondition(() => document.body.textContent?.includes('Send 3 invoices') === true, 'the overflow menu')

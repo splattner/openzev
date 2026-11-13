@@ -114,6 +114,10 @@ python -c "import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).dec
 
 ## Destinations
 
+Use the pencil button to **Edit** a destination and the bin to **Delete** it.
+Hover or focus either button to see the action and destination name. Actions
+run left to right as **Edit**, **Test**, **Delete**; Test keeps its text label.
+
 A destination is where finished backups are written. Add one with **Add
 destination**.
 

@@ -12,7 +12,7 @@ import type { Zev } from '../src/types/api'
 /** Admin ZEV creation wizard — bank fields. */
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
-        t: (k: string) => k,
+        t: (k: string, options?: { number?: number }) => options?.number ? `${k}:${options.number}` : k,
         i18n: { language: 'en', changeLanguage: vi.fn() },
     }),
 }))
@@ -65,6 +65,7 @@ vi.mock('../src/lib/api/auth', () => ({
 vi.mock('../src/lib/appSettings', () => ({
     useAppSettings: () => ({ settings: {} }),
     formatShortDate: (d: string) => d,
+    toDayJsDateFormat: () => 'DD.MM.YYYY',
 }))
 
 vi.mock('../src/components/ConfirmDialog', () => ({
@@ -171,6 +172,23 @@ async function walkToReview(container: HTMLElement) {
 describe('ZevListPage creation wizard — bank fields', () => {
     beforeEach(() => {
         createZevWithOwnerMock.mockClear()
+    })
+
+    it('puts Edit before Manage and keeps both actions attached to the community', async () => {
+        const { container, root } = await renderZevListPage()
+        try {
+            const buttons = container.querySelectorAll<HTMLButtonElement>('tbody tr .actions-cell button')
+            expect(buttons[0].getAttribute('aria-label')).toBe('common.edit: Muster ZEV')
+            expect(buttons[1].textContent).toBe('pages.zevs.manage')
+            await act(async () => buttons[1].click())
+            expect(mockSetSelectedZevId).toHaveBeenCalledWith('z1')
+            expect(mockNavigate).toHaveBeenCalledWith('/')
+            await act(async () => buttons[0].click())
+            expect(container.querySelector<HTMLInputElement>('[role="dialog"] input')!.value).toBe('Muster ZEV')
+        } finally {
+            act(() => root.unmount())
+            container.remove()
+        }
     })
 
     it('sends bank_iban and bank_name to createZevWithOwner', async () => {
@@ -368,12 +386,19 @@ describe('ZevListPage creation wizard — bank fields', () => {
             await flush()
             expect(meterIdInputs(container).map((input) => input.value)).toEqual(['METER-A', 'METER-B'])
             const deleteButtons = Array.from(container.querySelectorAll<HTMLButtonElement>('[data-testid="wizard-metering-point-row"] button')).filter((b) =>
-                b.textContent?.includes('common.delete'),
+                b.getAttribute('aria-label')?.startsWith('pages.zevs.wizard.removeMeteringPoint:'),
             )
-            expect(deleteButtons.length).toBe(2)
+            expect(deleteButtons.map((button) => button.getAttribute('aria-label'))).toEqual([
+                'pages.zevs.wizard.removeMeteringPoint:1',
+                'pages.zevs.wizard.removeMeteringPoint:2',
+            ])
+            expect(deleteButtons.every((button) => button.textContent === '' && !button.disabled)).toBe(true)
+            expect(deleteButtons.every((button) => button.classList.contains('button-danger') && !button.classList.contains('button-ghost'))).toBe(true)
             await act(async () => { deleteButtons[0].click() })
             await flush()
             expect(meterIdInputs(container).map((input) => input.value)).toEqual(['METER-B'])
+            const remaining = container.querySelector<HTMLButtonElement>('[aria-label="pages.zevs.wizard.removeMeteringPoint:1"]')!
+            expect(remaining.disabled).toBe(true)
         } finally {
             act(() => root.unmount())
             container.remove()

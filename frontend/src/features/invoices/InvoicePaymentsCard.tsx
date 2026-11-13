@@ -136,7 +136,7 @@ export function InvoicePaymentsCard({
                                             {invoice.status !== 'cancelled' && !hasCredits ? (
                                                 <button
                                                     type="button"
-                                                    className="table-inline-link"
+                                                    className="button button-danger button-compact button-icon"
                                                     aria-label={t('pages.invoiceDetail.payments.remove')}
                                                     title={t('pages.invoiceDetail.payments.remove')}
                                                     onClick={() => confirm({

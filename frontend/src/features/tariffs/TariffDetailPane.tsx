@@ -1,3 +1,4 @@
+import { Tooltip } from '@mantine/core'
 import { useState, type ReactNode, type Ref } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
@@ -221,15 +222,17 @@ export function TariffDetailPane({
                     )}
                     {!readOnly && (
                         <div className="tariff-version-card-actions">
-                            <button
-                                className="button button-secondary button-compact"
-                                type="button"
-                                data-action-key={`edit-${version.id}`}
-                                onClick={() => onEditTariff(version, `edit-${version.id}`)}
-                            >
-                                <FontAwesomeIcon icon={faPen} fixedWidth />
-                                {t('common.edit')}
-                            </button>
+                            <Tooltip label={`${t('common.edit')}: ${dateWindow(version)}`} events={{ hover: true, focus: true, touch: false }}>
+                                <button
+                                    className="button button-secondary button-compact button-icon"
+                                    type="button"
+                                    data-action-key={`edit-${version.id}`}
+                                    onClick={() => onEditTariff(version, `edit-${version.id}`)}
+                                    aria-label={`${t('common.edit')}: ${dateWindow(version)}`}
+                                >
+                                    <FontAwesomeIcon icon={faPen} fixedWidth />
+                                </button>
+                            </Tooltip>
                             <ActionMenu
                                 iconOnly
                                 label={t('pages.tariffs.versions.moreActions')}

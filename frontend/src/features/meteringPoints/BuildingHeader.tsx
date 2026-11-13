@@ -1,3 +1,4 @@
+import { Tooltip } from '@mantine/core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faBuilding, faEllipsis, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
@@ -71,16 +72,17 @@ export function BuildingHeader({
       <div className="building-header-side">
         {canManage && (
           <div className="building-header-actions actions-row actions-row-wrap">
+            <Tooltip label={`${t('pages.meteringPoints.buildings.edit')}: ${building.name}`} events={{ hover: true, focus: true, touch: false }}>
+              <button type="button" className="button button-secondary button-compact button-icon" aria-label={`${t('pages.meteringPoints.buildings.edit')}: ${building.name}`} onClick={() => onEdit(building)}>
+                <FontAwesomeIcon icon={faPen} fixedWidth />
+              </button>
+            </Tooltip>
             {onAddMeteringPoint && (
               <button type="button" className="button button-secondary button-compact" onClick={() => onAddMeteringPoint(building)}>
                 <FontAwesomeIcon icon={faPlus} fixedWidth />
                 {t('pages.meteringPoints.buildings.addMeteringPoint')}
               </button>
             )}
-            <button type="button" className="button button-secondary button-compact" onClick={() => onEdit(building)}>
-              <FontAwesomeIcon icon={faPen} fixedWidth />
-              {t('pages.meteringPoints.buildings.edit')}
-            </button>
             {menuItems.length > 0 && <ActionMenu
               label={t('pages.meteringPoints.moreActions')}
               icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}

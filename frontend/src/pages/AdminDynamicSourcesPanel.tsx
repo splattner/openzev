@@ -209,8 +209,9 @@ export function AdminDynamicSourcesPanel() {
         const source = row.original
         return (
           <ActionMenu
-            label={t('common.actions')}
+            label={`${t('common.actions')}: ${source.label}`}
             icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
+            iconOnly
             items={[
               {
                 key: 'history', label: t('pages.dynamicSources.history.open'),

@@ -39,6 +39,16 @@ async function pane(props: Record<string, unknown> = {}): Promise<HTMLElement> {
 }
 
 describe('TariffDetailPane', () => {
+    it('names the icon-only edit by its validity window and edits that version', async () => {
+        const onEditTariff = vi.fn()
+        const container = await pane({ onEditTariff })
+        const edit = container.querySelector<HTMLButtonElement>('[data-action-key="edit-next"]')!
+        expect(edit.getAttribute('aria-label')).toBe('common.edit: 01.01.2999 – pages.tariffs.openEnded')
+        expect(edit.textContent).toBe('')
+        act(() => edit.click())
+        expect(onEditTariff).toHaveBeenCalledExactlyOnceWith(next, 'edit-next')
+    })
+
     it('is a region named by its title and is not modal', async () => {
         const container = await pane()
         const region = container.querySelector('section.detail-pane')!
