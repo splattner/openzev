@@ -1834,21 +1834,27 @@ manager with one community sees no control. Each menu item shows the
 community name and, for non-admin relations, the account's relation below it
 (`nav.relation.{manager,viewer,participant,former}`, class
 `community-menu-relation`); the current community carries `aria-current="true"`
-and a check mark. When the selection is fixed (`isSelectable` false) the other
-items are disabled. The switch chooses a community; it manages nothing. Its
+and a check mark. It remains readable but cannot be selected. When selection
+is fixed (`isSelectable` false), no item can be selected.
+The switch chooses a community; it manages nothing. Its
 accessible name is `nav.chooseZevCurrent` ("Choose (v)ZEV, current:
 {{name}}"), its `title` `nav.chooseZev`. Keyboard handling, focus return to
 the trigger on Escape or selection, and outside-click dismissal are the
-menu's. When the ZEV settings draft is dirty, selecting a different community
+menu's. Arrow-key navigation skips the disabled current item; the trigger's
+accessible name announces the current community.
+When the ZEV settings draft is dirty, selecting a different community
 opens `ConfirmDialog` (portalled to `document.body`, since the scope line is a
 paragraph): Cancel keeps the current selection and edits; Switch without
-saving changes the selection and drops the draft. Selecting the current
-community or switching with a clean draft opens no confirmation.
+saving changes the selection and drops the draft. Switching with a clean draft
+opens no confirmation.
 The switch always shows as a small button (a pill in the kicker's type), so it
 reads as a control without motion or stored state.
 `ZevSettingsPage` publishes and clears this state through `zevUnsavedGuard`;
 `community-switcher.test.ts` covers the list, the relation labels, the plain
-fallbacks, the dirty-draft flow and fixed selections. Pages with the switch:
+fallbacks, the dirty-draft flow and fixed selections. The community cases in
+`screenshots/layout-overflow.spec.ts` cover named switch targets at desktop and
+phone widths, keyboard navigation past the disabled current item, selection,
+and focus return on Escape. Pages with the switch:
 Overview, Energy balance (`DashboardPage`), Metering chart and imports,
 Metering points, Billing hub and invoices, Reports, Participants, Tariffs, ZEV
 settings, and the owner audit log (not its `/admin` view). The invoice

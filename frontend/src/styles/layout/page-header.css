@@ -121,6 +121,8 @@
 .community-menu-item.is-current {
   color: var(--text-heading);
   font-weight: 600;
+  cursor: default;
+  opacity: 1;
 }
 
 .community-menu-relation {
