@@ -2406,7 +2406,7 @@ sidebar. For managers and viewers the same page is called <strong>Live energy</s
 whole community there and pick a participant for the own-system views. Your dashboard (<strong>Energy balance</strong> for managers) keeps the grid operator's
 official figures and only points to this page, with a link that opens the same period.</p>
 <p><strong>Right now</strong> is at the top: what your community produces and uses at this moment,
-marked <em>Live, indicative</em> and never used for billing. If you have a live source, your own
+measured live by your devices and never used for billing. If you have a live source, your own
 consumption and production come first, with how much of it was local and how much came from or
 went to the grid; the ZEV's <strong>ZEV production</strong>, <strong>ZEV consumption</strong>, <strong>Spare now</strong> and <strong>Local share</strong> follow, all as tiles
 in one row (they wrap on a narrow screen). Where the ZEV's consumption is not known, the tile says in a note behind its
@@ -2417,14 +2417,13 @@ says so: a manager or a participant gets a button to connect one, a viewer is to
 management can.</p>
 <p>Managers and viewers also get <strong>Live values per metering point</strong>: a table (a small card per
 point on a phone) with each point's power, how old the value is and its state. A power reads
-in words (<em>6.2 kW produced</em>, <em>2.0 kW to the grid</em>), not with the meter's minus sign. The table is closed;
-its title says how many metering points have no current value. For a point of the community with no source it
+in words (<em>6.2 kW produced</em>, <em>2.0 kW to the grid</em>), not with the meter's minus sign. The table is always open. For a point of the community with no source it
 offers <strong>Connect</strong>, and for one a participant holds it says the participant connects it.</p>
 <p>Below it the views are chosen with the tabs <strong>Today</strong>, <strong>Tomorrow</strong> (when there is a
 forecast for it), <strong>7 days</strong> and <strong>Period</strong> (the billing period, with the usual period selector).
 A participant who cannot have a history (no plant behind their meter) sees only <strong>Today</strong>. Managers and
 viewers pick the participant whose system they want to see, above the tabs; a manager who is a participant with a
-connected source starts on themselves. Where the community has no source that could provide a history, live
+connected source or a live meter starts on themselves, and on <strong>7 days</strong> and <strong>Period</strong> they are asked to pick a participant while nobody is chosen. Where the community has no source that could provide a history, live
 values or a forecast, there are no tabs and no picker, only the note on how to connect one. When a manager looks at
 somebody else, the chart and the notes speak of the person rather than of "you".</p>
 <p><strong>Today</strong> draws your own consumption (and production, if you have a PV system) in one
@@ -2432,7 +2431,8 @@ line: from your source's <strong>history</strong> up to its last synchronisation
 from <strong>live</strong> values after that (dashed line). A marker shows where history hands over
 to live. Where neither has a value, the line has a gap; nothing is estimated. The ZEV's
 totals in the same chart are live only. With a production forecast, its expected production is drawn
-dashed, and the highest expected production of the day is named above the chart.
+as one bar per hour (the same as on <strong>Tomorrow</strong>), and the highest expected production of the day is named above the chart.
+If your own line is much smaller than the ZEV's, it gets its own axis on the right, named in the legend.
 <strong>7 days</strong> and <strong>Period</strong> show the card described below.</p>
 <p>With a connected source, the card <strong>Your own system</strong> shows
 production, consumption, self-consumption, grid import and export, your
