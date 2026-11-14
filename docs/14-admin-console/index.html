@@ -2857,7 +2857,7 @@ active for an invoice period, VAT defaults to <strong>0%</strong> in every mode.
 <p>Admins can manage the HTML/CSS template used for invoice PDF generation in <strong>Platform → Templates → PDF templates</strong> (<code>/admin/templates/pdf</code>).</p>
 <p><img alt="PDF templates" src="../screenshots/14-admin-pdf-templates.png" /></p>
 <ul>
-<li>Edit the template used for invoice PDF rendering (tabs for the invoice, participant contract, and annual statement templates)</li>
+<li>Edit the template used for PDF rendering (tabs for invoice, participant contract, annual statement, and credit note templates)</li>
 <li>The <strong>Available Fields</strong> panel lists supported fields with preview examples. In source view, search by token or description and click a token to insert it at the caret. Shift-click keeps the caret in its original position. Loop tags insert a ready-to-fill block.</li>
 <li><strong>Preview</strong> shows a real, sample-data PDF rendered through the same pipeline as issued documents; a source toggle reveals the raw template markup</li>
 <li><strong>Built-in default</strong> means no platform override is saved; <strong>Customized</strong> means an override is saved. <strong>Unsaved changes</strong> describes edits in the current editor separately.</li>
@@ -2866,6 +2866,8 @@ active for an invoice period, VAT defaults to <strong>0%</strong> in every mode.
   unchanged until <strong>regenerated</strong> — individual invoices can be regenerated, and
   administrators can regenerate PDFs for an entire billing period.</li>
 </ul>
+<p>On narrow screens, PDF and email editors place the field reference below the
+editor. PDF previews are shorter to keep the reference within easier reach.</p>
 <p>The default invoice PDF includes the recipient's optional second address line.
 For custom templates, insert this after the first address line, or reset the
 template to the default:</p>
