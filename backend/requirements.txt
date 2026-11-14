@@ -2,10 +2,10 @@ amqp==5.4.2
 asgiref==3.13.0
 attrs==26.1.0
 billiard==4.3.2
-boto3==1.44.2  # direct: S3-compatible backup destinations (SPEC-2026-09-backup-and-restore)
-botocore==1.44.2
+boto3==1.44.3  # direct: S3-compatible backup destinations (SPEC-2026-09-backup-and-restore)
+botocore==1.44.3
 brotli==1.2.1
-cbor2==6.2.1
+cbor2==6.3.0
 celery==5.7.0
 cffi==2.1.1
 click==8.5.1
@@ -51,7 +51,7 @@ pycparser==3.12
 pydyf==0.13.0
 pyOpenSSL==26.4.0
 pyotp==2.10.0  # direct: TOTP secret generation and code verification
-pypdf==7.0.1
+pypdf==7.1.0
 Pygments==2.21.0
 PyJWT==2.15.1
 pyphen==0.18.1
