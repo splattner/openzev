@@ -4608,6 +4608,7 @@ export const it = {
                 participant_magic_link: 'Link di accesso',
                 zev_access_invitation: 'Invito all\'accesso',
                 zev_access_granted: 'Avviso di accesso',
+                document_delivered: 'Invio documenti',
             },
             title: 'Modelli',
             tabs: {

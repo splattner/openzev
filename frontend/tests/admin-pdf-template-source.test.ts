@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MantineProvider } from '@mantine/core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { deferred, pdfBlob } from './pdf-test-utils'
 
 const api = vi.hoisted(() => {
     const current = { template_name: 'invoice', content: 'Default PDF', is_customized: false, is_stale: false }
@@ -17,6 +18,7 @@ const api = vi.hoisted(() => {
             Object.assign(current, { content: 'Default PDF', is_customized: false })
             return { ...current, detail: 'reset' }
         }),
+        preview: vi.fn(() => new Promise<Blob>(() => {})),
     }
 })
 const toastSpy = vi.hoisted(() => vi.fn())
@@ -36,9 +38,11 @@ vi.mock('../src/lib/api/invoices', () => ({
     fetchCreditNotePdfTemplate: api.fetch,
     updateCreditNotePdfTemplate: api.save,
     resetCreditNotePdfTemplate: api.reset,
-    previewPdfTemplateBlob: vi.fn(() => new Promise(() => {})),
+    previewPdfTemplateBlob: api.preview,
 }))
-vi.mock('../src/components/PdfPreview', () => ({ PdfPreview: () => null }))
+vi.mock('../src/components/PdfPreview', () => ({
+    PdfPreview: ({ src }: { src: string | null }) => createElement('output', { 'data-preview-src': src }),
+}))
 
 import { AdminPdfTemplatesPage } from '../src/pages/AdminPdfTemplatesPage'
 
@@ -51,7 +55,10 @@ afterEach(() => {
     api.fetch.mockClear()
     api.save.mockClear()
     api.reset.mockClear()
+    api.preview.mockReset()
     toastSpy.mockClear()
+    vi.useRealTimers()
+    vi.restoreAllMocks()
 })
 
 async function renderEditor() {
@@ -87,6 +94,37 @@ function click(container: ParentNode, label: string) {
 }
 
 describe('platform PDF template source', () => {
+    it.each(['success', 'error'])('keeps the newer preview %s when an older error finishes parsing', async (outcome) => {
+        const { container } = await renderEditor()
+        vi.useFakeTimers()
+        vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:new-preview')
+        vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+        const oldErrorText = deferred<string>()
+        const oldErrorBody = new Blob()
+        oldErrorBody.text = vi.fn(() => oldErrorText.promise)
+        const newerPreview = deferred<Blob>()
+        api.preview.mockRejectedValueOnce({ response: { status: 400, data: oldErrorBody } })
+            .mockReturnValueOnce(newerPreview.promise)
+
+        await act(async () => { click(container, 'admin.preview') })
+        await act(async () => { await vi.advanceTimersByTimeAsync(700) })
+        expect(oldErrorBody.text).toHaveBeenCalledOnce()
+        await act(async () => { click(container, 'admin.previewRenderNow') })
+        expect(api.preview).toHaveBeenCalledTimes(2)
+        await act(async () => {
+            if (outcome === 'success') newerPreview.resolve(pdfBlob())
+            else newerPreview.reject({ response: { status: 400 } })
+        })
+        await act(async () => { oldErrorText.resolve('{"error":"Old render failed"}') })
+
+        expect(container.querySelector('.error-banner')?.textContent ?? null)
+            .toBe(outcome === 'success' ? null : 'admin.previewRenderError')
+        if (outcome === 'success') {
+            expect(container.querySelector('[data-preview-src]')?.getAttribute('data-preview-src'))
+                .toBe('blob:new-preview')
+        }
+    })
+
     it('keeps a dirty buffer and accepts definitive save/reset responses after failed refreshes', async () => {
         const { container, client, editor } = await renderEditor()
         edit(editor, 'Draft PDF')

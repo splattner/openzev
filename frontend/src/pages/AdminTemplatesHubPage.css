@@ -30,6 +30,11 @@
   row-gap: 0.25rem;
 }
 
+/* Keep wrapping tab widths stable when selection changes. */
+.template-tabs-row .app-tabs-tab {
+  font-weight: 500;
+}
+
 @media (max-width: 540px) {
   .template-tabs-row {
     flex-direction: column;

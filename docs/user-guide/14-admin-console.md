@@ -361,7 +361,7 @@ Admins can manage the HTML/CSS template used for invoice PDF generation in **Pla
 
 ![PDF templates](screenshots/14-admin-pdf-templates.png)
 
-- Edit the template used for invoice PDF rendering (tabs for the invoice, participant contract, and annual statement templates)
+- Edit the template used for PDF rendering (tabs for invoice, participant contract, annual statement, and credit note templates)
 - The **Available Fields** panel lists supported fields with preview examples. In source view, search by token or description and click a token to insert it at the caret. Shift-click keeps the caret in its original position. Loop tags insert a ready-to-fill block.
 - **Preview** shows a real, sample-data PDF rendered through the same pipeline as issued documents; a source toggle reveals the raw template markup
 - **Built-in default** means no platform override is saved; **Customized** means an override is saved. **Unsaved changes** describes edits in the current editor separately.
@@ -369,6 +369,9 @@ Admins can manage the HTML/CSS template used for invoice PDF generation in **Pla
 - Template changes affect future PDF renders. Existing stored PDFs remain
   unchanged until **regenerated** — individual invoices can be regenerated, and
   administrators can regenerate PDFs for an entire billing period.
+
+On narrow screens, PDF and email editors place the field reference below the
+editor. PDF previews are shorter to keep the reference within easier reach.
 
 The default invoice PDF includes the recipient's optional second address line.
 For custom templates, insert this after the first address line, or reset the

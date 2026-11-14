@@ -37,19 +37,26 @@ fieldset.form-grid {
    work gets the room, the reference stays a readable column. */
 
 .content-with-aside {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(20rem, 30rem);
+  container-type: inline-size;
+  display: flex;
+  flex-wrap: wrap;
   gap: 1.5rem;
   align-items: start;
 }
 
 .content-with-aside > aside {
-  width: 100%;
-  max-width: 30rem;
+  flex: 1 1 20rem;
   min-width: 0;
 }
 
 .content-with-aside > section {
+  flex: 2 1 40rem;
   min-width: 0;
+}
+
+@container (max-width: 61.5rem) {
+  .content-with-aside .pdf-preview-frame {
+    max-height: 40vh;
+  }
 }
 
