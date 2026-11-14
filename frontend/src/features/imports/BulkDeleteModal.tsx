@@ -89,7 +89,7 @@ export function BulkDeleteModal(props: BulkDeleteModalProps) {
                                 <p className="muted" style={{ margin: '0 0 0.5rem' }}>
                                     {t('pages.imports.delete.blockedNotice', { count: protectedCount })}
                                 </p>
-                                <ul style={{ margin: '0 0 0.5rem 1.25rem' }}>
+                                <ul role="list" style={{ margin: '0 0 0.5rem', marginLeft: protectedExamples.length === 1 ? 0 : '1.25rem' }}>
                                     {protectedExamples.map((label) => (
                                         <li key={label} className="muted">{label}</li>
                                     ))}

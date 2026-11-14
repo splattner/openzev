@@ -91,7 +91,7 @@ export function CsvImport({ sourceId }: { sourceId: string }) {
                 <div className="error-banner" role="alert">
                     <p className="m-0">{error.message}</p>
                     {error.rejected.length > 0 && (
-                        <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem' }}>
+                        <ul role="list" className="response-list mt-05">
                             {error.rejected.slice(0, MAX_ERRORS_SHOWN).map((row) => (
                                 <li key={row.index}>{t('supplementary.csv.rowError', { row: row.index + 2, reason: row.reason })}</li>
                             ))}

@@ -1020,6 +1020,9 @@ contracts are unchanged.
 
 ### 15.3 Page anatomy
 
+- Single-item unordered lists in `.content-main` have no marker or indent.
+  Component and multi-item spacing is unchanged. Edited response lists retain
+  explicit list roles.
 - `PageHeader`: `.page-header > .eyebrow` is the scope kicker in
   `--accent-rule`; `h1` per §7.3; description `p.muted`; actions
   bottom-aligned. The header closes with the documents' rule: a

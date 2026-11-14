@@ -230,7 +230,11 @@
 
 .raw-metering-cell-detail ul {
   margin: 0.35rem 0 0;
-  padding-left: 1.1rem;
+  padding-inline-start: 1.1rem;
+}
+
+.raw-metering-cell-detail ul:has(> li:only-child) {
+  padding-inline-start: 0;
 }
 
 .raw-metering-cell-detail-time {

@@ -114,10 +114,12 @@ label :is(input, select, textarea) {
   cursor: default;
 }
 
-/* A single-item response list drops the bullet and indent. */
+.response-list {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+}
 
-.content-main ul:has(> li:only-child),
-.content-main ol:has(> li:only-child) {
+.content-main ul:has(> li:only-child) {
   list-style: none;
   padding-inline-start: 0;
 }
