@@ -44,7 +44,7 @@ describe('templates tab strip', () => {
     it('renders two labelled tab rows and no icon tiles', async () => {
         const container = await render('/admin/templates/pdf?template=contract&source=bookmark')
         const tabs = container.querySelectorAll('[role="tab"]')
-        // 3 PDF templates + 7 email templates (two ZEV-access emails since #761, the document email since #862).
+        // 4 PDF templates + 7 email templates.
         expect(tabs).toHaveLength(11)
         const lists = container.querySelectorAll('[role="tablist"]')
         expect(lists).toHaveLength(2)

@@ -292,10 +292,7 @@ function TemplateEditor({
         })
     }
 
-    // Single render path shared by the debounced auto-render and the explicit
-    // Render button: owns the revision guard, the abort controller and the
-    // object-URL lifecycle. The source text is passed in so the callback stays
-    // stable across content edits.
+    // Keep automatic and manual renders under the same cancellation guard.
     const renderPreview = useCallback(
         async (source: string) => {
             const revision = ++revisionRef.current
@@ -312,7 +309,7 @@ function TemplateEditor({
                 urlRef.current = url
                 setPreviewUrl(url)
                 setRendering(false)
-                // Revoke the replaced URL only after the new frame had time to load.
+                // Delay revocation so the replacement iframe can load.
                 if (previous) window.setTimeout(() => URL.revokeObjectURL(previous), 10_000)
             } catch (err) {
                 if (controller.signal.aborted || revision !== revisionRef.current) return
@@ -327,17 +324,14 @@ function TemplateEditor({
                         /* non-JSON body */
                     }
                 }
+                if (controller.signal.aborted || revision !== revisionRef.current) return
                 setPreviewError(detail || t(status === 400 ? 'admin.previewRenderError' : 'admin.previewError'))
             }
         },
         [templateType, t],
     )
 
-    // Debounced auto-render whenever the preview view is open and the content
-    // changes (typing happens in the separate editor view, so in practice this
-    // fires once on entering the preview and after each editor round-trip).
-    // The previous object URL stays visible with a transient "re-rendering…"
-    // state until the replacement frame has loaded.
+    // Debounce render requests while keeping the previous preview visible.
     useEffect(() => {
         if (!showPreview || debugSource) return
         if (!content.trim()) return
