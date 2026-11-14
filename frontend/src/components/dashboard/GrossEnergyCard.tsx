@@ -18,14 +18,20 @@ interface Props {
     participantName?: string
     formatBucketLabel: (value: string) => string
     formatBucketTooltipLabel: (label: unknown) => string
+    /** Hourly buckets over several days: label the axis once per day (`Mon 9.11.`) instead of at arbitrary hours. */
+    dayAxis?: boolean
 }
+
+const zurichHour = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Zurich', hour: '2-digit', hourCycle: 'h23' })
+const dayLabel = new Intl.DateTimeFormat(undefined, { timeZone: 'Europe/Zurich', weekday: 'short', day: 'numeric', month: 'numeric' })
+const isMidnight = (bucket: string) => Number(zurichHour.format(new Date(bucket))) === 0
 
 /**
  * What a net-metered participant's own system measured: production, consumption, import, export and
  * the two rates the meter alone cannot give. Labelled as reported by that system and never used for
  * billing. A rate with too little data behind it is a dash with the reason, not a low number.
  */
-export function GrossEnergyCard({ gross, whose, participantName, formatBucketLabel, formatBucketTooltipLabel }: Props) {
+export function GrossEnergyCard({ gross, whose, participantName, formatBucketLabel, formatBucketTooltipLabel, dayAxis = false }: Props) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
     // Two of these cards can be on one page (a manager's own and a selected participant's).
@@ -34,6 +40,7 @@ export function GrossEnergyCard({ gross, whose, participantName, formatBucketLab
     const selfSufficiency = grossRate(gross, 'self_sufficiency')
     const selfConsumption = grossRate(gross, 'self_consumption')
     const timeline = gross.timeline ?? []
+    const dayTicks = dayAxis ? timeline.map((item) => item.bucket).filter(isMidnight) : undefined
 
     return (
         <section className="card chart-card" aria-labelledby={titleId}>
@@ -83,7 +90,14 @@ export function GrossEnergyCard({ gross, whose, participantName, formatBucketLab
                 <ResponsiveContainer width="100%" height={280} style={{ marginTop: '1.25rem' }}>
                     <ComposedChart data={timeline} margin={{ top: 4, right: 20, bottom: 4, left: 0 }}>
                         <CartesianGrid stroke={CHART_GRIDLINE} strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="bucket" tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} tickFormatter={formatBucketLabel} />
+                        <XAxis
+                            dataKey="bucket"
+                            tick={CHART_AXIS_TICK}
+                            stroke={AXIS_COLOR}
+                            ticks={dayTicks}
+                            interval={dayTicks ? 0 : undefined}
+                            tickFormatter={dayTicks ? (bucket: string) => dayLabel.format(new Date(bucket)) : formatBucketLabel}
+                        />
                         <YAxis tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} unit=" kWh" width={60} tickFormatter={kwhTick} />
                         <Tooltip
                             contentStyle={CHART_TOOLTIP_STYLE}

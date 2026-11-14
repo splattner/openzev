@@ -1,15 +1,20 @@
 import { useTranslation } from 'react-i18next'
-import { Area, CartesianGrid, ComposedChart, Legend, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Area, Bar, CartesianGrid, ComposedChart, Legend, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import {
     ANNOTATION_COLOR, AXIS_COLOR, CHART_GRID, CHART_GRIDLINE, CHART_LOCAL, FLOW_GRID_EXP, FLOW_LOCAL_CONS,
 } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
 import { nextPeakWindow, peakDayKind, peakRange } from '../../lib/forecast'
-import { formatClockMinutes, kwFigure, liveDayAxis } from '../../lib/live'
+import { formatClockMinutes, liveDayAxis } from '../../lib/live'
 import type { TodayRow } from '../../lib/myEnergy'
 import type { ForecastPeakWindow } from '../../types/api'
+import {
+    FORECAST_TOOLTIP_CURSOR, type ForecastHourBar, ForecastHourBars, forecastTooltipLabel, HOUR_MS, kwTooltipText, noBarShape,
+} from '../live/forecastChartParts'
 
 const LIVE_DASH = '5 3'
+/** The own lines move to a right-hand axis when they would be this many times smaller than everything else on the left one. */
+const OWN_AXIS_RATIO = 4
 
 /**
  * Today in kW (SPEC-2026-live-energy-data §7.2). The ZEV's production and consumption are live
@@ -41,12 +46,26 @@ export function TodayChart({ date, rows, through, hasLive, isOwn = true, peakWin
     const peak = nextPeakWindow(peakWindows.filter((window) => window.date === date))
     const handOver = through ? Date.parse(through) : null
     const showHandOver = handOver !== null && hasOwnHistory && handOver > axis.start && handOver < axis.end
-    const kwTooltip = (value: unknown) => (typeof value === 'number' ? `${kwFigure(value * 1000)} kW` : String(value))
+    // The forecast is flat across each hour in the rows; the bars are drawn once per hour.
+    const forecastHours = new Map<number, ForecastHourBar>()
+    for (const row of rows) {
+        if (row.forecast === null) continue
+        const start = Math.floor(row.ts / HOUR_MS) * HOUR_MS
+        if (!forecastHours.has(start)) forecastHours.set(start, { start, power: row.forecast, band: row.forecastBand })
+    }
+    // A household's own consumption is a fraction of what the ZEV produces, so on one axis it would be a line on the floor.
+    const maxOf = (picks: Array<(row: TodayRow) => number | null>) =>
+        rows.reduce((max, row) => picks.reduce((inner, pick) => Math.max(inner, pick(row) ?? 0), max), 0)
+    const ownMax = maxOf([(row) => row.ownHistory, (row) => row.ownLive, (row) => row.ownHistoryProduction, (row) => row.ownLiveProduction])
+    const zevMax = maxOf([(row) => row.production, (row) => row.consumption, (row) => row.forecastBand?.[1] ?? row.forecast])
+    const ownAxis = ownMax > 0 && ownMax * OWN_AXIS_RATIO < zevMax
+    const ownName = (name: string) => (ownAxis ? `${name} (${t('myEnergy.today.rightAxis')})` : name)
     const ownLine = (dataKey: keyof TodayRow, name: string, stroke: string, live: boolean) => (
         <Line
+            yAxisId={ownAxis ? 'own' : undefined}
             type="monotone"
             dataKey={dataKey}
-            name={name}
+            name={ownName(name)}
             stroke={stroke}
             strokeWidth={2}
             strokeDasharray={live ? LIVE_DASH : undefined}
@@ -65,7 +84,7 @@ export function TodayChart({ date, rows, through, hasLive, isOwn = true, peakWin
                 <>
                     {peak && <p><strong>{t(`forecast.peak.${peakDayKind(peak)}`, { range: peakRange(peak) })}</strong></p>}
                     <ResponsiveContainer width="100%" height={280}>
-                        <ComposedChart data={rows} margin={{ top: 16, right: 20, bottom: 4, left: 0 }}>
+                        <ComposedChart data={rows} margin={{ top: 16, right: ownAxis ? 0 : 20, bottom: 4, left: 0 }}>
                             <CartesianGrid stroke={CHART_GRIDLINE} strokeDasharray="3 3" vertical={false} />
                             <XAxis
                                 type="number"
@@ -77,10 +96,12 @@ export function TodayChart({ date, rows, through, hasLive, isOwn = true, peakWin
                                 tickFormatter={formatClockMinutes}
                             />
                             <YAxis tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} unit=" kW" width={56} />
+                            {ownAxis && <YAxis yAxisId="own" orientation="right" domain={[0, 'auto']} tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} unit=" kW" width={68} />}
                             <Tooltip
                                 contentStyle={CHART_TOOLTIP_STYLE}
-                                labelFormatter={(label) => formatClockMinutes(Number(label))}
-                                formatter={kwTooltip}
+                                cursor={FORECAST_TOOLTIP_CURSOR}
+                                labelFormatter={(label) => forecastTooltipLabel(Number(label))}
+                                formatter={kwTooltipText}
                             />
                             <Legend />
                             {showHandOver && (
@@ -91,34 +112,12 @@ export function TodayChart({ date, rows, through, hasLive, isOwn = true, peakWin
                                     label={{ value: t('myEnergy.today.handOver'), position: 'top', fontSize: 11, fill: ANNOTATION_COLOR }}
                                 />
                             )}
-                            {hasBand && (
-                                <Area
-                                    type="stepAfter"
-                                    dataKey="forecastBand"
-                                    name={t('forecast.band')}
-                                    stroke="none"
-                                    fill={CHART_LOCAL}
-                                    fillOpacity={0.1}
-                                    legendType="none"
-                                    connectNulls={false}
-                                    isAnimationActive={false}
-                                />
-                            )}
+                            {hasForecast && <ForecastHourBars hours={[...forecastHours.values()]} nowMs={new Date().getTime()} />}
                             {hasForecast && (
-                                <Area
-                                    type="stepAfter"
-                                    dataKey="forecast"
-                                    name={t('myEnergy.today.forecast')}
-                                    stroke={CHART_LOCAL}
-                                    strokeOpacity={0.55}
-                                    strokeDasharray={LIVE_DASH}
-                                    fill={CHART_LOCAL}
-                                    fillOpacity={0.06}
-                                    strokeWidth={1.5}
-                                    dot={false}
-                                    connectNulls={false}
-                                    isAnimationActive={false}
-                                />
+                                <Bar dataKey="forecast" name={t('forecast.expected')} fill={CHART_LOCAL} fillOpacity={0.6} shape={noBarShape} isAnimationActive={false} />
+                            )}
+                            {hasBand && (
+                                <Area dataKey="forecastBand" name={t('forecast.band')} stroke="none" fill="none" legendType="none" activeDot={false} isAnimationActive={false} connectNulls={false} />
                             )}
                             {hasZev && (
                                 <Area

@@ -1,7 +1,7 @@
 import { SortableHeader, useTableSorting } from '../../components/tableSorting'
+import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Disclosure } from '../../components/Disclosure'
 import { useCommunityAccess } from '../../lib/communityAccess'
 import { formatKw, livePointFlow } from '../../lib/live'
 import type { LivePoint } from '../../types/api'
@@ -44,12 +44,12 @@ function ConnectNote({ point }: { point: LivePoint }) {
 
 /**
  * Each live source's latest value, for whoever manages or may view the ZEV (the snapshot carries `points` only
- * for them). It supports the card above it, so it is a disclosure, closed; the summary says how many metering points
- * have no current value, counted as the card counts (the grid connection point is not one of them).
+ * for them). It is always open: the points without a value are the reason to look, and each says what to do next.
  */
 export function LivePointsTable({ points }: { points: LivePoint[] }) {
     const { t } = useTranslation()
     const power = usePointPower()
+    const titleId = useId()
     const sorting = useTableSorting(points, {
         meter: row => row.meter_id ?? row.target,
         holder: row => row.participant_name,
@@ -57,18 +57,11 @@ export function LivePointsTable({ points }: { points: LivePoint[] }) {
         age: row => row.age_s,
         state: row => row.live_state,
     })
-    const quiet = points.filter((point) => point.target === 'metering_point' && point.live_state !== 'fresh').length
     return (
-        <section className="card">
-            <Disclosure
-                className="live-points-disclosure"
-                summary={(
-                    <span>
-                        <strong>{t('live.points.summary')}</strong>
-                        {quiet > 0 && <span className="muted">{` · ${t('live.points.quiet', { missing: quiet })}`}</span>}
-                    </span>
-                )}
-            >
+        <section className="card" aria-labelledby={titleId}>
+            <div className="card-header">
+                <h3 id={titleId}>{t('live.points.summary')}</h3>
+            </div>
                 <div className="table-scroll live-points-wide">
                     <table className="participant-table live-points-table">
                         <thead>
@@ -111,7 +104,6 @@ export function LivePointsTable({ points }: { points: LivePoint[] }) {
                         </li>
                     ))}
                 </ul>
-            </Disclosure>
         </section>
     )
 }

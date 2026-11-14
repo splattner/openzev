@@ -1,9 +1,11 @@
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 import { EmptyState } from '../../components/EmptyState'
 import { Notice } from '../../components/Notice'
 import { PageSkeleton } from '../../components/PageSkeleton'
 import { useCommunityAccess } from '../../lib/communityAccess'
 import { liveCardState, useLiveEnabled, useLiveEnergy } from '../../lib/live'
+import { useEnergyDataEligibility } from '../../lib/supplementary'
 import { LiveEnergyCard } from './LiveEnergyCard'
 import { LivePointsTable } from './LivePointsTable'
 
@@ -17,6 +19,7 @@ export function LiveEnergyView({ zevId }: { zevId: string | undefined }) {
     const { t } = useTranslation()
     const { isZevScope, canManage } = useCommunityAccess()
     const enabledQuery = useLiveEnabled()
+    const energyData = useEnergyDataEligibility()
     const snapshotQuery = useLiveEnergy(zevId)
     const snapshot = snapshotQuery.data
     const state = liveCardState(snapshot)
@@ -47,9 +50,18 @@ export function LiveEnergyView({ zevId }: { zevId: string | undefined }) {
             />
         )
     }
+    // A participant whose own meter reports nothing sees only the community's totals; say why and where to change that.
+    const canConnectLive = !isZevScope && snapshot.own === null
+        && energyData.liveEligible.some((point) => point.zev === zevId && !point.sources?.live)
     return (
         <>
             <LiveEnergyCard snapshot={snapshot} />
+            {canConnectLive && (
+                <p className="muted">
+                    {t('myEnergy.noLiveSource')}{' '}
+                    <Link className="text-link" to="/me/metering-points">{t('myEnergy.connectLive')}</Link>
+                </p>
+            )}
             {snapshot.points && snapshot.points.length > 0 && <LivePointsTable points={snapshot.points} />}
         </>
     )

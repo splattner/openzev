@@ -86,10 +86,10 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
                 .map((participant) => participant.id) ?? [],
         [user?.memberships, selectedZevId],
     )
-    // A manager who is a participant with an own system starts on themselves; anybody else picks.
+    // A manager who is a participant with an own system (history or live) starts on themselves; anybody else picks.
     const defaultParticipantId = energyData.historyEligible.find(
         (point) => point.zev === selectedZevId && point.source !== null,
-    )?.participant ?? ''
+    )?.participant ?? ownParticipantIds[0] ?? ''
     const requested = searchParams.get('participant') ?? ''
     const selectedParticipantId = isZevScope
         ? (participants.some((participant) => participant.id === requested) ? requested : defaultParticipantId)
@@ -155,8 +155,9 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
         <>
             <LiveEnergyView zevId={selectedZevId || undefined} />
 
-            {hasViews && isZevScope && range !== 'tomorrow' && (
-                // The picker decides what the views below show, so it comes first (UI patterns §10.3 rule 2).
+            {hasViews && isZevScope && (
+                // The picker decides what the views below show, so it comes first (UI patterns §10.3 rule 2). It stays on every
+                // tab, Tomorrow included, so the tab strip does not jump when the tab changes.
                 <section className="filter-bar">
                     <div className="filter-bar-fields">
                         <label>
@@ -292,6 +293,8 @@ function TodayPanel({ zevId, subject, canConnect, hasOwnSource, historyPossible,
         [curve, history, forecast, date],
     )
     const hasOwn = history.rows.length > 0
+    // Somebody else's live line is data, so "no own system" must not be said under it; their own system is a story of the history.
+    const hasPersonLive = !subject.isOwn && rows.some((row) => row.ownLive !== null || row.ownLiveProduction !== null)
 
     if (!curveSettled || seriesQuery.isLoading) return <PageSkeleton variant="kpiRow" />
     return (
@@ -300,7 +303,7 @@ function TodayPanel({ zevId, subject, canConnect, hasOwnSource, historyPossible,
             {(liveShown || hasOwn || rows.some((row) => row.forecast !== null)) && (
                 <TodayChart date={date} rows={rows} through={history.through} hasLive={!!curve} isOwn={subject.isOwn} peakWindows={forecast?.peak_windows} />
             )}
-            {!hasOwn && !seriesQuery.isError && <NoOwnSystem subject={subject} canConnect={canConnect} hasOwnSource={hasOwnSource} historyPossible={historyPossible} />}
+            {!hasOwn && !hasPersonLive && !seriesQuery.isError && <NoOwnSystem subject={subject} canConnect={canConnect} hasOwnSource={hasOwnSource} historyPossible={historyPossible} />}
         </>
     )
 }
@@ -325,6 +328,8 @@ function SeriesPanel({ zevId, subject, canConnect, hasOwnSource, historyPossible
     )
     const gross = query.data?.gross ?? null
 
+    // Nobody picked yet (a manager, viewer or admin): say what to do instead of showing an empty tab.
+    if (!subject.ready) return subject.participantId ? null : <p className="muted">{t('myEnergy.pickParticipantHint')}</p>
     if (query.isError) {
         return (
             <Notice tone="error" onRetry={() => void query.refetch()} isRetrying={query.isFetching}>
@@ -342,6 +347,7 @@ function SeriesPanel({ zevId, subject, canConnect, hasOwnSource, historyPossible
                     participantName={subject.name}
                     formatBucketLabel={formatBucketLabel}
                     formatBucketTooltipLabel={formatBucketTooltipLabel}
+                    dayAxis={bucket === 'hour'}
                 />
             ) : (
                 <NoOwnSystem subject={subject} canConnect={canConnect} hasOwnSource={hasOwnSource} historyPossible={historyPossible} />

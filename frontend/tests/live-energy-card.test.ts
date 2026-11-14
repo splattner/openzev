@@ -195,11 +195,11 @@ describe('LiveEnergyCard', () => {
         expect(out).toContain('live.ownProductionSplitHint|{"toZev":"3.0\u00a0kW","toGrid":"1.0\u00a0kW"}')
     })
 
-    it('shows the time of the oldest value and the badge, and no coverage or connection point line', async () => {
+    it('shows the time of the oldest value, no indicative badge, and no coverage or connection point line', async () => {
         const out = await text(exact())
 
         expect(out).toContain('live.asOf|{"time":"12:02:10"}')
-        expect(out).toContain('live.badge')
+        expect(out).not.toContain('live.badge')
         expect(out).not.toContain('live.coverage')
         expect(out).not.toContain('live.connectionPoint')
     })
@@ -218,7 +218,7 @@ describe('LiveEnergyCard', () => {
             createElement(LiveEnergyCard, { snapshot: exact({ own: own({ complete: false, points: 2, points_fresh: 1 }) }) }),
             cleanups,
         )
-        expect(partly.container.querySelector('.issue-text--warning')?.textContent).toBe('live.ownPartlyQuiet')
+        expect(partly.container.querySelector('.issue-text--warning')?.textContent).toBe('live.ownPartlyQuiet|{"fresh":1,"total":2}')
 
         const fine = await renderWithProviders(createElement(LiveEnergyCard, { snapshot: exact() }), cleanups)
         expect(fine.container.querySelector('.issue-text--warning')).toBeNull()
@@ -291,22 +291,17 @@ describe('LivePointsTable', () => {
         expect(out).not.toMatch(/-\d+\.\d/)
     })
 
-    it('is closed, and says how many metering points have no current value, counted as the card counts them', async () => {
+    it('is always open, titled only, and does not count the points without a value in its title', async () => {
         const partial = [
             point({}),
             point({ metering_point_id: 'm2', meter_id: 'CH-2', live_state: 'never', source_id: null, meter_power_w: null, age_s: null }),
             point({ metering_point_id: null, target: 'connection_point', meter_id: null, live_state: 'stale', source_id: 's2' }),
         ]
         const { container } = await renderWithProviders(createElement(LivePointsTable, { points: partial }), cleanups)
-        const summary = container.querySelector('summary')?.textContent ?? ''
-        // The grid connection point is not a metering point of the card's "X of Y", so it is not in this count either.
-        expect(summary).toContain('live.points.summary')
-        expect(summary).toContain('live.points.quiet|{"missing":1}')
-        expect(summary).not.toContain('"total"')
-        expect(container.querySelector('details')?.open).toBe(false)
-
-        const complete = await renderWithProviders(createElement(LivePointsTable, { points: [point({})] }), cleanups)
-        expect(complete.container.querySelector('summary')?.textContent).not.toContain('live.points.quiet')
+        expect(container.querySelector('details')).toBeNull()
+        expect(container.querySelector('h3')?.textContent).toBe('live.points.summary')
+        expect(container.textContent).not.toContain('live.points.quiet')
+        expect(container.querySelectorAll('tbody tr')).toHaveLength(3)
     })
 
     it('offers a manager the way to connect a point nobody holds, and tells a viewer or a holder\'s point nothing to do', async () => {
