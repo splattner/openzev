@@ -15,7 +15,11 @@ import { LivePointsTable } from './LivePointsTable'
  * does not wait for the flag (the server answers 404 while the feature is off). Without live data it says so compactly and points to the setup; the
  * rest of the page (own history) does not depend on it.
  */
-export function LiveEnergyView({ zevId }: { zevId: string | undefined }) {
+export function LiveEnergyView({ zevId, points = true }: {
+    zevId: string | undefined
+    /** Whether the per-point table follows the card; My energy system puts it after the views (`LivePointsView`). */
+    points?: boolean
+}) {
     const { t } = useTranslation()
     const { isZevScope, canManage } = useCommunityAccess()
     const enabledQuery = useLiveEnabled()
@@ -62,7 +66,17 @@ export function LiveEnergyView({ zevId }: { zevId: string | undefined }) {
                     <Link className="text-link" to="/me/metering-points">{t('myEnergy.connectLive')}</Link>
                 </p>
             )}
-            {snapshot.points && snapshot.points.length > 0 && <LivePointsTable points={snapshot.points} />}
+            {points && snapshot.points && snapshot.points.length > 0 && <LivePointsTable points={snapshot.points} />}
         </>
     )
+}
+
+/**
+ * The per-point table on its own, for a page that shows it after its main views: always open, it would otherwise push
+ * the chart far down on a phone. It shares the snapshot query with the card, so it costs no second request.
+ */
+export function LivePointsView({ zevId }: { zevId: string | undefined }) {
+    const snapshot = useLiveEnergy(zevId).data
+    if (!snapshot || !liveCardState(snapshot) || !snapshot.points || snapshot.points.length === 0) return null
+    return <LivePointsTable points={snapshot.points} />
 }

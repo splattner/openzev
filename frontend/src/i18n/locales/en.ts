@@ -4953,7 +4953,6 @@ export const en = {
     },
     live: {
         title: 'Right now',
-        asOf: 'as of {{time}}',
         none: 'No live production data right now',
         noneZev: 'No live data for the ZEV as a whole right now, because not all metering points report.',
         othersUnknown: 'We don\'t know how much the other participants are using at the moment, so part of it may already be in use.',

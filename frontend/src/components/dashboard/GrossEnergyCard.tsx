@@ -104,7 +104,8 @@ export function GrossEnergyCard({ gross, whose, participantName, formatBucketLab
                             labelFormatter={formatBucketTooltipLabel}
                             formatter={(value) => (typeof value === 'number' ? `${formatKwh(value)}` : String(value))}
                         />
-                        <Legend />
+                        {/* Drawing order, not alphabetical: the order must not change with the language. */}
+                        <Legend itemSorter={null} />
                         <Bar dataKey="production_kwh" name={t('supplementary.gross.production')} fill={CHART_LOCAL} />
                         <Bar dataKey="export_kwh" name={t('supplementary.gross.export')} fill={FLOW_GRID_EXP} radius={[3, 3, 0, 0]} />
                         <Line

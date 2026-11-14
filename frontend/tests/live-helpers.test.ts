@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-    formatClock,
     formatKw,
     kwFigure,
     liveCardState,
@@ -41,13 +40,6 @@ describe('formatKw', () => {
 
     it('shows a dash for a number that is not finite', () => {
         expect(formatKw(Number.NaN)).toBe('–')
-    })
-})
-
-describe('formatClock', () => {
-    it('shows hh:mm:ss in the business timezone', () => {
-        expect(formatClock('2026-10-30T11:02:10Z')).toBe('12:02:10')
-        expect(formatClock('2026-12-01T23:30:05Z')).toBe('00:30:05')
     })
 })
 

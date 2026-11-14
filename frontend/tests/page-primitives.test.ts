@@ -332,6 +332,17 @@ describe('StatCard', () => {
         expect(page.container.querySelector('.stat-figure--text') !== null).toBe(wraps)
     })
 
+    it('keeps the info mark on the label\'s first line, apart from the wrapping text', () => {
+        const page = render(createElement(StatCard, { label: 'ZEV production', value: '6.3', unit: 'kW', info: 'Others unknown' }))
+        const label = page.container.querySelector('.stat-label')!
+        expect(label.classList.contains('stat-label--with-info')).toBe(true)
+        expect(label.querySelector('.stat-label-text')?.textContent).toBe('ZEV production')
+        expect(label.lastElementChild?.classList.contains('stat-info')).toBe(true)
+
+        const plain = render(createElement(StatCard, { label: 'Total', value: 3 }))
+        expect(plain.container.querySelector('.stat-label--with-info, .stat-label-text')).toBeNull()
+    })
+
     it('uses phrasing content for an unpressed toggle with a hint', () => {
         const page = render(createElement(StatCard, { label: 'Red', value: 2, hint: 'Missing readings', onPress: vi.fn(), pressed: false }))
         const button = page.container.querySelector('button')!

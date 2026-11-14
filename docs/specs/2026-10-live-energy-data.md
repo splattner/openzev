@@ -724,7 +724,7 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
   queryKeys.live.enabled(), queryFn: fetchLiveEnabled, staleTime: 60_000, retry: false })` with no polling;
   the nav and the page share it. `useLiveCurve(zevId, enabled, participantId?)` refetches every 60 s and is enabled only while the
   card shows; the date is today's civil date (`todayBusinessIso`). Pure helpers: `kwFigure`, `formatKw`
-  (kW, one decimal), `formatClock` (`hh:mm:ss`, Europe/Zurich), `showLiveCard` (snapshot non-null and
+  (kW, one decimal), `showLiveCard` (snapshot non-null and
   `coverage.live_sources > 0`), `liveCardState` (what the card may say per tier), `liveCurveRows`,
   `liveDayAxis`. `useProductionForecast(zevId, enabled)` (`lib/forecast.ts`, plus `forecastForDay`, `hoursOfDay`, `hasExpectedProduction`, `tomorrowBusinessIso`: `queryKeys.live.forecast(zevId)`, every 15 min, no
   focus refetch, `404` to `null` and no polling after it) with the pure helpers `forecastRows` (kW, band `[min, max]` or `null`),
@@ -735,7 +735,7 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
   with `queryKeys.live.all`), `ownHistoryFromSeries` and `todayRows` (the history/live merge, §5.3).
 - `frontend/src/features/live/LiveEnergyCard.tsx`:
   - **Layout.** The card is **not** a white `.card` box: like the tiles of the Energy balance it is a plain `.live-now` section
-    on the page: a heading row (`card-header` classes: "Right now", the time on the right), then **one** `.stat-grid`
+    on the page: a heading row (`card-header` classes: "Right now" alone), then **one** `.stat-grid`
     with all the tiles, then the muted notes. The ZEV tile is labelled **ZEV production** (`live.production`) so it is not mistaken for **Your production**.
   - `none`: "No live production data right now". When the viewer's own tiles are shown (below), the sentence is the muted "No live data for the ZEV as a whole
     right now, because not all metering points report" (`live.noneZev`) instead, so it does not read as if the viewer's own
@@ -762,12 +762,15 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
     withheld): an `IssueText` warning under the title linking to `/me/metering-points`, "Your source is not reporting
     right now" when `own.points_fresh` is `0`, else "Not all of your metering points are reporting live right now (1 of 2)"
     (`live.ownQuiet`, `live.ownPartlyQuiet` with `own.points_fresh` and `own.points`). The payload has no per-source age or name, so the text names none.
-  - Always: "as of hh:mm:ss" (when `as_of` is set). There is **no "Live, indicative" badge** (removed after a UI review: "indicative"
+  - There is **no time stamp** in the heading row (the "as of hh:mm:ss" was removed after a UI review: the values refresh every
+    15 s and say "Right now", so the clock added nothing a user acts on). There is **no "Live, indicative" badge** (removed after a UI review: "indicative"
     was not understood and the heading "Right now" already says what the values are). There is **no coverage line** ("Live data from X of
     Y metering points", the grid connection point's state): it repeated what the per-point table says, and for a participant it
     only confused. `liveCardState` no longer has `reporting`.
 - `LivePointsTable.tsx` (meter or "Grid connection point", holder or "ZEV-operated", kW, age, state)
-  for a snapshot that carries `points` (manager, viewer, admin). It is a card that is **always open**, titled only
+  for a snapshot that carries `points` (manager, viewer, admin). On My energy system it comes **after the views**
+  (`LiveEnergyView points={false}` above, `LivePointsView` after the tabs, sharing the snapshot query), so a manager's chart is not
+  pushed below nine cards on a phone. It is a card that is **always open**, titled only
   "Live values per metering point" (`live.points.summary`, an `h3` in a `card-header`): no `Disclosure` and no count of the points
   without a value in the title (the rows say it, each with its next step). The rows are read-only, so they have no hover tint and no
   pointer cursor (`.live-points-table` overrides the shared `.participant-table` row styles). The power
@@ -847,10 +850,15 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
      **Forecast overlay.** While the live view is on, `useProductionForecast(zevId)` (enabled only once the energy data
      feature is on) feeds `todayRows(..., {date, hours})`, which draws each of today's forecast hours flat across its
      5-minute steps (`forecast`, `forecastBand`; hours already past included, so the plan can be read against what
-     happened). `TodayChart` shows it exactly as Tomorrow does (`features/live/forecastChartParts.tsx`, shared by both charts): one solid
-     bar per hour, past hours paler, the min/max band behind each bar, and the same tooltip (date and time, "Range", "Expected
+     happened). `TodayChart` shows it exactly as Tomorrow does (`features/live/forecastChartParts.tsx`, shared by both charts): one light
+     bar per hour (fill opacity 0.35, past hours 0.15, so the expectation never outweighs the measured lines in front of it), the min/max
+     band as a thin whisker with caps at the bar's centre (not a rectangle, which read as a stacked bar), and the same tooltip (date and time, "Range", "Expected
      production", `3.8–6.5 kW` for a band). `ForecastHourBars` draws bars and band from the chart's axes; the series are kept
-     in the chart only for the tooltip and the legend. The chart names today's next peak window above itself. The
+     in the chart only for the tooltip and the legend. Both legends (`TodayChart`, `GrossEnergyCard`) keep the drawing order
+     (`itemSorter={null}`), not Recharts' alphabetical default, so the order does not change with the language; the forecast's
+     swatch gets the bars' light fill (`.chart-card--forecast-legend`). The ZEV consumption line and its legend entry are drawn
+     only where there is a consumption (not below tier `exact`), and the own live production is left out when it equals the ZEV
+     production (`ownProductionIsZevProduction`: the only producer would get two identical lines). The chart names today's next peak window above itself. The
      chart appears whenever there is live data, an own history **or** a forecast, so a ZEV with only a forecast still
      sees it here.
   5b. *Tomorrow* (`ProductionForecastChart` with `forecastForDay(forecast, tomorrow)`, title "Tomorrow: expected
@@ -1334,7 +1342,7 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
 - PR 3a landed `tests/live-energy-card.test.ts` (12 tests: the three tiers' texts, the single
   coverage line (since removed), "as of", own split
   only at `exact`, the inconsistent hint, a producer's split, the connection point part, points table rows, empty curve) and `tests/live-helpers.test.ts` (16 tests: `formatKw`,
-  `formatClock`, `showLiveCard` hidden for `null` or no live source, `liveCardState`, polling stops on
+  `showLiveCard` hidden for `null` or no live source, `liveCardState`, polling stops on
   `null`, curve rows with gaps, the day axis incl. the 25-hour day).
 - PR 3b added `tests/live-setup.test.ts` (13 tests: live modal payloads and consent per holder, field errors, push
   panel endpoints; the former `PointLiveDialog` and `ConnectionPointCard` cases moved to

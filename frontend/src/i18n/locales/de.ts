@@ -4942,7 +4942,6 @@ export const de = {
     },
     live: {
         title: 'Jetzt',
-        asOf: 'Stand {{time}}',
         none: 'Zurzeit keine Live-Produktionsdaten',
         noneZev: 'Für das ZEV insgesamt liegen gerade keine Live-Daten vor, weil nicht alle Messpunkte melden.',
         othersUnknown: 'Wir wissen nicht, wie viel die anderen Teilnehmer gerade verbrauchen. Ein Teil davon wird deshalb vielleicht schon genutzt.',

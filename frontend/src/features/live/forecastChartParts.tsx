@@ -3,16 +3,20 @@ import { AXIS_COLOR, CHART_LOCAL } from '../../lib/chartTokens'
 import { formatClockMinutes, kwFigure } from '../../lib/live'
 
 /**
- * The expected production is drawn the same way on the Today and the Tomorrow tab: one solid bar per hour (past hours
- * paler), the forecast's band behind it, and the same tooltip. Both charts use these parts so the two cannot drift apart.
+ * The expected production is drawn the same way on the Today and the Tomorrow tab: one light bar per hour (past hours
+ * paler still), the forecast's band as a min–max whisker over it, and the same tooltip. Both charts use these parts so the
+ * two cannot drift apart. The bars stay light: what is expected must not outweigh what was measured.
  */
 
 export const HOUR_MS = 3_600_000
-const BAR_OPACITY = 0.6
-const PAST_BAR_OPACITY = 0.25
-const BAND_OPACITY = 0.15
+const BAR_OPACITY = 0.35
+const PAST_BAR_OPACITY = 0.15
+const WHISKER_OPACITY = 0.7
+const PAST_WHISKER_OPACITY = 0.35
 /** Share of an hour's width left empty on each side of its bar. */
 const BAR_GAP = 0.1
+/** Half the width of a whisker's caps, px. */
+const CAP = 4
 
 /** One hour of the forecast; `start` is the hour's start (epoch ms), power and band in kW. */
 export interface ForecastHourBar {
@@ -41,7 +45,7 @@ export const FORECAST_TOOLTIP_CURSOR = { stroke: AXIS_COLOR, strokeWidth: 1 }
 export const noBarShape = () => <g />
 
 /**
- * The hourly bars and bands, drawn from the chart's own axes (they need a numeric x axis in epoch ms and a y axis in
+ * The hourly bars and their bands, drawn from the chart's own axes (they need a numeric x axis in epoch ms and a y axis in
  * kW). Rendered before the lines, so measured values stay in front of the expectation.
  */
 export function ForecastHourBars({ hours, nowMs }: { hours: ForecastHourBar[]; nowMs: number }) {
@@ -61,17 +65,23 @@ export function ForecastHourBars({ hours, nowMs }: { hours: ForecastHourBar[]; n
                 const gap = (right - left) * BAR_GAP
                 const x = left + gap
                 const width = Math.max(right - left - 2 * gap, 0)
-                const bandTop = hour.band ? yScale(hour.band[1]) : undefined
-                const bandBottom = hour.band ? yScale(hour.band[0]) : undefined
+                const past = hour.start < nowHour
+                const bandHigh = hour.band ? yScale(hour.band[1]) : undefined
+                const bandLow = hour.band ? yScale(hour.band[0]) : undefined
+                const centre = x + width / 2
                 return (
                     <g key={hour.start}>
-                        {typeof bandTop === 'number' && typeof bandBottom === 'number' && (
-                            <rect x={x} y={bandTop} width={width} height={Math.max(bandBottom - bandTop, 0)} fill={CHART_LOCAL} fillOpacity={BAND_OPACITY} />
-                        )}
                         <rect
                             x={x} y={top} width={width} height={Math.max(baseline - top, 0)}
-                            fill={CHART_LOCAL} fillOpacity={hour.start < nowHour ? PAST_BAR_OPACITY : BAR_OPACITY}
+                            fill={CHART_LOCAL} fillOpacity={past ? PAST_BAR_OPACITY : BAR_OPACITY}
                         />
+                        {typeof bandHigh === 'number' && typeof bandLow === 'number' && bandLow - bandHigh > 0.5 && (
+                            // The range as one thin line with caps, so it reads as "between" and not as a stacked part of the bar.
+                            <path
+                                d={`M${centre},${bandHigh}V${bandLow}M${centre - CAP},${bandHigh}H${centre + CAP}M${centre - CAP},${bandLow}H${centre + CAP}`}
+                                stroke={CHART_LOCAL} strokeWidth={1.25} strokeOpacity={past ? PAST_WHISKER_OPACITY : WHISKER_OPACITY} fill="none"
+                            />
+                        )}
                     </g>
                 )
             })}

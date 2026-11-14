@@ -1,6 +1,6 @@
 import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
-import { formatClock, formatKw, kwFigure, liveCardState } from '../../lib/live'
+import { formatKw, kwFigure, liveCardState } from '../../lib/live'
 import { formatPercentFigure } from '../../lib/numbers'
 import type { LiveSnapshot } from '../../types/api'
 import { IssueText } from '../../components/IssueText'
@@ -42,7 +42,6 @@ export function LiveEnergyCard({ snapshot }: { snapshot: LiveSnapshot }) {
         <section className="live-now" aria-labelledby={titleId}>
             <div className="card-header">
                 <h3 id={titleId}>{t('live.title')}</h3>
-                {snapshot.as_of && <span className="muted">{t('live.asOf', { time: formatClock(snapshot.as_of) })}</span>}
             </div>
 
             {own && !own.complete && (

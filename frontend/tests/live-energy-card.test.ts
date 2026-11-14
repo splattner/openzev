@@ -195,10 +195,10 @@ describe('LiveEnergyCard', () => {
         expect(out).toContain('live.ownProductionSplitHint|{"toZev":"3.0\u00a0kW","toGrid":"1.0\u00a0kW"}')
     })
 
-    it('shows the time of the oldest value, no indicative badge, and no coverage or connection point line', async () => {
+    it('shows no time stamp, no indicative badge, and no coverage or connection point line', async () => {
         const out = await text(exact())
 
-        expect(out).toContain('live.asOf|{"time":"12:02:10"}')
+        expect(out).not.toContain('live.asOf')
         expect(out).not.toContain('live.badge')
         expect(out).not.toContain('live.coverage')
         expect(out).not.toContain('live.connectionPoint')

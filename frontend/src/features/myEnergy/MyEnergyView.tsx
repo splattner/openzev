@@ -29,7 +29,7 @@ import { useEnergyDataEligibility } from '../../lib/supplementary'
 import type { ProductionForecast } from '../../types/api'
 import { usePageNavigation } from '../../lib/usePageNavigation'
 import { type DashboardBodyProps, useBucketLabelFormatters } from '../dashboard/dashboardShared'
-import { LiveEnergyView } from '../live/LiveEnergyView'
+import { LiveEnergyView, LivePointsView } from '../live/LiveEnergyView'
 import { ProductionForecastChart } from '../live/ProductionForecastChart'
 import { TodayChart } from './TodayChart'
 
@@ -153,7 +153,7 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
 
     return (
         <>
-            <LiveEnergyView zevId={selectedZevId || undefined} />
+            <LiveEnergyView zevId={selectedZevId || undefined} points={false} />
 
             {hasViews && isZevScope && (
                 // The picker decides what the views below show, so it comes first (UI patterns §10.3 rule 2). It stays on every
@@ -232,6 +232,9 @@ export function MyEnergyView({ interval, period, onPeriodChange, periodReady }: 
                     </AppTabs.Panel>
                 </AppTabs>
             )}
+
+            {/* The detail per metering point comes after the views: the chart is what most visits are for. */}
+            <LivePointsView zevId={selectedZevId || undefined} />
         </>
     )
 }

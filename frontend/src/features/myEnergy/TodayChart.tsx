@@ -6,7 +6,7 @@ import {
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
 import { nextPeakWindow, peakDayKind, peakRange } from '../../lib/forecast'
 import { formatClockMinutes, liveDayAxis } from '../../lib/live'
-import type { TodayRow } from '../../lib/myEnergy'
+import { ownProductionIsZevProduction, type TodayRow } from '../../lib/myEnergy'
 import type { ForecastPeakWindow } from '../../types/api'
 import {
     FORECAST_TOOLTIP_CURSOR, type ForecastHourBar, ForecastHourBars, forecastTooltipLabel, HOUR_MS, kwTooltipText, noBarShape,
@@ -38,6 +38,8 @@ export function TodayChart({ date, rows, through, hasLive, isOwn = true, peakWin
     const axis = liveDayAxis(date)
     const has = (pick: (row: TodayRow) => number | null) => rows.some((row) => pick(row) !== null)
     const hasZev = has((row) => row.production)
+    // Below tier `exact` the ZEV's consumption is not known: no line, and no legend entry for one.
+    const hasZevConsumption = has((row) => row.consumption)
     const positive = (pick: (row: TodayRow) => number | null) => rows.some((row) => (pick(row) ?? 0) > 0)
     const hasOwnHistory = has((row) => row.ownHistory)
     const hasOwnLive = has((row) => row.ownLive)
@@ -59,6 +61,8 @@ export function TodayChart({ date, rows, through, hasLive, isOwn = true, peakWin
     const ownMax = maxOf([(row) => row.ownHistory, (row) => row.ownLive, (row) => row.ownHistoryProduction, (row) => row.ownLiveProduction])
     const zevMax = maxOf([(row) => row.production, (row) => row.consumption, (row) => row.forecastBand?.[1] ?? row.forecast])
     const ownAxis = ownMax > 0 && ownMax * OWN_AXIS_RATIO < zevMax
+    // The only producer's own live production is the ZEV's production: one line, not two on top of each other.
+    const ownProductionIsZevs = ownProductionIsZevProduction(rows)
     const ownName = (name: string) => (ownAxis ? `${name} (${t('myEnergy.today.rightAxis')})` : name)
     const ownLine = (dataKey: keyof TodayRow, name: string, stroke: string, live: boolean) => (
         <Line
@@ -77,7 +81,7 @@ export function TodayChart({ date, rows, through, hasLive, isOwn = true, peakWin
 
     return (
         // The tab above already says "Today"; the card does not repeat it as a heading (UI patterns §10.3 rule 12).
-        <section className="card chart-card">
+        <section className={hasForecast ? 'card chart-card chart-card--forecast-legend' : 'card chart-card'}>
             {!hasZev && !hasOwnHistory && !hasOwnLive && !hasForecast ? (
                 <p className="muted">{t(hasLive ? 'myEnergy.today.empty' : `myEnergy.today.${who}EmptyHistory`)}</p>
             ) : (
@@ -103,7 +107,8 @@ export function TodayChart({ date, rows, through, hasLive, isOwn = true, peakWin
                                 labelFormatter={(label) => forecastTooltipLabel(Number(label))}
                                 formatter={kwTooltipText}
                             />
-                            <Legend />
+                            {/* Drawing order, not alphabetical: the order must not change with the language. */}
+                            <Legend itemSorter={null} />
                             {showHandOver && (
                                 <ReferenceLine
                                     x={handOver}
@@ -114,7 +119,7 @@ export function TodayChart({ date, rows, through, hasLive, isOwn = true, peakWin
                             )}
                             {hasForecast && <ForecastHourBars hours={[...forecastHours.values()]} nowMs={new Date().getTime()} />}
                             {hasForecast && (
-                                <Bar dataKey="forecast" name={t('forecast.expected')} fill={CHART_LOCAL} fillOpacity={0.6} shape={noBarShape} isAnimationActive={false} />
+                                <Bar dataKey="forecast" name={t('forecast.expected')} fill={CHART_LOCAL} fillOpacity={0.35} shape={noBarShape} isAnimationActive={false} />
                             )}
                             {hasBand && (
                                 <Area dataKey="forecastBand" name={t('forecast.band')} stroke="none" fill="none" legendType="none" activeDot={false} isAnimationActive={false} connectNulls={false} />
@@ -133,7 +138,7 @@ export function TodayChart({ date, rows, through, hasLive, isOwn = true, peakWin
                                     isAnimationActive={false}
                                 />
                             )}
-                            {hasZev && (
+                            {hasZevConsumption && (
                                 <Line
                                     type="monotone"
                                     dataKey="consumption"
@@ -149,7 +154,7 @@ export function TodayChart({ date, rows, through, hasLive, isOwn = true, peakWin
                             {hasOwnLive && ownLine('ownLive', t(`myEnergy.today.${who}Live`), CHART_GRID, true)}
                             {positive((row) => row.ownHistoryProduction) &&
                                 ownLine('ownHistoryProduction', t(`myEnergy.today.${who}ProductionHistory`), FLOW_GRID_EXP, false)}
-                            {positive((row) => row.ownLiveProduction) &&
+                            {positive((row) => row.ownLiveProduction) && !ownProductionIsZevs &&
                                 ownLine('ownLiveProduction', t(`myEnergy.today.${who}ProductionLive`), FLOW_GRID_EXP, true)}
                         </ComposedChart>
                     </ResponsiveContainer>

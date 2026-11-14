@@ -69,7 +69,7 @@ export function ProductionForecastChart({ forecast, title }: { forecast: Product
                         formatter={kwTooltipText}
                     />
                     <ForecastHourBars hours={rows} nowMs={now.getTime()} />
-                    <Bar dataKey="power" name={t('forecast.expected')} fill={CHART_LOCAL} fillOpacity={0.6} shape={noBarShape} isAnimationActive={false} />
+                    <Bar dataKey="power" name={t('forecast.expected')} fill={CHART_LOCAL} fillOpacity={0.35} shape={noBarShape} isAnimationActive={false} />
                     {hasBand && (
                         <Area dataKey="band" name={t('forecast.band')} stroke="none" fill="none" legendType="none" activeDot={false} isAnimationActive={false} connectNulls={false} />
                     )}
