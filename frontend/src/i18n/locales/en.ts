@@ -4619,6 +4619,7 @@ export const en = {
                 participant_magic_link: 'Sign-in link',
                 zev_access_invitation: 'Access invitation',
                 zev_access_granted: 'Access notice',
+                document_delivered: 'Document delivery',
             },
             title: 'Templates',
             tabs: {

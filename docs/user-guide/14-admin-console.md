@@ -370,6 +370,9 @@ Admins can manage the HTML/CSS template used for invoice PDF generation in **Pla
   unchanged until **regenerated** — individual invoices can be regenerated, and
   administrators can regenerate PDFs for an entire billing period.
 
+On narrow screens, PDF and email editors place the field reference below the
+editor. PDF previews are shorter to keep the reference within easier reach.
+
 The default invoice PDF includes the recipient's optional second address line.
 For custom templates, insert this after the first address line, or reset the
 template to the default:

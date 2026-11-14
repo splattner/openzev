@@ -4608,6 +4608,7 @@ export const de = {
                 participant_magic_link: 'Anmeldelink',
                 zev_access_invitation: 'Zugangseinladung',
                 zev_access_granted: 'Zugangsmitteilung',
+                document_delivered: 'Dokumentzustellung',
             },
             title: 'Vorlagen',
             tabs: {

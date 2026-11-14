@@ -400,7 +400,7 @@ function TemplateEditor({
                         )}
                         {showPreview && (
                             <div className="page-stack">
-                                <div className="actions-row">
+                                <div className="actions-row actions-row-wrap">
                                     <button
                                         className={`button button-compact ${debugSource ? 'button-secondary' : 'button-primary'}`}
                                         type="button"

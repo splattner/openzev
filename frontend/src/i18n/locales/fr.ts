@@ -4608,6 +4608,7 @@ export const fr = {
                 participant_magic_link: 'Lien de connexion',
                 zev_access_invitation: 'Invitation d\'accès',
                 zev_access_granted: 'Avis d\'accès',
+                document_delivered: 'Envoi de document',
             },
             title: 'Modèles',
             tabs: {
