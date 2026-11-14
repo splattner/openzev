@@ -71,6 +71,26 @@
   position: relative;
 }
 
+/* With an info mark the mark sits in the tile's top-right corner, in its padding, so the label keeps the full width:
+   in a narrow tile the mark is never left alone on a line under the label, and the label does not break earlier for it.
+   Only the button moves; the bubble still opens from the tile's left edge, inside the screen. */
+
+.stat-label--with-info {
+  display: block;
+  padding-right: 0.25rem;
+}
+
+.stat-label--with-info .stat-info {
+  display: inline;
+  margin-left: 0;
+}
+
+.stat-label--with-info .stat-info-trigger {
+  position: absolute;
+  top: 0.9rem;
+  right: 0.3rem;
+}
+
 .stat-info {
   display: inline-block;
   margin-left: 0.4rem;

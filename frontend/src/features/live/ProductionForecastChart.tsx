@@ -5,8 +5,11 @@ import { Area, Bar, CartesianGrid, ComposedChart, ResponsiveContainer, Tooltip, 
 import { AXIS_COLOR, CHART_LOCAL, CHART_GRIDLINE } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
 import { forecastRows, nextPeakWindow, peakDayKind, peakRange } from '../../lib/forecast'
-import { formatClockMinutes, kwFigure } from '../../lib/live'
+import { formatClockMinutes } from '../../lib/live'
 import type { ProductionForecast } from '../../types/api'
+import {
+    FORECAST_TOOLTIP_CURSOR, ForecastHourBars, forecastTooltipLabel, HOUR_MS, kwTooltipText, noBarShape,
+} from './forecastChartParts'
 
 const dayFormatter = new Intl.DateTimeFormat(undefined, { timeZone: 'Europe/Zurich', weekday: 'short', day: 'numeric', month: 'numeric' })
 
@@ -26,16 +29,17 @@ export function ProductionForecastChart({ forecast, title }: { forecast: Product
     const { t } = useTranslation()
     const titleId = useId()
     const narrow = useMediaQuery('(max-width: 30em)')
-    const rows = forecastRows(forecast.hours)
+    // A row sits in the middle of its hour, so the tooltip picks the hour the pointer is over; the bars are drawn from `start`.
+    const rows = forecastRows(forecast.hours).map((row) => ({ ...row, start: row.ts, ts: row.ts + HOUR_MS / 2 }))
     const hasBand = rows.some((row) => row.band)
     // A tick every three hours, six beyond a day and a half or on a phone (nine labels do not fit its width), and midnight names the day.
     const step = narrow || rows.length > 36 ? 6 : 3
     // One day needs no day name (the title says which), and the long label would collide with its neighbour on a phone.
     const namesDays = rows.length > 24
-    const ticks = rows.filter((row) => localHour(row.ts) % step === 0).map((row) => row.ts)
+    const ticks = rows.filter((row) => localHour(row.start) % step === 0).map((row) => row.start)
+    const domain: [number, number] = rows.length > 0 ? [rows[0].start, rows[rows.length - 1].start + HOUR_MS] : [0, HOUR_MS]
     const now = new Date()
     const next = nextPeakWindow(forecast.peak_windows, now)
-    const nowHour = Math.floor(now.getTime() / 3_600_000) * 3_600_000
 
     return (
         <section className="card chart-card" aria-labelledby={titleId}>
@@ -53,26 +57,21 @@ export function ProductionForecastChart({ forecast, title }: { forecast: Product
             <ResponsiveContainer width="100%" height={260}>
                 <ComposedChart data={rows} margin={{ top: 8, right: 20, bottom: 4, left: 0 }}>
                     <CartesianGrid stroke={CHART_GRIDLINE} strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="ts" ticks={ticks} interval={0} tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} tickFormatter={(ts: number) => tickLabel(ts, namesDays)} />
+                    <XAxis
+                        type="number" dataKey="ts" domain={domain} ticks={ticks} interval={0} tick={CHART_AXIS_TICK} stroke={AXIS_COLOR}
+                        tickFormatter={(ts: number) => tickLabel(ts, namesDays)}
+                    />
                     <YAxis tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} unit=" kW" width={56} />
                     <Tooltip
                         contentStyle={CHART_TOOLTIP_STYLE}
-                        labelFormatter={(label) => `${dayFormatter.format(new Date(Number(label)))} ${formatClockMinutes(Number(label))}`}
-                        formatter={(value: unknown, name) => {
-                            const text = Array.isArray(value) ? `${kwFigure(Number(value[0]) * 1000)}–${kwFigure(Number(value[1]) * 1000)} kW` : `${kwFigure(Number(value) * 1000)} kW`
-                            return [text, name]
-                        }}
+                        cursor={FORECAST_TOOLTIP_CURSOR}
+                        labelFormatter={(label) => forecastTooltipLabel(Number(label) - HOUR_MS / 2)}
+                        formatter={kwTooltipText}
                     />
-                    <Bar dataKey="power" name={t('forecast.expected')} fill={CHART_LOCAL} fillOpacity={0.55} isAnimationActive={false}
-                        shape={(props: { x?: number; y?: number; width?: number; height?: number; payload?: { ts: number } }) => (
-                            <rect
-                                x={props.x} y={props.y} width={props.width} height={props.height}
-                                fill={CHART_LOCAL} fillOpacity={(props.payload?.ts ?? 0) < nowHour ? 0.25 : 0.6}
-                            />
-                        )}
-                    />
+                    <ForecastHourBars hours={rows} nowMs={now.getTime()} />
+                    <Bar dataKey="power" name={t('forecast.expected')} fill={CHART_LOCAL} fillOpacity={0.35} shape={noBarShape} isAnimationActive={false} />
                     {hasBand && (
-                        <Area dataKey="band" name={t('forecast.band')} stroke="none" fill={CHART_LOCAL} fillOpacity={0.15} isAnimationActive={false} connectNulls={false} />
+                        <Area dataKey="band" name={t('forecast.band')} stroke="none" fill="none" legendType="none" activeDot={false} isAnimationActive={false} connectNulls={false} />
                     )}
                 </ComposedChart>
             </ResponsiveContainer>

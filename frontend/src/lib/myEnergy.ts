@@ -158,3 +158,17 @@ export function todayRows(
     }
     return [...byTs.values()].sort((a, b) => a.ts - b.ts)
 }
+
+/**
+ * Whether the viewer's own live production is the ZEV's production (they are its only producer): the two lines would lie
+ * on top of each other, so the chart draws the ZEV's alone. Equal means within the display resolution (0.1 kW).
+ */
+export function ownProductionIsZevProduction(rows: TodayRow[]): boolean {
+    let overlap = false
+    for (const row of rows) {
+        if (row.ownLiveProduction === null || row.production === null) continue
+        if (Math.abs(row.ownLiveProduction - row.production) >= 0.05) return false
+        overlap = true
+    }
+    return overlap
+}

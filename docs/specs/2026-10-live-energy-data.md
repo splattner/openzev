@@ -724,7 +724,7 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
   queryKeys.live.enabled(), queryFn: fetchLiveEnabled, staleTime: 60_000, retry: false })` with no polling;
   the nav and the page share it. `useLiveCurve(zevId, enabled, participantId?)` refetches every 60 s and is enabled only while the
   card shows; the date is today's civil date (`todayBusinessIso`). Pure helpers: `kwFigure`, `formatKw`
-  (kW, one decimal), `formatClock` (`hh:mm:ss`, Europe/Zurich), `showLiveCard` (snapshot non-null and
+  (kW, one decimal), `showLiveCard` (snapshot non-null and
   `coverage.live_sources > 0`), `liveCardState` (what the card may say per tier), `liveCurveRows`,
   `liveDayAxis`. `useProductionForecast(zevId, enabled)` (`lib/forecast.ts`, plus `forecastForDay`, `hoursOfDay`, `hasExpectedProduction`, `tomorrowBusinessIso`: `queryKeys.live.forecast(zevId)`, every 15 min, no
   focus refetch, `404` to `null` and no polling after it) with the pure helpers `forecastRows` (kW, band `[min, max]` or `null`),
@@ -735,7 +735,7 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
   with `queryKeys.live.all`), `ownHistoryFromSeries` and `todayRows` (the history/live merge, §5.3).
 - `frontend/src/features/live/LiveEnergyCard.tsx`:
   - **Layout.** The card is **not** a white `.card` box: like the tiles of the Energy balance it is a plain `.live-now` section
-    on the page: a heading row (`card-header` classes: "Right now" and the badge, the time on the right), then **one** `.stat-grid`
+    on the page: a heading row (`card-header` classes: "Right now" alone), then **one** `.stat-grid`
     with all the tiles, then the muted notes. The ZEV tile is labelled **ZEV production** (`live.production`) so it is not mistaken for **Your production**.
   - `none`: "No live production data right now". When the viewer's own tiles are shown (below), the sentence is the muted "No live data for the ZEV as a whole
     right now, because not all metering points report" (`live.noneZev`) instead, so it does not read as if the viewer's own
@@ -760,19 +760,20 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
     and `kwFigure` both normalise a negative zero).
   - When `own` is set and not `complete` (the viewer holds a point that reports no fresh value, so the own tiles are
     withheld): an `IssueText` warning under the title linking to `/me/metering-points`, "Your source is not reporting
-    right now" when `own.points_fresh` is `0`, else "Not all of your metering points are reporting live right now"
-    (`live.ownQuiet`, `live.ownPartlyQuiet`). The payload has no per-source age, so the text names none.
-  - Always: "as of hh:mm:ss" (when `as_of` is set) and a "Live, indicative" badge (the page's **one** marker that the values are
-    indicative: neither the page description nor the chart notes say it again). There is **no coverage line** ("Live data from X of
+    right now" when `own.points_fresh` is `0`, else "Not all of your metering points are reporting live right now (1 of 2)"
+    (`live.ownQuiet`, `live.ownPartlyQuiet` with `own.points_fresh` and `own.points`). The payload has no per-source age or name, so the text names none.
+  - There is **no time stamp** in the heading row (the "as of hh:mm:ss" was removed after a UI review: the values refresh every
+    15 s and say "Right now", so the clock added nothing a user acts on). There is **no "Live, indicative" badge** (removed after a UI review: "indicative"
+    was not understood and the heading "Right now" already says what the values are). There is **no coverage line** ("Live data from X of
     Y metering points", the grid connection point's state): it repeated what the per-point table says, and for a participant it
     only confused. `liveCardState` no longer has `reporting`.
 - `LivePointsTable.tsx` (meter or "Grid connection point", holder or "ZEV-operated", kW, age, state)
-  for a snapshot that carries `points` (manager, viewer, admin). It is a `Disclosure` inside a card, **closed**, its summary
-  a bold "Live values per metering point" and, while some points have no current value, the muted "no current data: N"
-  (`live.points.summary`, `live.points.quiet`; N counts the points with `target = metering_point` whose `live_state` is not
-  `fresh`, so it is the complement of the card's "X of Y", which also leaves out the grid connection point). The summary has no
-  "X of Y" of its own: the card says it once (UI patterns §10.3 rule 12), and a long table must not push the chart off the first
-  screen on a phone. The power
+  for a snapshot that carries `points` (manager, viewer, admin). On My energy system it comes **after the views**
+  (`LiveEnergyView points={false}` above, `LivePointsView` after the tabs, sharing the snapshot query), so a manager's chart is not
+  pushed below nine cards on a phone. It is a card that is **always open**, titled only
+  "Live values per metering point" (`live.points.summary`, an `h3` in a `card-header`): no `Disclosure` and no count of the points
+  without a value in the title (the rows say it, each with its next step). The rows are read-only, so they have no hover tint and no
+  pointer cursor (`.live-points-table` overrides the shared `.participant-table` row styles). The power
   reads in words, never with the meter's sign (a meter counts positive when it draws, negative when it feeds out):
   `livePointFlow` gives *6.2 kW produced* (production meter), *consumed* (positive), *fed in* (negative on any other
   meter), *from the grid* / *to the grid* (grid connection point); a power that rounds to `0.0` has no direction. A
@@ -810,8 +811,11 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
      `coverage.live_sources === 0` -> `EmptyState` `pages.live.empty.*` by what the user can do (UI patterns
      §10.3 rule 1): `canManage` -> "Connect a live source" to `/zev-settings/energy`; a viewer (`isZevScope` without
      `canManage`) -> the explanation `empty.viewer` that the community's management can connect a source, **no button**;
-     a participant -> "Connect your own live source" to `/me/metering-points`. None of these hides the views below.
-  3. *Participant picker* (`isZevScope`, not on Tomorrow, which is not about a participant), above the tabs it steers (§10.3 rule 2),
+     a participant -> "Connect your own live source" to `/me/metering-points`. None of these hides the views below. With a card,
+     a participant whose own meter has no live source (`own` is `null`, `liveEligible` has a point of the community without
+     `sources.live`) gets one muted line under it, "Your metering point is not reporting live values yet" with a `.text-link`
+     "Connect a live source" to `/me/metering-points` (`myEnergy.noLiveSource`, `myEnergy.connectLive`).
+  3. *Participant picker* (`isZevScope`, on every tab so the tab strip does not move when Tomorrow is chosen), above the tabs it steers (§10.3 rule 2),
      with the placeholder `myEnergy.pickParticipant` and no helper text. *Range tabs* `AppTabs` (Today | Tomorrow | 7 days | Period, `keepMounted={false}`), the choice in the URL as
      `?range=tomorrow|week|period` (absent = `today`, `parseMyEnergyRange`; tab changes push history entries). The
      **Tomorrow** tab exists only while the ZEV forecast has an hour above zero for tomorrow's civil day
@@ -827,14 +831,16 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
      filtered to the ZEV and `valid_to` open or not past), the manager's own marked "(You)", and two participants with the same
      display name told apart by their e-mail ("Ben · ben@a.example"). `?participant=`
      in the URL, validated against that list. Default: the participant of a history-eligible point of the
-     user with a source (`historyEligible`, `source !== null`), else none. Participants get no picker and send no `participant_id`; managers
+     user with a source (`historyEligible`, `source !== null`), else the user's own participant with a live system (`memberships[].participants[].live`), so the manager who is a participant starts on themselves and the chart says "your", else none. Participants get no picker and send no `participant_id`; managers
      always send the selected one (the same permission path as the dashboards' selected participant, §5.3).
   5. *Today* (`TodayPanel`). With a live card: `useLiveCurve(zevId, true, participantId)`, own history from
      the curve's `own_history`/`own_history_through`. Without one (live off, no live source, or the curve
      answered `404`): the own-series endpoint (`bucket=quarter`, today) through `useOwnSeries`,
      `ownHistoryFromSeries` turning kWh per quarter hour into W. `TodayChart` draws the ZEV production
      (area) and consumption (line), both live only, and the own line of `todayRows` (§5.3): consumption
-     from history **solid** (`stepAfter`), from live **dashed**, own production likewise when present, a
+     from history **solid** (`stepAfter`), from live **dashed**, own production likewise when present (on a **right-hand axis**, named in
+     the legend "(right axis)", when the own lines are less than a quarter of the largest ZEV or forecast value on the left, so a household's
+     0.5 kW is not a line on the floor next to 8 kW of production), a
      dashed reference line at `own_history_through` labelled "History to live". The card has **no heading** (the
      tab says "Today", §10.3 rule 12). **Whose line it is** follows the subject: `isOwn` gives "Your consumption (history)" and
      so on (`myEnergy.today.own*`), a manager looking at somebody else gets "Person's consumption (history)"
@@ -844,22 +850,34 @@ All samples and buckets are UTC instants; "today" and `peak_windows` days are Sw
      **Forecast overlay.** While the live view is on, `useProductionForecast(zevId)` (enabled only once the energy data
      feature is on) feeds `todayRows(..., {date, hours})`, which draws each of today's forecast hours flat across its
      5-minute steps (`forecast`, `forecastBand`; hours already past included, so the plan can be read against what
-     happened). `TodayChart` shows it as a dashed `stepAfter` area "Expected production" with the min/max band behind it
-     where there is one, names today's next peak window above the chart. The
+     happened). `TodayChart` shows it exactly as Tomorrow does (`features/live/forecastChartParts.tsx`, shared by both charts): one light
+     bar per hour (fill opacity 0.35, past hours 0.15, so the expectation never outweighs the measured lines in front of it), the min/max
+     band as a thin whisker with caps at the bar's centre (not a rectangle, which read as a stacked bar), and the same tooltip (date and time, "Range", "Expected
+     production", `3.8–6.5 kW` for a band). `ForecastHourBars` draws bars and band from the chart's axes; the series are kept
+     in the chart only for the tooltip and the legend. Both legends (`TodayChart`, `GrossEnergyCard`) keep the drawing order
+     (`itemSorter={null}`), not Recharts' alphabetical default, so the order does not change with the language; the forecast's
+     swatch gets the bars' light fill (`.chart-card--forecast-legend`). The ZEV consumption line and its legend entry are drawn
+     only where there is a consumption (not below tier `exact`), and the own live production is left out when it equals the ZEV
+     production (`ownProductionIsZevProduction`: the only producer would get two identical lines). The chart names today's next peak window above itself. The
      chart appears whenever there is live data, an own history **or** a forecast, so a ZEV with only a forecast still
      sees it here.
   5b. *Tomorrow* (`ProductionForecastChart` with `forecastForDay(forecast, tomorrow)`, title "Tomorrow: expected
-     production"): the forecast alone, no live or own data and no participant.
+     production"): the forecast alone, no live or own data and no participant. Same bars, band and tooltip as the Today overlay;
+     a row sits in the middle of its hour so the tooltip names the hour under the pointer.
   6. *7 days* (`SeriesPanel`): `useOwnSeries` for the last 7 civil days (`lastDaysRange(today, 7)`) in
-     `hour` buckets, shown with `GrossEnergyCard` (totals, rates, chart) and the note "ZEV live totals are
-     kept for 48 hours only; the official figures are on Energy balance" with an underlined link (`.text-link`) to `/dashboard`;
-     for a manager looking at somebody else the note says "the person's own system" (`myEnergy.week.notePerson`). The card's
+     `hour` buckets, shown with `GrossEnergyCard` (totals, rates, chart with the x axis labelled once per day, `dayAxis`) and the note "This view shows your own
+     system. The official figures are on Energy balance" with an underlined link (`.text-link`) to `/dashboard`;
+     for a manager looking at somebody else the note says "the person's own system" (`myEnergy.week.notePerson`). While nobody is
+     selected (a manager, viewer or admin without an own participant) 7 days and Period show only "Select a participant to see their
+     history" (`myEnergy.pickParticipantHint`), no note and no empty chart. The card's
      provenance line names a vendor ("Reported by your own system (Solar Manager)") but not the provider "own system / file",
      which the sentence already says (`supplementary.gross.reportedOwnGeneric`/`reportedParticipantGeneric`).
   7. *Period*: the same panel for the billing period (`period.from..period.to`, `day` buckets, enabled
      once `periodReady`), `GrossEnergyCard` titled "Your own system" (`whose="own"`; for a manager looking
      at somebody else `whose="participant"` with their name).
-  8. *No own system* (`NoOwnSystem`): no participant selected -> nothing (the picker's placeholder asks); the viewer's
+  8. *No own system* (`NoOwnSystem`): no participant selected -> nothing (the picker's placeholder asks); somebody else's system
+     with a live line in today's chart -> nothing either (it must not say "no data" under a line; `myEnergy.noOwnSystemParticipant`
+     reads "There is no history of an own system for this participant" and shows only without one); the viewer's
      own system without a history-eligible point -> nothing (there is no history to wait for); the viewer's own system and
      `historyEligible` has a point without a source -> `GrossEnergyCallToAction`; the viewer's own system with a source ->
      "Your source has not delivered any history yet. It appears here after the next sync." (`myEnergy.notSynced`) and a
@@ -1324,7 +1342,7 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
 - PR 3a landed `tests/live-energy-card.test.ts` (12 tests: the three tiers' texts, the single
   coverage line (since removed), "as of", own split
   only at `exact`, the inconsistent hint, a producer's split, the connection point part, points table rows, empty curve) and `tests/live-helpers.test.ts` (16 tests: `formatKw`,
-  `formatClock`, `showLiveCard` hidden for `null` or no live source, `liveCardState`, polling stops on
+  `showLiveCard` hidden for `null` or no live source, `liveCardState`, polling stops on
   `null`, curve rows with gaps, the day axis incl. the 25-hour day).
 - PR 3b added `tests/live-setup.test.ts` (13 tests: live modal payloads and consent per holder, field errors, push
   panel endpoints; the former `PointLiveDialog` and `ConnectionPointCard` cases moved to
@@ -1351,6 +1369,11 @@ pure tier rule), `SnapshotTierTests`, `SnapshotSplitTests`, `ManagerPointsTests`
   the viewer's explanation without a button and the manager's and participant's task buttons; `tests/live-energy-card.test.ts` the closed
   points table with the missing count, the underlined Connect link, the quiet-own-source warning, the person's empty text and the chart's
   one visible hint with the rest in a `Disclosure`; `tests/gross-energy-card.test.ts` the provider-free provenance line.
+- UI review follow-up: `tests/my-energy.test.ts` gained the 7 days prompt while nobody is picked, the manager who starts on themselves
+  with a live-only system, no "no own system" sentence under a participant's live line, and the picker staying on Tomorrow;
+  `tests/live-page.test.ts` the participant's "not reporting live yet" line with its link (and its absence with a source, without an
+  eligible meter and for a manager); `tests/live-energy-card.test.ts` no badge, the "(1 of 2)" count and the always-open, title-only
+  points table; `tests/forecast-chart-parts.test.ts` the shared tooltip text and label.
 - Setup guidance (#1164): `tests/forecast-ui.test.ts` gained the manager who connects their own plant (setup text and link) and the participant, or the
   manager of another community, who is told to ask; `tests/zev-energy-sources.test.ts` the empty tab with one explanation and one button (and none
   when nothing can be connected), the intro and toolbar button once a source exists; `tests/my-metering-points-page.test.ts` the history-only hint with and without the live pointer.

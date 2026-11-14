@@ -55,8 +55,8 @@ export function StatCard({ label, value, unit, currency, hint, info, accent, ton
     const figure = statValueParts(value, unit, currency)
     const body = (
         <>
-            <span className="stat-label">
-                {label}
+            <span className={info && !onPress ? 'stat-label stat-label--with-info' : 'stat-label'}>
+                {info && !onPress ? <span className="stat-label-text">{label}</span> : label}
                 {info && !onPress ? (
                     <span className="stat-info">
                         <button type="button" className="stat-info-trigger" aria-label={label} aria-describedby={infoId}>i</button>

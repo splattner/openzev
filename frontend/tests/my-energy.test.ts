@@ -5,6 +5,7 @@ import { businessDayStartMs, todayBusinessIso } from '../src/lib/dates'
 import {
     lastDaysRange,
     ownHistoryFromSeries,
+    ownProductionIsZevProduction,
     parseMyEnergyRange,
     shiftIsoDate,
     showMyEnergyEntry,
@@ -106,6 +107,20 @@ describe('ownHistoryFromSeries', () => {
     it('is empty without a series or without data', () => {
         expect(ownHistoryFromSeries(null)).toEqual({ rows: [], through: null })
         expect(ownHistoryFromSeries(series({ gross: null, history_through: null }))).toEqual({ rows: [], through: null })
+    })
+})
+
+describe('ownProductionIsZevProduction (one line for the only producer)', () => {
+    const row = (production: number | null, own: number | null) => ({
+        ts: 0, production, consumption: null, ownHistory: null, ownHistoryProduction: null, ownLive: null, ownLiveProduction: own,
+        forecast: null, forecastBand: null,
+    })
+
+    it('is true only where the own and the ZEV production overlap and agree to the display resolution', () => {
+        expect(ownProductionIsZevProduction([row(5.9, 5.92), row(6.1, 6.1), row(null, 2)])).toBe(true)
+        expect(ownProductionIsZevProduction([row(5.9, 5.92), row(8, 6.1)])).toBe(false) // another producer
+        expect(ownProductionIsZevProduction([row(5.9, null), row(null, 2)])).toBe(false) // never side by side
+        expect(ownProductionIsZevProduction([])).toBe(false)
     })
 })
 
@@ -370,6 +385,76 @@ describe('MyEnergyView', () => {
             expect(container.textContent).not.toContain('myEnergy.week.note|')
         })
 
+        it('tells a manager to pick a participant on 7 days instead of showing an empty tab', async () => {
+            eligibleApi.fetchEligibleOrNull.mockResolvedValue([])
+            eligibleApi.listSupplementarySources.mockResolvedValue([historySource()])
+            const { container } = await render()
+            await clickTab(container, 1)
+
+            expect(container.textContent).toContain('myEnergy.pickParticipantHint')
+            expect(container.textContent).not.toContain('myEnergy.week.notePerson')
+        })
+
+        it('starts on the manager themselves when their own meter reports live only', async () => {
+            mockUser.mockReturnValue({ memberships: [{ zev: 'z1', participants: [{ id: 'p-me', live: true }] }] })
+            eligibleApi.fetchEligibleOrNull.mockResolvedValue([])
+            eligibleApi.listSupplementarySources.mockResolvedValue([historySource()])
+            const { container } = await render()
+
+            expect((container.querySelector('select') as HTMLSelectElement).value).toBe('p-me')
+        })
+
+        it('does not say a participant has no own system under their live line', async () => {
+            live.fetchLiveEnabled.mockResolvedValue(true)
+            live.fetchLiveSnapshotOrNull.mockResolvedValue(snapshot(2))
+            eligibleApi.listSupplementarySources.mockResolvedValue([historySource()])
+            const pick = async (container: Element) => {
+                await act(async () => {
+                    const select = container.querySelector('select') as HTMLSelectElement
+                    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(select, 'p-other')
+                    select.dispatchEvent(new Event('change', { bubbles: true }))
+                })
+                for (let tick = 0; tick < 4; tick += 1) await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)) })
+            }
+            const curve = (buckets: LiveCurve['buckets']): LiveCurve => ({
+                date: todayBusinessIso(), bucket_s: 300, buckets, own_history: [], own_history_through: null,
+            })
+
+            live.fetchLiveCurveOrNull.mockResolvedValue(curve([
+                { start: '2026-10-30T07:45:00Z', tier: 'exact', production_w: 8000, consumption_w: 5000, own_consumption_w: 700 },
+            ]))
+            const withLive = await render()
+            await pick(withLive.container)
+            expect(withLive.container.textContent).not.toContain('myEnergy.noOwnSystemParticipant')
+            cleanups.splice(0).forEach((cleanup) => cleanup())
+
+            live.fetchLiveCurveOrNull.mockResolvedValue(curve([
+                { start: '2026-10-30T07:45:00Z', tier: 'exact', production_w: 8000, consumption_w: 5000 },
+            ]))
+            const without = await render()
+            await pick(without.container)
+            expect(without.container.textContent).toContain('myEnergy.noOwnSystemParticipant')
+        })
+
+        it('puts the per-point table after the views, so the chart comes first', async () => {
+            live.fetchLiveEnabled.mockResolvedValue(true)
+            live.fetchLiveSnapshotOrNull.mockResolvedValue({
+                ...snapshot(2),
+                points: [{
+                    metering_point_id: 'm1', target: 'metering_point', meter_id: 'CH-1', meter_type: 'consumption',
+                    participant_name: 'Anna', held_by: 'participant', live_state: 'fresh', meter_power_w: 1200, age_s: 7, source_id: 's1',
+                }],
+            })
+            eligibleApi.listSupplementarySources.mockResolvedValue([historySource()])
+            const { container } = await render()
+
+            const table = container.querySelector('.live-points-table')!
+            const tabs = container.querySelector('[role="tablist"]')!
+            expect(table).not.toBeNull()
+            expect(container.querySelectorAll('.live-points-table')).toHaveLength(1)
+            expect(tabs.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+        })
+
         it('starts on the manager themselves when they are a participant with an own system', async () => {
             mockUser.mockReturnValue({ memberships: [{ zev: 'z1', participants: [{ id: 'p-me', live: true }] }] })
             eligibleApi.fetchEligibleOrNull.mockResolvedValue([point('s1', 'p-me')])
@@ -447,6 +532,20 @@ describe('the forecast in My energy system', () => {
         expect(container.textContent).toContain('myEnergy.tomorrow.title')
         expect(container.textContent).toContain('forecast.hint')
         expect(live.fetchOwnSeries).not.toHaveBeenCalled()
+    })
+
+    it('keeps the participant picker on the Tomorrow tab, so the tab strip does not jump', async () => {
+        mockAccess.mockReturnValue({ isZevScope: true, isParticipantScope: false })
+        mockUser.mockReturnValue({ memberships: [{ zev: 'z1', participants: [] }] })
+        eligibleApi.listSupplementarySources.mockResolvedValue([
+            { id: 's1', zev: 'z1', target: 'metering_point', participant: 'p-other', provides_history: true, provides_live: false },
+        ])
+        live.fetchProductionForecastOrNull.mockResolvedValue(forecast([todayBusinessIso(), shiftIsoDate(todayBusinessIso(), 1)]))
+        const { container } = await render()
+        await clickTab(container, 1)
+
+        expect(container.textContent).toContain('myEnergy.tomorrow.title')
+        expect(container.querySelector('select')).not.toBeNull()
     })
 
     it('has no Tomorrow tab when the forecast has nothing for tomorrow or is all dark', async () => {

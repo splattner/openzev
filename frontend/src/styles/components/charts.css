@@ -63,3 +63,11 @@
   min-height: 360px;
 }
 
+
+/* Recharts draws a legend swatch without the series' opacity, so the forecast's swatch would be the solid green of the
+   measured production. The forecast is drawn first and the legend keeps the drawing order (`itemSorter={null}`), so it
+   is the first item; give it the bars' light fill. */
+
+.chart-card--forecast-legend .legend-item-0 .recharts-legend-icon {
+  fill-opacity: 0.35;
+}

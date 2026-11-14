@@ -85,24 +85,12 @@ export function livePointFlow(point: Pick<LivePoint, 'target' | 'meter_type' | '
     return { flow, watts: Math.abs(power) }
 }
 
-const clockFormatter = new Intl.DateTimeFormat('en-GB', {
-    timeZone: BUSINESS_TIME_ZONE,
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-})
 const clockMinuteFormatter = new Intl.DateTimeFormat('en-GB', {
     timeZone: BUSINESS_TIME_ZONE,
     hour: '2-digit',
     minute: '2-digit',
     hourCycle: 'h23',
 })
-
-/** `hh:mm:ss` of an instant in the business timezone. */
-export function formatClock(value: string | number | Date): string {
-    return clockFormatter.format(new Date(value))
-}
 
 /** `hh:mm` of an instant in the business timezone. */
 export function formatClockMinutes(value: string | number | Date): string {

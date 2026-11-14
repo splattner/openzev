@@ -74,12 +74,6 @@
   max-width: none;
 }
 
-/* The summary names the table like a heading would; what is missing follows in the muted summary colour. */
-
-.live-points-disclosure > summary strong {
-  color: var(--text-primary);
-}
-
 /* The phone layout of the live points: one small card per point instead of five columns. */
 
 .live-points-list {
@@ -308,6 +302,20 @@
 .page-stack tbody tr:hover > td,
 .data-table tbody tr:hover > td {
   background: var(--surface);
+}
+
+/* The live points are read-only: a row is not a click target, so no pointer and no hover tint (the frozen first column keeps its card surface). */
+
+.live-points-table tbody tr {
+  cursor: default;
+}
+
+.live-points-table tbody tr:hover > td {
+  background: transparent;
+}
+
+.live-points-table tbody tr:hover > td:first-child {
+  background: var(--surface-card);
 }
 
 /* Quantities and money — tabular numerals align vertically down the column. */

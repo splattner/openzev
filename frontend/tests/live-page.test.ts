@@ -20,6 +20,9 @@ const api = vi.hoisted(() => ({
 }))
 vi.mock('../src/lib/api/live', () => api)
 
+const eligibleApi = vi.hoisted(() => ({ fetchEligibleOrNull: vi.fn(), listSupplementarySources: vi.fn() }))
+vi.mock('../src/lib/api/supplementary', () => eligibleApi)
+
 const cleanups: Array<() => void> = []
 afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()))
 
@@ -52,6 +55,7 @@ beforeEach(() => {
     api.fetchLiveEnabled.mockResolvedValue(true)
     api.fetchLiveCurveOrNull.mockResolvedValue(null)
     api.fetchLiveSnapshotOrNull.mockResolvedValue(snapshot(2))
+    eligibleApi.fetchEligibleOrNull.mockResolvedValue([])
 })
 
 describe('LiveEnergyView', () => {
@@ -122,5 +126,36 @@ describe('LiveEnergyView', () => {
         expect(container.textContent).toContain('CH-1')
         expect(container.querySelector('.empty-state')).toBeNull()
         expect(api.fetchLiveCurveOrNull).not.toHaveBeenCalled() // the curve belongs to the Today view now
+    })
+
+    describe('for a participant whose own meter reports nothing', () => {
+        const meter = (live: string | null) => ({
+            metering_point: 'mp', meter_id: 'CH-1', zev: 'z1', zev_name: 'Z1', participant: 'p1', source: null,
+            eligible_capabilities: ['live'], sources: { history: null, live, forecast: null },
+        })
+
+        beforeEach(() => mockAccess.mockReturnValue({ isZevScope: false, canManage: false }))
+
+        it('says why the own figures are missing and links to where a live source is connected', async () => {
+            eligibleApi.fetchEligibleOrNull.mockResolvedValue([meter(null)])
+            const { container } = await render()
+
+            expect(container.textContent).toContain('myEnergy.noLiveSource')
+            expect(container.querySelector('a[href="/me/metering-points"]')?.textContent).toBe('myEnergy.connectLive')
+        })
+
+        it('stays quiet when a source exists, when the meter cannot host one, and for a manager', async () => {
+            eligibleApi.fetchEligibleOrNull.mockResolvedValue([meter('s1')])
+            expect((await render()).container.textContent).not.toContain('myEnergy.noLiveSource')
+            cleanups.splice(0).forEach((cleanup) => cleanup())
+
+            eligibleApi.fetchEligibleOrNull.mockResolvedValue([])
+            expect((await render()).container.textContent).not.toContain('myEnergy.noLiveSource')
+            cleanups.splice(0).forEach((cleanup) => cleanup())
+
+            mockAccess.mockReturnValue({ isZevScope: true, canManage: true })
+            eligibleApi.fetchEligibleOrNull.mockResolvedValue([meter(null)])
+            expect((await render()).container.textContent).not.toContain('myEnergy.noLiveSource')
+        })
     })
 })

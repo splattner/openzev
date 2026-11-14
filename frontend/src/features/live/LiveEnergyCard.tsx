@@ -1,6 +1,6 @@
 import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
-import { formatClock, formatKw, kwFigure, liveCardState } from '../../lib/live'
+import { formatKw, kwFigure, liveCardState } from '../../lib/live'
 import { formatPercentFigure } from '../../lib/numbers'
 import type { LiveSnapshot } from '../../types/api'
 import { IssueText } from '../../components/IssueText'
@@ -9,7 +9,7 @@ import { StatCard } from '../../components/StatCard'
 /**
  * What the ZEV produces and uses right now (SPEC-2026-live-energy-data §7.1). The tier decides what
  * may be said: below `exact` there is no spare power, local share or split, and a value the payload
- * leaves `null` is never shown. Everything here is measured and labelled live, indicative.
+ * leaves `null` is never shown. Everything here is measured.
  */
 export function LiveEnergyCard({ snapshot }: { snapshot: LiveSnapshot }) {
     const { t } = useTranslation()
@@ -41,18 +41,14 @@ export function LiveEnergyCard({ snapshot }: { snapshot: LiveSnapshot }) {
     return (
         <section className="live-now" aria-labelledby={titleId}>
             <div className="card-header">
-                <h3 id={titleId}>
-                    {t('live.title')}
-                    <span className="badge badge-info">{t('live.badge')}</span>
-                </h3>
-                {snapshot.as_of && <span className="muted">{t('live.asOf', { time: formatClock(snapshot.as_of) })}</span>}
+                <h3 id={titleId}>{t('live.title')}</h3>
             </div>
 
             {own && !own.complete && (
                 // The viewer's own tiles are withheld unless every one of their points reports; say why they are missing.
                 <p>
                     <IssueText tone="warning" to="/me/metering-points">
-                        {t(own.points_fresh === 0 ? 'live.ownQuiet' : 'live.ownPartlyQuiet')}
+                        {own.points_fresh === 0 ? t('live.ownQuiet') : t('live.ownPartlyQuiet', { fresh: own.points_fresh, total: own.points })}
                     </IssueText>
                 </p>
             )}
