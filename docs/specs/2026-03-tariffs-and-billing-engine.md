@@ -1353,7 +1353,9 @@ the overlay detail drawer). The overview lists a series once, under **Current**
 **History**, with a link to the next version's price change. A tariff opens
 beside the list when the content area is at least 62rem wide, otherwise the pane
 replaces the list (the list is `hidden`, so it leaves the tab order and the
-accessibility tree). Tariff create, edit, rename, duplicate, schedule price
+accessibility tree). Narrow lists use cards with visible, wrapping sort controls
+(see the split-view spec for the layout contract).
+Tariff create, edit, rename, duplicate, schedule price
 change, price-band create/edit and the dynamic source form are forms inside the
 pane; there are no edit dialogs. Delete is on the version card's `⋮` menu and the band row's trash icon, not in the forms, and asks through the shared confirmation.
 

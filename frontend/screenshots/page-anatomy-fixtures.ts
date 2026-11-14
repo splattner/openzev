@@ -6,6 +6,7 @@ export const apiErrors = new WeakMap<Page, string[]>()
 const currentPeriod: [string, string] = ['2026-10-01', '2026-10-31']
 const defaultZev = { id: '42', name: 'Review ZEV' }
 export type ApiState = {
+  language?: string
   role?: 'admin' | 'manager' | 'viewer' | 'participant' | 'former' | 'none'
   roleByZev?: Record<string, 'manager' | 'viewer' | 'participant' | 'former'>
   zevs?: Array<{ id: string; name: string; disabled_at?: string | null }>
@@ -57,12 +58,12 @@ export async function mockApi(page: Page, state: ApiState = {}) {
   })
   if (state.fakeTimers) await page.clock.install({ time: new Date('2026-10-02T12:00:00Z') })
   else await page.clock.setFixedTime(new Date('2026-10-02T12:00:00Z'))
-  await page.addInitScript(() => {
+  await page.addInitScript(language => {
     // Only the app needs this preference; Chromium's PDF frames may lack storage.
     if (window === window.top && location.protocol.startsWith('http')) {
-      localStorage.setItem('openzev.language', 'en')
+      localStorage.setItem('openzev.language', language)
     }
-  })
+  }, state.language ?? 'en')
   const zevs = () => state.scopeEmpty ? [] : state.zevs ?? [defaultZev]
   const user = () => ({
     id: 1, role: state.role === 'admin' || (!state.role && !state.roleByZev) ? 'admin' : 'user',
