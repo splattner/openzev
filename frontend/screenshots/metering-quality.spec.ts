@@ -46,7 +46,7 @@ for (const width of [1440, 400]) {
     await raw.getByRole('button', { name: /02:00, 2.0000 kWh/ }).click()
     await expect(raw.getByRole('region', { name: 'Interval detail' })).toContainText('25.10.2026 02:00 GMT+02:00')
     await expect(raw.getByRole('region', { name: 'Interval detail' })).toContainText('25.10.2026 02:00 GMT+01:00')
-    expect(heldQueries).toHaveLength(0)
+    await expect.poll(() => heldQueries.length).toBe(1)
     await raw.getByRole('button', { name: 'Show held observations' }).click()
     const panel = raw.locator('.held-readings')
     await expect(panel).toContainText('0.0000 kWh')
@@ -91,6 +91,12 @@ for (const width of [1440, 400]) {
     await page.getByRole('button', { name: 'Open protocol', exact: true }).click()
     await expect(dialog).toContainText('No held observations from this import remain.')
     await expect(dialog).toContainText('51') // Historical accounting survives resolution.
+    const emptyHeld = page.waitForResponse('**/metering/held-readings/**')
+    await page.goto(`/metering/chart?${period}&metering_point=mp42`)
+    await (await emptyHeld).finished()
+    await expect(raw.locator('tr.raw-metering-day')).toBeVisible()
+    await expect(raw.locator('.held-readings')).toHaveCount(0)
+    await page.screenshot({ path: testInfo.outputPath(`no-held-${width}.png`), fullPage: true })
     expect(errors).toEqual([])
   })
 }

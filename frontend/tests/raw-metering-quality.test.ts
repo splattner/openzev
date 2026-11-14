@@ -7,6 +7,7 @@ import { createInstance } from 'i18next'
 import { I18nextProvider, initReactI18next } from 'react-i18next'
 import { en } from '../src/i18n/locales/en'
 import { RawMeteringTable } from '../src/components/RawMeteringTable'
+import { queryKeys } from '../src/lib/api/queryKeys'
 
 const api = vi.hoisted(() => ({
     fetchRawMeteringData: vi.fn(),
@@ -38,9 +39,10 @@ vi.mock('../src/lib/api/zev', () => ({
 }))
 
 const unmounts: Array<() => void> = []
+const heldKey = queryKeys.metering.heldReadings('mp1', '2026-01-01', '2026-12-31', '', 1)
 
-async function renderTable(day: string, overrides: { canReadHeld?: boolean } = {}) {
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+async function renderTable(day: string, overrides: { canReadHeld?: boolean; client?: QueryClient } = {}) {
+    const client = overrides.client ?? new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const container = document.createElement('div')
     document.body.appendChild(container)
     const root = createRoot(container)
@@ -122,7 +124,12 @@ describe('raw metering reading quality', () => {
             reading({ timestamp: '2026-01-02T00:30:00Z', energy_kwh: 0, condition: '99' }),
         ])
         api.fetchHeldMeteringReadings.mockResolvedValue({ count: 0, page_size: 50, next: null, previous: null, results: [] })
-        const container = await renderTable('2026-01-02')
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        const container = await renderTable('2026-01-02', { client })
+        await act(async () => {
+            await vi.waitFor(() => expect(client.getQueryState(heldKey)?.status).toBe('success'))
+        })
+        expect(container.querySelector('.held-readings')).toBeNull()
         await openDay(container)
 
         await vi.waitFor(() =>
@@ -180,6 +187,26 @@ describe('raw metering reading quality', () => {
         expect(detail?.textContent).toContain('Estimated')
         expect(detail?.textContent).toContain('2026-10-25 02:00 GMT+02:00')
         expect(detail?.textContent).toContain('2026-10-25 02:00 GMT+01:00')
+    })
+
+    it.each([false, true])('keeps failed held reads retryable with cached empty data: %s', async (cachedEmpty) => {
+        api.fetchRawMeteringData.mockResolvedValue([
+            { date: '2026-01-02', in_kwh: 1, out_kwh: 0, readings_count: 1 },
+        ])
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        if (cachedEmpty) client.setQueryData(heldKey, { count: 0, page_size: 50, results: [] })
+        api.fetchHeldMeteringReadings.mockRejectedValue(new Error('Unavailable'))
+        const container = await renderTable('2026-01-02', { client })
+        await vi.waitFor(() => expect(client.getQueryState(heldKey)?.status).toBe('error'))
+        const toggle = Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Show held observations')
+        expect(toggle).toBeDefined()
+        await act(async () => toggle?.click())
+        expect(container.textContent).toContain('Failed to load held observations')
+        api.fetchHeldMeteringReadings.mockResolvedValue({ count: 1, page_size: 50, results: [heldReading()] })
+        await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Retry')?.click())
+        await vi.waitFor(() => expect(container.textContent).toContain('9.0000'))
+        await act(async () => client.setQueryData(heldKey, { count: 0, page_size: 50, results: [] }))
+        await vi.waitFor(() => expect(container.textContent).toContain('No held observations match this selection.'))
     })
 
     it('does not offer the held section on a participant surface', async () => {

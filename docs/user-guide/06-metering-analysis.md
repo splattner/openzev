@@ -131,8 +131,8 @@ uses: it shows the stored quality, it does not reinterpret it.
 
 Some SDAT-CH values are not billable — temporary (`21`) or information-only
 observations. They are **held** rather than stored as readings. Below the raw
-data table, **Held observations** opens a lazily loaded, paginated list for the
-selected meter and period:
+data table, **Held observations** opens a paginated list for the selected meter
+and period. The collapsed section is hidden when the list is empty:
 
 | Column | Meaning |
 | --- | --- |
