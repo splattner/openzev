@@ -191,6 +191,8 @@ export async function mockApi(page: Page, state: ApiState = {}) {
     if (path.endsWith('/hourly-profile/')) return route.fulfill({ json: { hourly_profile: null } })
     if (path.endsWith('/chart-data/')) return route.fulfill({ json: [] })
     if (path.endsWith('/raw-data/')) return route.fulfill({ json: [] })
+    if (path.endsWith('/notifications/unread-count/')) return route.fulfill({ json: { count: 0 } })
+    if (path.endsWith('/metering/live/enabled/')) return route.fulfill({ json: { enabled: false } })
     if (path.endsWith('/annual-report/')) return route.fulfill({ json: { has_data: false, year: Number(params.get('year')) } })
     if (path.endsWith('/invoices/invoices/email-template/invoice_email/')) return route.fulfill({ json: {
       template_key: 'invoice_email', subject: 'Invoice {{ invoice_number }}', body: 'Dear participant', is_customized: false, fields: [],

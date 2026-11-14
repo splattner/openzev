@@ -38,7 +38,7 @@ export function HeldReadingsPanel({
         ),
         queryFn: () =>
             fetchHeldMeteringReadings({ meteringPoint: meteringPointId, importBatch, dateFrom, dateTo, page }),
-        enabled: visible && (!!meteringPointId || !!importBatch),
+        enabled: !!meteringPointId || !!importBatch,
     })
 
     const rows: HeldMeteringReading[] = query.data?.results ?? []
@@ -46,6 +46,8 @@ export function HeldReadingsPanel({
     const pageSize = query.data?.page_size ?? 1
     const pageCount = Math.max(1, Math.ceil(count / pageSize))
     const title = t(importBatch ? 'pages.imports.protocol.heldTitle' : 'pages.meteringData.rawTable.heldTitle')
+
+    if (!importBatch && !open && !query.isError && (query.isPending || query.data?.count === 0)) return null
 
     return (
         <div className="held-readings">
