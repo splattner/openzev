@@ -485,6 +485,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
         },
         {
             accessorKey: 'severityRank',
+            sortDescFirst: false,
             header: t('meteringDataQuality.status'),
             cell: (ctx) => {
                 const mp = ctx.row.original

@@ -339,6 +339,40 @@ describe('applying', () => {
 })
 
 describe('history', () => {
+    it('sorts restore start times chronologically across the daylight-saving fallback', async () => {
+        setup({ history: [
+            job({ id: 'older', target_zev_name: 'older', started_at: '2026-10-25T02:30:00+02:00', created_at: '2026-10-25T03:30:00+01:00' }),
+            job({ id: 'newer', target_zev_name: 'newer', started_at: null, created_at: '2026-10-25T02:10:00+01:00' }),
+        ] })
+        const container = await render()
+        const communities = () => Array.from(container.querySelectorAll('tbody tr'), (row) => row.children[1].textContent)
+        expect(communities()).toEqual(['newer', 'older'])
+        await click(button(container, 'pages.backups.restore.columns.when'))
+        expect(communities()).toEqual(['older', 'newer'])
+    })
+
+    it('sorts failed restores before completed restores on the first status click', async () => {
+        setup({ history: (['completed', 'running', 'queued', 'failed'] as const).map((status) => job({ id: status, status })) })
+        const container = await render()
+        await click(button(container, 'pages.backups.jobs.columns.status'))
+        expect(Array.from(container.querySelectorAll('tbody tr'), (row) => row.lastElementChild?.textContent))
+            .toEqual(['failed', 'queued', 'running', 'completed'].map((status) => `pages.backups.jobs.status.${status}`))
+    })
+
+    it('sorts backups chronologically with undated sources last in either direction', async () => {
+        setup({ history: [
+            job({ id: 'undated', target_zev_name: 'undated', source_created_at: null, source_description: 'legacy archive' }),
+            job({ id: 'old', target_zev_name: 'old', source_created_at: '2026-02-01T00:30:00+02:00' }),
+            job({ id: 'new', target_zev_name: 'new', source_created_at: '2026-01-31T23:30:00Z' }),
+        ] })
+        const container = await render()
+        const communities = () => Array.from(container.querySelectorAll('tbody tr'), (row) => row.children[1].textContent)
+        await click(button(container, 'pages.backups.restore.columns.backup'))
+        expect(communities()).toEqual(['new', 'old', 'undated'])
+        await click(button(container, 'pages.backups.restore.columns.backup'))
+        expect(communities()).toEqual(['old', 'new', 'undated'])
+    })
+
     it('lists earlier restores with their kind, whether forced, and how they ended', async () => {
         setup({
             history: [

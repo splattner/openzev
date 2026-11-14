@@ -937,6 +937,19 @@ the backup status request rather than showing a generic failure message.
 
 All under `frontend/src/features/backups/`.
 
+The destination, backup-job and restore-history tables use the shared `DataTable`:
+100 rows per page, pagination controls only for multiple pages, and sort controls
+only with at least two rows. Destinations initially sort by name ascending;
+backup jobs and restore history sort by `started_at ?? created_at` descending,
+comparing timestamps so different UTC offsets across daylight-saving changes
+remain chronological.
+Action columns are not sortable. Status sorts by rank (failed, queued, running,
+completed) on the first click; backup integrity sorts failed, checking, never,
+ok, then rows without an applicable check. Numeric columns sort descending on
+the first click. Unlimited retention (zero) sorts above finite retention counts.
+The restore-history Backup column compares `source_created_at` as timestamps,
+newest first on the first click, with undated sources last in either direction.
+
 | Component | Contents |
 |---|---|
 | `BackupSettingsSection` | Composes the tab. An intro; the **encryption banner** — `error-banner` with the specific problem when `encryption_key_problem` is set (evaluated first), `error-banner` ("Backups cannot run" with a server-configuration remedy) when no key is configured while `encryption_required` is true, `warning-banner` when no key is configured while plaintext is permitted, `info-banner` (with the key fingerprint) when one is; a note that restore is not available in the app yet; `StatCard`s for last successful / last failed backup and enabled destinations |
@@ -1305,12 +1318,12 @@ the dev worker.
 - Not verified against a real object store, as before; the beat process itself was not
   left running to watch a schedule fire.
 
-### Frontend (119 tests, phases 1, 3 and 4 plus fail-closed encryption policy and status recovery)
+### Frontend (135 tests, phases 1, 3 and 4 plus fail-closed encryption policy and status recovery)
 
 - `tests/backup-helpers.test.ts` (17) — the payload contract: a blank edit never
   wipes a secret, a clear is explicit, switching kind clears the other kind's
   fields; target formatting; manifest reading; polling and download rules.
-- `tests/backup-settings-section.test.ts` (29) — independent destination,
+- `tests/backup-settings-section.test.ts` (38) — action focus during pending destination tests and backup checks; natural destination-name and unlimited-retention sorting; chronological start-time sorting across daylight-saving changes; status and integrity priority sorting; independent destination,
   schedule, job and restore access during status loading/failure; status retry,
   cached refetch failure, and the encryption banner in its four states
   (encrypted; plaintext warning where permitted; "cannot run"
@@ -1321,11 +1334,11 @@ the dev worker.
   (download, check, details) enabled and working, stale-page 409 detail shown); job list
   (download only for local archives, unencrypted badge, failed reason, details).
 - `tests/backup-restore-helpers.test.ts` (10) — `canStartRestore` (clean, needs `force`, **never past a hard conflict**), the name to type, reading a plan, choosing a backup and community, polling.
-- `tests/backup-restore-section.test.ts` (20) — no backup, communities follow the chosen backup, the whole instance never offered; **a preview is a dry run** and remains available when safety-backup encryption blocks a real restore; a deleted community can still be recreated; unlinked accounts named; a refusal shows the reason, the conflicts and no way forward; damaged-archive failures listed; **apply needs the exact name** (case matters); the request carries the safety destination, no `force` unless asked; a chosen destination; none for a community that no longer exists; **`force` required for overridable conflicts and absent for hard ones**; a finished restore reports and refreshes every cache; changing the community resets the flow; history.
+- `tests/backup-restore-section.test.ts` (23) — no backup, communities follow the chosen backup, the whole instance never offered; **a preview is a dry run** and remains available when safety-backup encryption blocks a real restore; a deleted community can still be recreated; unlinked accounts named; a refusal shows the reason, the conflicts and no way forward; damaged-archive failures listed; **apply needs the exact name** (case matters); the request carries the safety destination, no `force` unless asked; a chosen destination; none for a community that no longer exists; **`force` required for overridable conflicts and absent for hard ones**; a finished restore reports and refreshes every cache; changing the community resets the flow; history with failed-first status sorting and chronological start-time and source-backup sorting across UTC offsets, undated sources last.
 - `tests/backup-operate-helpers.test.ts` (12) — the schedule form (HH:MM with leading zeros, the request, **the weekday only for weekly**, invalid times refused, a change reported only when the server would store a difference), retention parsing (blank/zero/negative/junk keep everything) and its place in the payload, the four verification states, a finished backup without a file, polling while a check runs.
 - `tests/backup-operate.test.ts` (24) — the schedule (shows what is saved, **Save disabled until something changes**, the request and status refresh, the weekday only when weekly, an invalid time cannot be saved, the unencrypted / blocked / key-problem warnings each honest — a blocked schedule never claims unencrypted writes — and the no-destination warning, the server's error); the stale banner (and the never-run wording, and absent when current); **Check** (queued, disabled while running, results and the reason a check failed); **Delete file asks first and does nothing on no**; a deleted backup is history with no actions; trigger badges and expiry; a deleted backup is not offered for restore; retention listed and sent.
 
-- `tests/system-health-backups.test.ts` (7) — the health card: not set up is a state, the last backup and the link, **degraded when the schedule has fallen behind**, never-run, the unencrypted note only when set up, and blocked-creation wording for a missing required key or rejected key.
+- `tests/system-health-backups.test.ts` (11) — the health card: not set up is a state, the last backup and the link, **degraded when the schedule has fallen behind**, never-run, the unencrypted note only when set up, and blocked-creation wording for a missing required key or rejected key.
 - `tests/system-settings-tabs.test.ts` — six tabs, and `?tab=backup` opens the
   section.
 - Checks: `npm run build`, `npm run lint`, `npm run lint:style`,

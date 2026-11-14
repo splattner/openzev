@@ -627,6 +627,9 @@ period. Switching community also clears any selected participant.
 
 In the participant table, Tab to a name and press Enter or Space to filter the
 charts; swipe the table horizontally on narrow screens to see every column.
+With at least two rows, click a column header to sort; numeric columns start
+with the highest value. Tables with more than 100 participants offer page
+controls below the table.
 The selected participant’s name stays visible while the energy overview loads
 or cannot load. Use **Retry** if the consumption profile fails.
 

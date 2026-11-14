@@ -1,7 +1,7 @@
-import { act, createElement } from 'react'
+import { act, createElement, forwardRef, memo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { DataTable, type ColumnDef, type ColumnFiltersState } from '../src/components/DataTable'
+import { DataTable, type CellContext, type ColumnDef, type ColumnFiltersState } from '../src/components/DataTable'
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
 
@@ -24,6 +24,7 @@ const columns: ColumnDef<Row, unknown>[] = [
         accessorKey: 'amount',
         header: 'Amount',
         sortDescFirst: false,
+        meta: { numeric: true },
         cell: ({ row }) => row.original.amountLabel,
     },
     { id: 'actions', header: 'Actions', enableSorting: false, cell: () => '—' },
@@ -43,7 +44,13 @@ afterEach(() => {
     container.remove()
 })
 
-function render(tableRows: Row[], filters?: ColumnFiltersState, options: { pageSize?: number; enableSorting?: boolean } = {}) {
+function render(tableRows: Row[], filters?: ColumnFiltersState, options: {
+    pageSize?: number
+    enableSorting?: boolean
+    tableClassName?: string
+    onRowClick?: (row: Row) => void
+    rowClassName?: (row: Row) => string | undefined
+} = {}) {
     act(() => root.render(createElement(DataTable<Row>, {
         data: tableRows,
         columns,
@@ -61,7 +68,7 @@ function rowNames(): string[] {
 }
 
 function header(label: string): HTMLTableCellElement {
-    const cell = Array.from(container.querySelectorAll('thead th'))
+    const cell = Array.from(container.querySelectorAll<HTMLTableCellElement>('thead th'))
         .find((th) => th.textContent?.startsWith(label))
     if (!cell) throw new Error(`header ${label} not found`)
     return cell
@@ -83,6 +90,8 @@ describe('DataTable sorting', () => {
         render(rows)
         expect(rowNames()).toEqual(['Ten', 'Two'])
         expect(container.querySelector('th[aria-sort]')).toBeNull()
+        expect(header('Amount').classList.contains('numeric')).toBe(true)
+        expect(header('Amount').getAttribute('scope')).toBe('col')
 
         act(() => header('Amount').querySelector('button')!.click())
 
@@ -116,6 +125,58 @@ describe('DataTable sorting', () => {
         expect(header('Actions').getAttribute('aria-sort')).toBeNull()
         expect(header('Actions').querySelector('.data-table-sort')).toBeNull()
         expect(header('Amount').querySelector('.data-table-sort')).not.toBeNull()
+    })
+
+    it('applies table class, row class and row click', () => {
+        const clicked: string[] = []
+        render(rows, undefined, {
+            tableClassName: 'participant-table',
+            rowClassName: (row) => row.id === 'ten' ? 'is-selected' : undefined,
+            onRowClick: (row) => clicked.push(row.id),
+        })
+
+        expect(container.querySelector('table.participant-table')).not.toBeNull()
+        const renderedRows = container.querySelectorAll('tbody tr')
+        expect(renderedRows[0].classList.contains('is-selected')).toBe(true)
+        expect(renderedRows[1].classList.contains('is-selected')).toBe(false)
+
+        act(() => renderedRows[1].dispatchEvent(new MouseEvent('click', { bubbles: true })))
+        expect(clicked).toEqual(['two'])
+    })
+
+    it('preserves focus and cell state across caller rerenders and row removal', () => {
+        function StatefulCell({ row }: CellContext<Row, unknown>) {
+            const [count, setCount] = useState(0)
+            return createElement('button', { onClick: () => setCount(count + 1) }, `${row.original.name} ${count}`)
+        }
+        const draw = (data: Row[]) => act(() => root.render(createElement(DataTable<Row>, {
+            data,
+            columns: [{ accessorKey: 'name', header: 'Name', cell: StatefulCell }],
+            getRowId: (row) => row.id,
+        })))
+
+        draw(rows)
+        const button = container.querySelector<HTMLButtonElement>('tbody button')!
+        button.focus()
+        act(() => button.click())
+        draw([rows[0]])
+
+        expect(document.activeElement?.textContent).toBe('Ten 1')
+    })
+
+    it.each([
+        ['memo', memo(({ row }: CellContext<Row, unknown>) => row.original.name)],
+        ['forwardRef', forwardRef<HTMLSpanElement, CellContext<Row, unknown>>(({ row }, ref) =>
+            createElement('span', { ref }, row.original.name))],
+    ])('renders a %s cell component', (_name, CellComponent) => {
+        act(() => root.render(createElement(DataTable<Row>, {
+            data: rows,
+            columns: [{
+                accessorKey: 'name',
+                cell: CellComponent,
+            }],
+        })))
+        expect(rowNames()).toEqual(['Ten', 'Two'])
     })
 })
 

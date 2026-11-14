@@ -3,6 +3,7 @@ import type {
     BackupDestinationInput,
     BackupDestinationKind,
     BackupJob,
+    BackupJobStatus,
     BackupManifest,
     BackupSchedule,
     BackupScheduleInput,
@@ -11,6 +12,13 @@ import type {
     RestoreJob,
     RestorePlan,
 } from '../../types/api'
+
+export const BACKUP_JOB_STATUS_RANK: Record<BackupJobStatus, number> = {
+    failed: 0,
+    queued: 1,
+    running: 2,
+    completed: 3,
+}
 
 /** While a job runs, or a check of its file does, its row is still changing, so the list keeps polling. */
 export function hasActiveJob(jobs: BackupJob[] | undefined): boolean {

@@ -17,6 +17,7 @@ import {
     sortFn_text,
     tableFeatures,
     useTable,
+    type CellContext as TanStackCellContext,
     type ColumnDef as TanStackColumnDef,
     type ColumnFiltersState,
     type SortingState,
@@ -47,10 +48,10 @@ type Features = typeof features
 /** Column definition bound to this table's feature set, so callers keep
  *  writing `ColumnDef<Row, unknown>`. */
 export type ColumnDef<TData extends Record<string, any>, TValue = unknown> = TanStackColumnDef<Features, TData, TValue>
+export type CellContext<TData extends Record<string, any>, TValue = unknown> = TanStackCellContext<Features, TData, TValue>
 export type { ColumnFiltersState }
 
-/** TanStack Table's default column size — used as a sentinel to skip
- *  explicit width when the caller hasn't set one. */
+/** Treat TanStack's default column size as no explicit width. */
 const TANSTACK_DEFAULT_SIZE = 150
 
 /** One fixed page size: long enough that most lists fit on one page, so the
@@ -59,6 +60,7 @@ const PAGE_SIZE = 100
 
 interface DataTableProps<T extends Record<string, any>> {
     data: T[]
+    /** Keep interactive cell component types stable across renders. */
     columns: ColumnDef<T, unknown>[]
     getRowId?: (row: T) => string
     initialSorting?: SortingState
@@ -70,6 +72,12 @@ interface DataTableProps<T extends Record<string, any>> {
     emptyMessage?: ReactNode
     /** Rows per page; a narrow container passes a short page. Read once, on mount. */
     pageSize?: number
+    /** Class applied to the `<table>`. */
+    tableClassName?: string
+    /** Row click handler; inner controls remain the keyboard path. */
+    onRowClick?: (row: T) => void
+    /** Row class such as `is-selected`. */
+    rowClassName?: (row: T) => string | undefined
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -83,6 +91,9 @@ export function DataTable<T extends Record<string, any>>({
     loading,
     emptyMessage,
     pageSize = PAGE_SIZE,
+    tableClassName,
+    onRowClick,
+    rowClassName,
 }: DataTableProps<T>) {
     const { t } = useTranslation()
     const [sorting, setSorting] = useState<SortingState>(initialSorting)
@@ -119,7 +130,7 @@ export function DataTable<T extends Record<string, any>>({
     return (
         <div className="data-table">
             <div className="table-scroll">
-                <table>
+                <table className={tableClassName}>
                     <thead>
                         {table.getHeaderGroups().map((headerGroup) => (
                             <tr key={headerGroup.id}>
@@ -128,6 +139,8 @@ export function DataTable<T extends Record<string, any>>({
                                     const dir = header.column.getIsSorted()
                                     return (
                                         <SortableHeader key={header.id} direction={dir}
+                                            scope="col"
+                                            className={header.column.columnDef.meta?.numeric ? 'numeric' : undefined}
                                             onSort={!header.isPlaceholder && canSort ? header.column.getToggleSortingHandler() : undefined}
                                             primary={header.column.getSortIndex() === 0}
                                             style={{ width: header.getSize() !== TANSTACK_DEFAULT_SIZE ? header.getSize() : undefined }}>
@@ -145,7 +158,11 @@ export function DataTable<T extends Record<string, any>>({
                             <tr><td colSpan={columns.length}>{emptyMessage ?? t('common.empty')}</td></tr>
                         ) : (
                             rows.map((row) => (
-                                <tr key={row.id}>
+                                <tr
+                                    key={row.id}
+                                    className={rowClassName?.(row.original)}
+                                    onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                                >
                                     {row.getVisibleCells().map((cell) => (
                                         <td key={cell.id} className={cell.column.columnDef.meta?.numeric ? 'numeric' : undefined}>
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}

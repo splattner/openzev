@@ -1,5 +1,4 @@
-import { SortableHeader, useTableSorting } from '../../components/tableSorting'
-import { useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCircleInfo, faDownload, faPlay, faShieldHalved, faTrash } from '@fortawesome/free-solid-svg-icons'
@@ -20,9 +19,11 @@ import { downloadBlob } from '../../lib/downloadBlob'
 import { formatBytes } from '../../lib/numbers'
 import { useToast } from '../../lib/toast'
 import { ConfirmDialog, consumeReportedError, useConfirmDialog } from '../../components/ConfirmDialog'
+import { DataTable, type CellContext, type ColumnDef } from '../../components/DataTable'
 import type { BackupJob, BackupJobScope, BackupJobStatus, BackupStatus } from '../../types/api'
 import { BackupJobDetailsModal } from './BackupJobDetailsModal'
 import {
+    BACKUP_JOB_STATUS_RANK,
     fileGone,
     hasActiveJob,
     hasFile,
@@ -32,6 +33,7 @@ import {
 } from './backupHelpers'
 
 const POLL_MS = 3000
+const VERIFICATION_RANK = { failed: 0, checking: 1, never: 2, ok: 3 }
 
 const STATUS_BADGE: Record<BackupJobStatus, string> = {
     queued: 'badge-neutral',
@@ -40,8 +42,72 @@ const STATUS_BADGE: Record<BackupJobStatus, string> = {
     failed: 'badge-danger',
 }
 
-export function BackupJobsSection({ status }: { status: BackupStatus | undefined }) {
+const JobActionsContext = createContext<{
+    verifying: boolean
+    downloading: boolean
+    deleting: boolean
+    showDetails: (job: BackupJob) => void
+    verify: (job: BackupJob) => void
+    download: (job: BackupJob) => void
+    deleteFile: (job: BackupJob) => void
+} | null>(null)
+
+function JobActionsCell({ row }: CellContext<BackupJob, unknown>) {
     const { t } = useTranslation()
+    const actions = useContext(JobActionsContext)
+    if (!actions) throw new Error('JobActionsCell requires JobActionsContext')
+    const job = row.original
+    return (
+        <div className="actions-cell-content">
+            {job.status === 'completed' && (
+                <button
+                    type="button"
+                    className="button button-secondary button-compact"
+                    onClick={() => actions.showDetails(job)}
+                >
+                    <FontAwesomeIcon icon={faCircleInfo} fixedWidth />
+                    {t('pages.backups.jobs.details')}
+                </button>
+            )}
+            {hasFile(job) && (
+                <button
+                    type="button"
+                    className="button button-secondary button-compact"
+                    disabled={job.verifying || actions.verifying}
+                    onClick={() => actions.verify(job)}
+                >
+                    <FontAwesomeIcon icon={faShieldHalved} fixedWidth />
+                    {t('pages.backups.jobs.check')}
+                </button>
+            )}
+            {isDownloadable(job) && (
+                <button
+                    type="button"
+                    className="button button-secondary button-compact"
+                    disabled={actions.downloading}
+                    onClick={() => actions.download(job)}
+                >
+                    <FontAwesomeIcon icon={faDownload} fixedWidth />
+                    {t('pages.backups.jobs.download')}
+                </button>
+            )}
+            {hasFile(job) && (
+                <button
+                    type="button"
+                    className="button button-secondary button-compact"
+                    disabled={actions.deleting}
+                    onClick={() => actions.deleteFile(job)}
+                >
+                    <FontAwesomeIcon icon={faTrash} fixedWidth />
+                    {t('pages.backups.jobs.deleteFile')}
+                </button>
+            )}
+        </div>
+    )
+}
+
+export function BackupJobsSection({ status }: { status: BackupStatus | undefined }) {
+    const { t, i18n } = useTranslation()
     const { settings } = useAppSettings()
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
@@ -68,15 +134,6 @@ export function BackupJobsSection({ status }: { status: BackupStatus | undefined
     const zevs = zevsQuery.data ?? []
     const jobs = jobsQuery.data ?? []
 
-    const sorting = useTableSorting(jobs, {
-        created: row => row.started_at ?? row.created_at,
-        scope: row => row.zev_name || row.scope,
-        destination: row => row.destination_name,
-        status: row => row.status,
-        size: row => row.archive_bytes,
-        encryption: row => Number(row.encrypted),
-        integrity: row => row.verification_ok === null ? null : Number(row.verification_ok),
-    })
     // The status card (last backup, encryption) reads different data than the
     // list, so refresh it once running work has finished.
     const wasActive = useRef(false)
@@ -146,6 +203,121 @@ export function BackupJobsSection({ status }: { status: BackupStatus | undefined
     const blocked = isBackupCreationBlocked(status)
     const canStart =
         !!selectedDestination && (scope === 'instance' || !!zevId) && !startMutation.isPending && !blocked
+
+    const collator = new Intl.Collator(i18n?.language, { numeric: true })
+    const compareText: ColumnDef<BackupJob>['sortFn'] = (left, right, id) =>
+        collator.compare(left.getValue<string>(id) ?? '', right.getValue<string>(id) ?? '')
+
+    const columns: ColumnDef<BackupJob, unknown>[] = [
+        {
+            id: 'created',
+            accessorFn: (job) => Date.parse(job.started_at ?? job.created_at),
+            sortDescFirst: true,
+            header: t('pages.backups.jobs.columns.created'),
+            cell: ({ row }) => formatDateTime(row.original.started_at ?? row.original.created_at, settings),
+        },
+        {
+            id: 'scope',
+            accessorFn: (job) => job.scope === 'zev' ? job.zev_name || 'zev' : 'instance',
+            sortFn: compareText,
+            header: t('pages.backups.jobs.columns.scope'),
+            cell: ({ row }) => {
+                const job = row.original
+                return (
+                    <>
+                        {job.scope === 'zev'
+                            ? job.zev_name || t('pages.backups.jobs.scopeZev')
+                            : t('pages.backups.jobs.scopeInstance')}
+                        {job.trigger !== 'manual' && (
+                            <span className="badge badge-neutral" style={{ marginLeft: '0.4rem' }}>
+                                {t(`pages.backups.jobs.trigger.${job.trigger}`)}
+                            </span>
+                        )}
+                    </>
+                )
+            },
+        },
+        {
+            id: 'destination',
+            accessorFn: (job) => job.destination_name,
+            sortFn: compareText,
+            header: t('pages.backups.jobs.columns.destination'),
+            cell: ({ row }) => row.original.destination_name || '—',
+        },
+        {
+            id: 'status',
+            accessorFn: (job) => BACKUP_JOB_STATUS_RANK[job.status],
+            sortDescFirst: false,
+            header: t('pages.backups.jobs.columns.status'),
+            cell: ({ row }) => {
+                const job = row.original
+                return (
+                    <>
+                        <span className={`badge ${STATUS_BADGE[job.status]}`}>
+                            {t(`pages.backups.jobs.status.${job.status}`)}
+                        </span>
+                        {fileGone(job) && (
+                            <div className="muted" style={{ marginTop: '0.25rem' }}>
+                                {t(`pages.backups.jobs.fileGone.${job.artifact_deleted_reason || 'manual'}`)}
+                            </div>
+                        )}
+                        {hasFile(job) && job.file_expires_at && (
+                            <div className="muted" style={{ marginTop: '0.25rem' }}>
+                                {t('pages.backups.jobs.expires', { date: formatDateTime(job.file_expires_at, settings) })}
+                            </div>
+                        )}
+                        {job.status === 'failed' && job.error_message && (
+                            <div className="muted" style={{ marginTop: '0.25rem', maxWidth: '28rem' }}>
+                                {job.error_message}
+                            </div>
+                        )}
+                    </>
+                )
+            },
+        },
+        {
+            id: 'size',
+            // Missing sizes follow known sizes on the first, descending sort.
+            accessorFn: (job) => job.archive_bytes ?? -1,
+            header: t('pages.backups.jobs.columns.size'),
+            meta: { numeric: true },
+            cell: ({ row }) => row.original.archive_bytes != null ? formatBytes(row.original.archive_bytes) : '—',
+        },
+        {
+            id: 'encryption',
+            accessorFn: (job) => job.status === 'completed' ? (job.encrypted ? 1 : 0) : -1,
+            header: t('pages.backups.jobs.columns.encryption'),
+            cell: ({ row }) => {
+                const job = row.original
+                if (job.status !== 'completed') return '—'
+                return (
+                    <span className={`badge ${job.encrypted ? 'badge-success' : 'badge-warning'}`}>
+                        {job.encrypted
+                            ? t('pages.backups.jobs.encrypted')
+                            : t('pages.backups.jobs.notEncrypted')}
+                    </span>
+                )
+            },
+        },
+        {
+            id: 'integrity',
+            accessorFn: (job) => job.status !== 'completed' || fileGone(job) ? 4 : VERIFICATION_RANK[verificationState(job)],
+            sortDescFirst: false,
+            header: t('pages.backups.jobs.columns.integrity'),
+            cell: ({ row }) => {
+                const job = row.original
+                return job.status !== 'completed' || fileGone(job)
+                    ? '—'
+                    : <VerificationBadge job={job} />
+            },
+        },
+        {
+            id: 'actions',
+            header: () => <span className="visually-hidden">{t('common.actions')}</span>,
+            enableSorting: false,
+            cell: JobActionsCell,
+        },
+    ]
 
     return (
         <section className="card page-stack">
@@ -222,124 +394,22 @@ export function BackupJobsSection({ status }: { status: BackupStatus | undefined
                 <div className="muted">{t('pages.backups.jobs.empty')}</div>
             ) : (
                 <div className="table-card">
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <SortableHeader {...sorting.header('created')}>{t('pages.backups.jobs.columns.created')}</SortableHeader>
-                                <SortableHeader {...sorting.header('scope')}>{t('pages.backups.jobs.columns.scope')}</SortableHeader>
-                                <SortableHeader {...sorting.header('destination')}>{t('pages.backups.jobs.columns.destination')}</SortableHeader>
-                                <SortableHeader {...sorting.header('status')}>{t('pages.backups.jobs.columns.status')}</SortableHeader>
-                                <SortableHeader {...sorting.header('size')}>{t('pages.backups.jobs.columns.size')}</SortableHeader>
-                                <SortableHeader {...sorting.header('encryption')}>{t('pages.backups.jobs.columns.encryption')}</SortableHeader>
-                                <SortableHeader {...sorting.header('integrity')}>{t('pages.backups.jobs.columns.integrity')}</SortableHeader>
-                                <th>{t('common.actions')}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {sorting.rows.map((job) => (
-                                <tr key={job.id}>
-                                    <td>{formatDateTime(job.started_at ?? job.created_at, settings)}</td>
-                                    <td>
-                                        {job.scope === 'zev'
-                                            ? job.zev_name || t('pages.backups.jobs.scopeZev')
-                                            : t('pages.backups.jobs.scopeInstance')}
-                                        {job.trigger !== 'manual' && (
-                                            <span className="badge badge-neutral" style={{ marginLeft: '0.4rem' }}>
-                                                {t(`pages.backups.jobs.trigger.${job.trigger}`)}
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td>{job.destination_name || '—'}</td>
-                                    <td>
-                                        <span className={`badge ${STATUS_BADGE[job.status]}`}>
-                                            {t(`pages.backups.jobs.status.${job.status}`)}
-                                        </span>
-                                        {fileGone(job) && (
-                                            <div className="muted" style={{ marginTop: '0.25rem' }}>
-                                                {t(`pages.backups.jobs.fileGone.${job.artifact_deleted_reason || 'manual'}`)}
-                                            </div>
-                                        )}
-                                        {hasFile(job) && job.file_expires_at && (
-                                            <div className="muted" style={{ marginTop: '0.25rem' }}>
-                                                {t('pages.backups.jobs.expires', { date: formatDateTime(job.file_expires_at, settings) })}
-                                            </div>
-                                        )}
-                                        {job.status === 'failed' && job.error_message && (
-                                            <div className="muted" style={{ marginTop: '0.25rem', maxWidth: '28rem' }}>
-                                                {job.error_message}
-                                            </div>
-                                        )}
-                                    </td>
-                                    <td>{job.archive_bytes != null ? formatBytes(job.archive_bytes) : '—'}</td>
-                                    <td>
-                                        {job.status === 'completed' ? (
-                                            <span className={`badge ${job.encrypted ? 'badge-success' : 'badge-warning'}`}>
-                                                {job.encrypted
-                                                    ? t('pages.backups.jobs.encrypted')
-                                                    : t('pages.backups.jobs.notEncrypted')}
-                                            </span>
-                                        ) : (
-                                            '—'
-                                        )}
-                                    </td>
-                                    <td>
-                                        {job.status !== 'completed' || fileGone(job) ? (
-                                            '—'
-                                        ) : (
-                                            <VerificationBadge job={job} />
-                                        )}
-                                    </td>
-                                    <td className="actions-cell">
-                                        <div className="actions-cell-content">
-                                            {job.status === 'completed' && (
-                                                <button
-                                                    type="button"
-                                                    className="button button-secondary button-compact"
-                                                    onClick={() => setDetailJob(job)}
-                                                >
-                                                    <FontAwesomeIcon icon={faCircleInfo} fixedWidth />
-                                                    {t('pages.backups.jobs.details')}
-                                                </button>
-                                            )}
-                                            {hasFile(job) && (
-                                                <button
-                                                    type="button"
-                                                    className="button button-secondary button-compact"
-                                                    disabled={job.verifying || verifyMutation.isPending}
-                                                    onClick={() => verifyMutation.mutate(job)}
-                                                >
-                                                    <FontAwesomeIcon icon={faShieldHalved} fixedWidth />
-                                                    {t('pages.backups.jobs.check')}
-                                                </button>
-                                            )}
-                                            {isDownloadable(job) && (
-                                                <button
-                                                    type="button"
-                                                    className="button button-secondary button-compact"
-                                                    disabled={downloadMutation.isPending}
-                                                    onClick={() => downloadMutation.mutate(job)}
-                                                >
-                                                    <FontAwesomeIcon icon={faDownload} fixedWidth />
-                                                    {t('pages.backups.jobs.download')}
-                                                </button>
-                                            )}
-                                            {hasFile(job) && (
-                                                <button
-                                                    type="button"
-                                                    className="button button-secondary button-compact"
-                                                    disabled={deleteFileMutation.isPending}
-                                                    onClick={() => askToDeleteFile(job)}
-                                                >
-                                                    <FontAwesomeIcon icon={faTrash} fixedWidth />
-                                                    {t('pages.backups.jobs.deleteFile')}
-                                                </button>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    <JobActionsContext.Provider value={{
+                        verifying: verifyMutation.isPending,
+                        downloading: downloadMutation.isPending,
+                        deleting: deleteFileMutation.isPending,
+                        showDetails: setDetailJob,
+                        verify: (job) => verifyMutation.mutate(job),
+                        download: (job) => downloadMutation.mutate(job),
+                        deleteFile: (job) => { void askToDeleteFile(job) },
+                    }}>
+                        <DataTable
+                            data={jobs}
+                            columns={columns}
+                            getRowId={(job) => job.id}
+                            initialSorting={[{ id: 'created', desc: true }]}
+                        />
+                    </JobActionsContext.Provider>
                 </div>
             )}
 

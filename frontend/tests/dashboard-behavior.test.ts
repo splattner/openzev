@@ -5,7 +5,7 @@ import { act } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import type { HourlyProfileEntry, MembershipParticipant } from '../src/types/api'
+import type { GrossEnergy, HourlyProfileEntry, MembershipParticipant } from '../src/types/api'
 import { waitForCondition } from './helpers/waitForCondition'
 
 type ProfileData = HourlyProfileEntry[] | null
@@ -123,6 +123,7 @@ vi.mock('../src/components/dashboard/HourlyProfileCard', async (importOriginal) 
 
 import { DashboardPage } from '../src/pages/DashboardPage'
 import { ParticipantDashboardBody } from '../src/features/dashboard/ParticipantDashboardBody'
+import { ParticipantTableCard } from '../src/components/dashboard/ParticipantTableCard'
 import { HourlyProfileCard } from '../src/components/dashboard/HourlyProfileCard'
 import { ToastProvider } from '../src/lib/toast'
 
@@ -140,6 +141,12 @@ afterEach(() => {
     eligibility.eligible = []
 })
 
+const gross = (rate: number): GrossEnergy => ({
+    source_provider: 'solar_manager', covered_from: '2026-07-01T00:00:00Z', covered_to: '2026-07-04T00:00:00Z', coverage_pct: 100,
+    production_kwh: 100, consumption_kwh: 50, import_kwh: 20, export_kwh: 60, self_consumption_kwh: 30,
+    self_consumption_rate: 30, self_sufficiency_rate: rate, rates_withheld_reason: null, timeline: [],
+})
+
 function managerSummary() {
     return {
         summary_kind: 'zev',
@@ -150,6 +157,7 @@ function managerSummary() {
             {
                 participant_id: 'p1',
                 participant_name: 'Alice',
+                has_behind_meter_generation: false,
                 total_consumed_kwh: 50,
                 total_produced_kwh: 10,
                 from_zev_kwh: 35,
@@ -158,6 +166,7 @@ function managerSummary() {
             {
                 participant_id: 'p2',
                 participant_name: 'Bob',
+                has_behind_meter_generation: false,
                 total_consumed_kwh: 30,
                 total_produced_kwh: 5,
                 from_zev_kwh: 20,
@@ -307,6 +316,79 @@ describe('dashboard behavior preservation', () => {
         expect(names()).toEqual(['Alice', 'Bob'])
         await sort(1)
         expect(names()).toEqual(['Bob', 'Alice'])
+    })
+
+    function participantTable(stats: Parameters<typeof ParticipantTableCard>[0]['participantStats'] = managerSummary().participant_stats) {
+        const container = document.createElement('div')
+        document.body.append(container)
+        const root = createRoot(container)
+        cleanups.push(() => { act(() => root.unmount()); container.remove() })
+        const onSelect = vi.fn()
+        const draw = (selectedParticipantId: string, ownParticipantIds?: string[]) => act(() => root.render(
+            createElement(ParticipantTableCard, {
+                participantStats: stats,
+                selectedParticipantId, ownParticipantIds, onSelect,
+            }),
+        ))
+        draw('')
+        return { container, onSelect, draw }
+    }
+
+    it('keeps locale-aware natural name ordering after the conversion', () => {
+        const stats = ['Zulu', 'Änne', 'Group 10', 'Group 2'].map((participant_name, i) => ({
+            ...managerSummary().participant_stats[0], participant_id: `p${i}`, participant_name,
+        }))
+        const { container } = participantTable(stats)
+        act(() => container.querySelector<HTMLButtonElement>('th:first-child button')!.click())
+        expect(Array.from(container.querySelectorAll('.participant-select'), button => button.textContent))
+            .toEqual(['Änne', 'Group 2', 'Group 10', 'Zulu'])
+    })
+
+    it('sorts the displayed gross shares and keeps withheld rates last in either direction', () => {
+        const base = managerSummary().participant_stats[0]
+        const { container } = participantTable([
+            { ...base, participant_id: 'low', participant_name: 'Low', has_behind_meter_generation: true, gross_energy: gross(20), from_zev_kwh: 45 },
+            { ...base, participant_id: 'missing', participant_name: 'Missing', has_behind_meter_generation: true, gross_energy: null },
+            { ...base, participant_id: 'high', participant_name: 'High', has_behind_meter_generation: true, gross_energy: gross(80), from_zev_kwh: 5 },
+        ])
+        const names = () => Array.from(container.querySelectorAll('.participant-select'), button => button.textContent)
+        const header = container.querySelector<HTMLButtonElement>('th:last-child button')!
+        act(() => header.click())
+        expect(names()).toEqual(['High', 'Low', 'Missing'])
+        act(() => header.click())
+        expect(names()).toEqual(['Low', 'High', 'Missing'])
+    })
+
+    it('keeps participant selection focus when selection and ownership change', () => {
+        const { container, onSelect, draw } = participantTable()
+        const button = container.querySelector<HTMLButtonElement>('button.participant-select')!
+        button.focus()
+        act(() => button.click())
+        expect(onSelect).toHaveBeenLastCalledWith('p1')
+        draw('p1', ['p1'])
+        expect(document.activeElement).toBe(button)
+        expect(button.getAttribute('aria-pressed')).toBe('true')
+        expect(button.parentElement?.textContent).toContain('pages.dashboard.youBadge')
+        act(() => button.click())
+        expect(onSelect).toHaveBeenLastCalledWith('')
+    })
+
+    it('selects the correct participant after numeric sorting and pagination', () => {
+        const stats = Array.from({ length: 101 }, (_, i) => ({
+            ...managerSummary().participant_stats[0], participant_id: `p${i}`,
+            participant_name: `Participant ${i}`, total_consumed_kwh: i,
+        }))
+        const { container, onSelect } = participantTable(stats)
+        act(() => container.querySelector<HTMLButtonElement>('th:nth-child(2) button')!.click())
+        expect(container.querySelectorAll('tbody tr')).toHaveLength(100)
+        const selectFirst = () => container.querySelector<HTMLButtonElement>('button.participant-select')!.click()
+        act(selectFirst)
+        expect(onSelect).toHaveBeenLastCalledWith('p100')
+        act(() => container.querySelector<HTMLButtonElement>('button[aria-label="common.pagination.next"]')!.click())
+        expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
+        expect(container.querySelector('th:nth-child(2) button')).not.toBeNull()
+        act(selectFirst)
+        expect(onSelect).toHaveBeenLastCalledWith('p0')
     })
 
     it('manager sees the per-participant breakdown table and no metering migration card', async () => {
@@ -816,11 +898,7 @@ describe('dashboard behavior preservation', () => {
 
 
 describe('manager dashboard: the manager as a participant', () => {
-    const gross = (rate: number) => ({
-        source_provider: 'solar_manager', covered_from: '2026-07-01T00:00:00Z', covered_to: '2026-07-04T00:00:00Z', coverage_pct: 100,
-        production_kwh: 100, consumption_kwh: 50, import_kwh: 20, export_kwh: 60, self_consumption_kwh: 30,
-        self_consumption_rate: 30, self_sufficiency_rate: rate, rates_withheld_reason: null, timeline: [],
-    })
+
     const withOwnBlock = (own: unknown, extra: Record<string, unknown> = {}) => ({ ...managerSummary(), own_gross_energy: own, selected_gross_energy: null, ...extra })
     const cards = (container: Element) => container.querySelectorAll('section[aria-labelledby]').length
     // Selecting starts a new query: settle it before looking at the page again.

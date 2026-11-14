@@ -1,4 +1,3 @@
-import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Switch } from '@mantine/core'
@@ -15,10 +14,12 @@ import {
 import { formatApiError } from '../../lib/api/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
+import { DataTable, type ColumnDef } from '../../components/DataTable'
 import { formatNumber } from '../../lib/numbers'
 import { useToast } from '../../lib/toast'
 import type { BackupJobStatus, BackupStatus, RestoreJob } from '../../types/api'
 import {
+    BACKUP_JOB_STATUS_RANK,
     canStartRestore,
     communitiesIn,
     confirmationName,
@@ -305,51 +306,83 @@ export function BackupRestoreSection({ status }: { status?: BackupStatus } = {})
 }
 
 function RestoreHistory({ jobs, loading }: { jobs: RestoreJob[]; loading: boolean }) {
-    const { t } = useTranslation()
+    const { t, i18n } = useTranslation()
     const { settings } = useAppSettings()
-    const sorting = useTableSorting(jobs, {
-        when: row => row.started_at ?? row.created_at,
-        community: row => row.target_zev_name || row.target_zev_id,
-        backup: row => row.source_created_at,
-        kind: row => Number(row.dry_run),
-        status: row => row.status,
-    })
     if (loading || jobs.length === 0) return null
+
+    const collator = new Intl.Collator(i18n?.language, { numeric: true })
+    const compareText: ColumnDef<RestoreJob>['sortFn'] = (left, right, id) =>
+        collator.compare(left.getValue<string>(id) ?? '', right.getValue<string>(id) ?? '')
+
+    const columns: ColumnDef<RestoreJob, unknown>[] = [
+        {
+            id: 'when',
+            accessorFn: (row) => Date.parse(row.started_at ?? row.created_at),
+            sortDescFirst: true,
+            header: t('pages.backups.restore.columns.when'),
+            cell: ({ row }) => formatDateTime(row.original.started_at ?? row.original.created_at, settings),
+        },
+        {
+            id: 'community',
+            accessorFn: (row) => row.target_zev_name || row.target_zev_id,
+            sortFn: compareText,
+            header: t('pages.backups.restore.community'),
+        },
+        {
+            id: 'backup',
+            accessorFn: (row) => row.source_created_at ? Date.parse(row.source_created_at) : undefined,
+            sortDescFirst: true,
+            sortUndefined: 'last',
+            header: t('pages.backups.restore.columns.backup'),
+            cell: ({ row }) => row.original.source_created_at
+                ? formatDateTime(row.original.source_created_at, settings)
+                : row.original.source_description || '—',
+        },
+        {
+            id: 'kind',
+            accessorFn: (row) => Number(row.dry_run),
+            header: t('pages.backups.restore.columns.kind'),
+            cell: ({ row }) => (
+                <>
+                    {row.original.dry_run ? t('pages.backups.restore.kindPreview') : t('pages.backups.restore.kindRestore')}
+                    {row.original.force && (
+                        <span className="badge badge-warning" style={{ marginLeft: '0.4rem' }}>
+                            {t('pages.backups.restore.forced')}
+                        </span>
+                    )}
+                </>
+            ),
+        },
+        {
+            id: 'status',
+            accessorFn: (row) => BACKUP_JOB_STATUS_RANK[row.status],
+            sortDescFirst: false,
+            header: t('pages.backups.jobs.columns.status'),
+            cell: ({ row }) => (
+                <>
+                    <span className={`badge ${STATUS_BADGE[row.original.status]}`}>
+                        {t(`pages.backups.jobs.status.${row.original.status}`)}
+                    </span>
+                    {row.original.status === 'failed' && row.original.error_message && (
+                        <div className="muted" style={{ marginTop: '0.25rem', maxWidth: '28rem' }}>
+                            {row.original.error_message}
+                        </div>
+                    )}
+                </>
+            ),
+        },
+    ]
 
     return (
         <div className="page-stack">
             <h4 className="m-0">{t('pages.backups.restore.history')}</h4>
             <div className="table-card">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <SortableHeader {...sorting.header('when')}>{t('pages.backups.restore.columns.when')}</SortableHeader>
-                            <SortableHeader {...sorting.header('community')}>{t('pages.backups.restore.community')}</SortableHeader>
-                            <SortableHeader {...sorting.header('backup')}>{t('pages.backups.restore.columns.backup')}</SortableHeader>
-                            <SortableHeader {...sorting.header('kind')}>{t('pages.backups.restore.columns.kind')}</SortableHeader>
-                            <SortableHeader {...sorting.header('status')}>{t('pages.backups.jobs.columns.status')}</SortableHeader>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {sorting.rows.map((row) => (
-                            <tr key={row.id}>
-                                <td>{formatDateTime(row.started_at ?? row.created_at, settings)}</td>
-                                <td>{row.target_zev_name || row.target_zev_id}</td>
-                                <td>{row.source_created_at ? formatDateTime(row.source_created_at, settings) : row.source_description || '—'}</td>
-                                <td>
-                                    {row.dry_run ? t('pages.backups.restore.kindPreview') : t('pages.backups.restore.kindRestore')}
-                                    {row.force && <span className="badge badge-warning" style={{ marginLeft: '0.4rem' }}>{t('pages.backups.restore.forced')}</span>}
-                                </td>
-                                <td>
-                                    <span className={`badge ${STATUS_BADGE[row.status]}`}>{t(`pages.backups.jobs.status.${row.status}`)}</span>
-                                    {row.status === 'failed' && row.error_message && (
-                                        <div className="muted" style={{ marginTop: '0.25rem', maxWidth: '28rem' }}>{row.error_message}</div>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                <DataTable
+                    data={jobs}
+                    columns={columns}
+                    getRowId={(row) => row.id}
+                    initialSorting={[{ id: 'when', desc: true }]}
+                />
             </div>
         </div>
     )

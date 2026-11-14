@@ -468,10 +468,15 @@ live on Reports; participant invoice PDF actions remain on the dashboard.
      generation). The production chart stacks used-locally over exported, with
      the self-consumption-rate line on the same kind of axis.
   4. `ParticipantTableCard` (sortable raw-value headers, with row selection retained): consumption, production/export, from ZEV, from
-     grid and from-ZEV % per participant (— for behind-meter participants). A
+     grid and from-ZEV % per participant (reported gross-energy rates for
+     behind-meter participants, or — when withheld). A
      row click sets the participant filter, the name button makes that
      keyboard-reachable, and the table scrolls with a sticky header and name
-     column.
+     column. It uses `DataTable` with 100 rows per page and sort controls for
+     at least two rows. Names use locale-aware natural ordering; energy values
+     and the displayed from-ZEV share sort numerically, descending on the first
+     click, with withheld rates last. Selection is identified
+     by `participant_id` across sorting and pagination.
   5. `HourlyProfileCard`, only when a participant is selected and the profile
      has data (the hourly-profile query runs only with a selection).
 - **Participant body.** No participant filter; the summary and hourly-profile
