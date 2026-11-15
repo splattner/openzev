@@ -974,13 +974,15 @@ fields name only the caller's own observations; no import contents, meters or
 ZEVs outside the scope are reachable through them.
 
 **UI:** `HeldReadingsPanel` appears below raw-day pagination on management
-surfaces only. Opening it fetches server-configured pages for the selected meter
-and period; changing that scope remounts the panel. Columns show meter/interval
+surfaces only. It fetches the first page for the selected meter
+and period before showing its disclosure. The collapsed section is hidden while
+that initial request is pending or its count is zero, except on error.
+Changing the meter or period remounts the panel. Columns show meter/interval
 start, direction, held kWh, quality/code, current accepted kWh, translated
 delivery purpose, source delivery/document IDs with source creation, and local
 record creation. Values have four decimal places; timestamps use Swiss time
-with UTC offsets. The source region supports keyboard scrolling. Loading,
-empty and error states are explicit; errors offer Retry, and failed/empty
+with UTC offsets. The source region supports keyboard scrolling. Open sections
+retain loading, empty and error states; errors offer Retry, and failed/empty
 later pages offer a return to page 1. Protocol presentation is specified in §8.4.
 
 ### 5.4 Dashboard summary
