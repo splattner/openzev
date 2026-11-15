@@ -5,8 +5,6 @@ test.use({ storageState: { cookies: [], origins: [] } })
 
 test('progression errors show readable diagnostics without validation metadata', async ({ page }, testInfo) => {
   const errors = await mockApi(page)
-  await page.route('**/api/v1/notifications/unread-count/', route => route.fulfill({ json: { count: 0 } }))
-  await page.route('**/api/v1/metering/live/enabled/', route => route.fulfill({ json: { enabled: false } }))
   await page.route('**/api/v1/tariffs/tariffs/progression/**', route => route.fulfill({
     status: 400,
     json: {

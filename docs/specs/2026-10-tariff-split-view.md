@@ -111,9 +111,9 @@ completion must not select or reopen anything (`useWriteScope`, reference spec �
 - Rows have a named, keyboard-accessible control that opens the pane (the name
   button, as today); row click is an extra. The tariff overview PDF's scope
   (valid or all) stays chosen at download.
-- The page header also links to **Price progression** (`/tariffs/progression`), a
-  separate read-only page that adds up all per-kWh tariffs
-  (SPEC-2026-tariff-progression); it has no navigation item of its own.
+- The **Tariffs** page uses routed tabs: **Tariff components** (`/tariffs`)
+  contains this list and pane; **Price progression** (`/tariffs/progression`)
+  shows the read-only combined prices (SPEC-2026-tariff-progression §8.1).
 
 ## 5. The pane
 
@@ -283,7 +283,7 @@ Values and decisions the pilot produced (reference spec §13, open question 3).
 | Overview rows | One row per series. `tariffOverview` puts a series in **Current** when a version is in force (the row carries `upcomingVersion`, the nearest scheduled one), else in **Upcoming** (nearest scheduled), else in **Ended tariffs** (the `history` group; most recently ended version). The group is a disclosure styled as a heading like the others, folded by default, and opens by itself for a linked past version; opening a row there gives the normal pane, with Edit, Schedule price change and delete. The row's validity cell links to the next version: `nextChange` compares the two versions' rate lines; the same bands (same `applies` text and unit) give `From {date}: {prices} {unit}`, different bands give "Prices and schedule change from {date}", and a next version with no prices to show gives "New version from {date}". When the prices are comparable the line adds the relative change per price in brackets (`From 01.11.2026: 0.290 / 0.220 per kWh (−1.7 % / −2.2 %)`, `deltaSummary`), left out when nothing moved. The row is highlighted for either version. |
 | Band coverage | `bandCoverage` (`bandCoverage.ts`) mirrors `tariffs.periods.resolve_band` for the hours of a version's bands: month first, flat prices its months outright, a windowed band needs both ends and its weekday, windows are `[start, end)` and wrap past midnight (equal ends are the whole day), a non-flat band without a window is the catch-all that prices every hour on its weekdays no windowed band matches (not counted as an overlap with them; two on one month and day count as one), and hours still unmatched are priced by the first band of the season in model order (type, start, id). It reports uncovered stretches (months, weekdays, hours), the fallback band and overlaps, and for a version with an end date only checks the month/weekday pairs inside it. Shown as **Hours without a band** issue text (`IssueText`) on current and upcoming rows, as a warning under the bands in the pane, and as a live preview in the band form (`showCovered`; hidden while exactly one of the two times is set; both empty means "all other hours"). No API change. |
 | Energy type icon | The second line under a tariff name (its energy type as text) is replaced by `TariffTypeIcon` before the name: a plug for grid, a solar panel for local, an arrow out of a box for feed-in, with the type name as `aria-label` and tooltip (`role="img"`). A tariff without an energy type (fees) has no icon. The detail pane's meta line still says it in words. |
-| Header | The page actions (import, overview PDF, New tariff) moved from a toolbar card into the page header, since the toolbar only held the tabs besides them. |
+| Page actions | Import, overview PDF and New tariff sit below the shared tabs, on the components tab only. |
 
 Browser checks of the acceptance table (laptop and phone widths, navigation,
 dirty guard, create/rename/delete round trip) were run by hand against the dev

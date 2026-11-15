@@ -2749,10 +2749,11 @@ export const en = {
             },
             allWeekdays: 'every day',
             chfPerKwh: 'CHF/kWh',
+            tabs: {
+                components: 'Tariff components',
+                progression: 'Price progression',
+            },
             progression: {
-                link: 'Price progression',
-                back: 'Back to tariffs',
-                title: 'Price progression',
                 description: 'What one kWh costs over time: every per-kWh tariff of an energy type added up, by time of use.',
                 allHours: 'All hours',
                 chartTitle: 'Price per kWh over time',

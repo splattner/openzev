@@ -3,8 +3,8 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MantineProvider } from '@mantine/core'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { TariffsPage } from '../src/pages/TariffsPage'
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
+import { TariffsHubPage } from '../src/pages/TariffsHubPage'
 import { queryKeys } from '../src/lib/api/queryKeys'
 import { setInputValue } from './helpers/render'
 import { waitForCondition } from './helpers/waitForCondition'
@@ -75,6 +75,9 @@ async function openEditForm(draft = '12.50') {
     if (draft) await act(async () => setInputValue(priceInput()!, draft))
 }
 
+// Cold module loading is covered in the browser; keep draft-guard waits about the UI.
+beforeAll(async () => { await import('../src/pages/TariffsPage') })
+
 beforeEach(async () => {
     vi.clearAllMocks()
     shown = [grid, levy]
@@ -84,7 +87,8 @@ beforeEach(async () => {
     document.body.append(container)
     client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
     router = createMemoryRouter([
-        { path: '/tariffs', element: createElement(TariffsPage) },
+        { path: '/tariffs', element: createElement(TariffsHubPage, { tab: 'components' }) },
+        { path: '/tariffs/progression', element: createElement('p', null, 'progression') },
         { path: '/other', element: createElement('p', null, 'elsewhere') },
     ], { initialEntries: ['/tariffs'] })
     root = createRoot(container)
@@ -117,6 +121,43 @@ it('lists the tariffs the harness serves', () => {
 })
 
 // Leaving
+
+it('uses tabs to switch views and preserves the selected tariff in the URL', async () => {
+    await click(q('[data-row-key="z:Grid:grid"] .tariff-select'))
+    const search = router.state.location.search
+    const tabs = [...container.querySelectorAll('[role="tab"]')]
+    expect(tabs.map((tab) => tab.textContent)).toEqual([
+        'pages.tariffs.tabs.components', 'pages.tariffs.tabs.progression',
+    ])
+    expect(tabs[0].getAttribute('aria-selected')).toBe('true')
+    expect(document.getElementById(tabs[0].getAttribute('aria-controls')!)?.getAttribute('role')).toBe('tabpanel')
+    await click(tabs[1])
+    expect(router.state.location.pathname).toBe('/tariffs/progression')
+    expect(router.state.location.search).toBe(search)
+})
+
+it('guards switching tabs with an unsaved draft, allowing keep editing or discard', async () => {
+    await openEditForm()
+    const progressionTab = () => [...container.querySelectorAll('[role="tab"]')][1]
+    await click(progressionTab())
+    expect(router.state.location.pathname).toBe('/tariffs')
+    expect(asked('common.unsavedChanges.message')).toBe(true)
+    await click(dialogButton('common.unsavedChanges.keepEditing') ?? null)
+    expect(priceInput()?.value).toBe('12.50')
+    expect(q('[role="tab"][aria-selected="true"]')?.textContent).toBe('pages.tariffs.tabs.components')
+    await click(progressionTab())
+    await click(dialogButton('common.unsavedChanges.discard') ?? null)
+    expect(router.state.location.pathname).toBe('/tariffs/progression')
+})
+
+it('does not navigate or ask to discard when the selected tab is activated', async () => {
+    await openEditForm()
+    const location = router.state.location
+    await click(q('[role="tab"][aria-selected="true"]'))
+    expect(router.state.location).toBe(location)
+    expect(asked('common.unsavedChanges.message')).toBe(false)
+    expect(priceInput()?.value).toBe('12.50')
+})
 
 it('asks before in-app navigation drops a changed draft, and keeps it when the user stays', async () => {
     await openEditForm()

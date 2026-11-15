@@ -1346,7 +1346,12 @@ uses the VAT rate in force on each day, where an invoice uses the rate on its
 
 ### Frontend tariff screen and write forms
 
-The tariff screen is an overview beside an in-flow detail pane
+The **Tariffs** screen has **Tariff components** (`/tariffs`) and read-only
+**Price progression** (`/tariffs/progression`) tabs. The components tab retains
+its editor and unsaved-draft guard. Navigation, URL preservation and focus
+behavior are specified in `2026-11-tariff-progression.md` §8.1.
+
+The components tab is an overview beside an in-flow detail pane
 (SPEC-2026-10-tariff-split-view; it replaced the Valid / Upcoming / All tabs and
 the overlay detail drawer). The overview lists a series once, under **Current**
 (a version is in force), **Upcoming** (only scheduled versions) or a collapsed

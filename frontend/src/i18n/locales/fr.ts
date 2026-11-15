@@ -2738,10 +2738,11 @@ export const fr = {
             },
             allWeekdays: 'chaque jour',
             chfPerKwh: 'CHF/kWh',
+            tabs: {
+                components: 'Composantes tarifaires',
+                progression: 'Évolution des prix',
+            },
             progression: {
-                link: 'Évolution tarifaire',
-                back: 'Retour aux tarifs',
-                title: 'Évolution tarifaire',
                 description: 'Ce que coûte un kWh au fil du temps : tous les tarifs par kWh d\'un type d\'énergie, additionnés, selon la plage horaire.',
                 allHours: 'Toutes les heures',
                 chartTitle: 'Prix par kWh au fil du temps',

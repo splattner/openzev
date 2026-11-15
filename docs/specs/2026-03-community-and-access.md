@@ -1738,7 +1738,7 @@ reaches every ZEV-scope route and sees its pages read-only
 | `/metering/imports` | ZEV scope | `MeteringChartPage` (`tab="imports"`, consuming the header-free `ImportsContent` body) |
 | `/metering-data` | any authenticated | alias → `/metering/chart`, except `?tab=quality` → guarded `/metering/quality`; `tab` is always stripped, remaining params preserved |
 | `/imports` | ZEV scope | alias → `/metering/imports` (query preserved) |
-| `/tariffs` | ZEV scope | `TariffsPage` |
+| `/tariffs` · `/tariffs/progression` | ZEV scope | `TariffsHubPage tab=…` (components · price progression) |
 | `/billing/invoices` · `/billing/emails` | ZEV scope | `BillingHubPage tab=…` (invoices · email delivery/history + retry) |
 | `/documents` | ZEV scope | `ParticipantDocumentsPage` (what was delivered to the community's participants, and where to issue or upload: the participant inbox's outbox, [participant document inbox §7.2](2026-11-participant-document-inbox.md)); `/billing/documents`, the old billing tab, redirects here |
 | `/billing/statements` | any authenticated | alias → `/reports` (the annual-statement ZIP moved there with the other yearly documents) |

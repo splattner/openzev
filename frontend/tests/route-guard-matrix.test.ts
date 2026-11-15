@@ -81,7 +81,7 @@ vi.mock('../src/pages/ZevSettingsPage', () => ({
 }))
 vi.mock('../src/pages/MeteringPointsPage', () => ({ MeteringPointsPage: marker('metering-points') }))
 vi.mock('../src/pages/MeteringChartPage', () => ({ MeteringChartPage: marker('metering-chart') }))
-vi.mock('../src/pages/TariffsPage', () => ({ TariffsPage: marker('tariffs') }))
+vi.mock('../src/pages/TariffsHubPage', () => ({ TariffsHubPage: marker('tariffs') }))
 vi.mock('../src/pages/InvoicesPage', () => ({ InvoicesContent: marker('invoices') }))
 vi.mock('../src/pages/DocumentsPage', () => ({ DocumentsPage: marker('my-documents') }))
 vi.mock('../src/pages/ParticipantDocumentsPage', () => ({ ParticipantDocumentsPage: marker('participant-documents') }))
