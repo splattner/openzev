@@ -1205,6 +1205,9 @@ overlapping assignment windows are surfaced by the amber row warnings below,
 not by the severity cell: a fully-complete meter with no holder is still
 `green` on completeness while its warning says its readings are unbilled.
 
+Severity labels use `badge-success` for `green`, `badge-warning badge-quiet` for
+`yellow` and `badge-danger` for `red` ("Missing" / "Fehlend"); see SPEC-2026-08 §15.
+
 **Reading aggregation:** the readings of all requested metering points are
 read in one grouped query — `(metering_point_id, Swiss civil day) -> count`,
 days bucketed in the database with `TruncDate(tzinfo=business_tz())` (ADR

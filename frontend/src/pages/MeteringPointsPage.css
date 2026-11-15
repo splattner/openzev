@@ -3,3 +3,13 @@
   font-size: 0.8125rem;
 }
 
+.metering-toolbar .filter-tab--attention .filter-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  background: color-mix(in srgb, var(--gold) 80%, var(--surface-card));
+  color: var(--brand-ink);
+}
+

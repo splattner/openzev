@@ -548,7 +548,8 @@ visible labels; every select starts on an "all …" option):
    the admin scope only, *ZEV* (name resolved from the options query, raw UUID
    as fallback). The event cell holds the event's name as the button that opens
    the pane, a status badge **only when the event did not succeed**, and the
-   target underneath. Below a 46rem container width each row becomes a card
+   target underneath. Denied and failed events use `badge-danger` (SPEC-2026-08 §15)
+   in both scopes and the detail pane. Below a 46rem container width each row becomes a card
    (name and time, then actor and ZEV), so a refused event stays visible at
    400px. No code is shown in the list. An empty result is an `EmptyState`:
    with filters it offers *Clear filters*, without it says nothing has been

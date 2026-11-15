@@ -82,6 +82,7 @@ describe('DynamicSourceSummary', () => {
     it('keeps the failed-fetch error visible next to the missing-price notice', () => {
         const html = render({ last_fetch_status: 'failed', last_fetch_error: 'upstream 503' }, true, missing)
         expect(html).toContain('upstream 503')
+        expect(html).toContain('badge badge-danger')
         expect(html).toContain('pages.dynamicSources.history.missingEffect')
     })
 })

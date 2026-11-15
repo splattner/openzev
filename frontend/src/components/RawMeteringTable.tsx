@@ -545,12 +545,12 @@ export function RawMeteringTable({
                                             </span>
                                             {formatShortDate(day.date, settings)}
                                             {flags.negativeTotal && (
-                                                <span className="raw-metering-day-flag raw-metering-day-flag-danger">
+                                                <span className="badge badge-danger badge-quiet raw-metering-day-flag">
                                                     {t('pages.meteringData.rawTable.negativeTotalFlag')}
                                                 </span>
                                             )}
                                             {flags.zeroConsumptionWithHolder && (
-                                                <span className="raw-metering-day-flag">
+                                                <span className="badge badge-warning badge-quiet raw-metering-day-flag">
                                                     {t('pages.meteringData.rawTable.zeroConsumptionFlag')}
                                                 </span>
                                             )}

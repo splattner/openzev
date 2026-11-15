@@ -49,7 +49,7 @@ export function TariffProgressionView({ progression, basis, day, lineKey, onPick
                         onPickDay={onPickDay}
                     />
                     {issues.length > 0 && (
-                        <ul className="tariff-progression-notices warning-banner">
+                        <ul className="tariff-progression-notices">
                             {issues.map((issue) => (
                                 <li key={`${issue.kind}|${issue.subject}|${issue.from}`}>
                                     {t(`pages.tariffs.progression.issues.${issue.kind}`, {

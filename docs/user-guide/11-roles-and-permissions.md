@@ -381,7 +381,8 @@ Audit log**) and to **managers** for their own communities (scoped events,
 
 Each event is named in your language ("Rechnung genehmigen", "Dokument zugestellt")
 with what it concerned and who did it; events that were refused or failed carry
-a badge. Search, category, actor, status and a date range narrow the list in one
+a status label.
+Search, category, actor, status and a date range narrow the list in one
 row. Click an event to see its details; the technical codes, IDs and the stored
 log text are under **Technical details**. Administrators also have **Technical
 filters** (action code, object type, object ID) on the platform log.
@@ -474,7 +475,8 @@ or recover your secrets, and cannot set up a factor on your behalf.
 
 The server needs an encryption key (`MFA_ENCRYPTION_KEYS`) before authenticator apps can be enrolled
 or a requirement can be set, and the passkey domain settings (`WEBAUTHN_RP_ID`, `WEBAUTHN_ORIGIN`)
-must match the address users open OpenZEV on. See `backend/.env.example` and the Helm chart README.
+must match the address users open OpenZEV on. When the MFA key is missing, the
+Security settings explain this above the disabled policy controls. See `backend/.env.example` and the Helm chart README.
 
 ## Email Address and Sessions
 

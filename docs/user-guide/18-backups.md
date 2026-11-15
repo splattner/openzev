@@ -94,8 +94,9 @@ a key with:
 python -c "import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
 ```
 
-- The backup page shows a warning until a key is set, and every backup records
-  whether it was encrypted.
+- When unencrypted backups are permitted, the page warns that backups are not
+  encrypted, below any urgent stale-backup warning. Missing required or unusable
+  keys remain blocking errors. Every backup records whether it was encrypted.
 - Backups are encrypted with AES-256-GCM. Several keys can be listed, comma
   separated: the first encrypts, every one can decrypt. To rotate, add the new
   key **in front**, take fresh backups, and drop the old key only once no backup

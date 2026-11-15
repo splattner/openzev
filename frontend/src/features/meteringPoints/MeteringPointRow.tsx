@@ -288,7 +288,7 @@ export function MeteringPointRow({
 
   return (
     <tbody role="rowgroup" className={`metering-point-card${expanded ? ' is-expanded' : ''}`}>
-      <tr role="row" className="metering-point-row" onClick={handleRowClick}>
+      <tr role="row" className={`metering-point-row${point.is_active ? '' : ' is-inactive'}`} onClick={handleRowClick}>
         <td role="cell" className="metering-point-title">
           <div className="metering-point-id">
             <span className="metering-point-id-main">

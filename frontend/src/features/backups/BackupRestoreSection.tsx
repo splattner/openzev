@@ -38,7 +38,7 @@ const STATUS_BADGE: Record<BackupJobStatus, string> = {
     queued: 'badge-neutral',
     running: 'badge-info',
     completed: 'badge-success',
-    failed: 'badge-danger',
+    failed: 'badge-danger badge-quiet',
 }
 
 /**
@@ -346,7 +346,7 @@ function RestoreHistory({ jobs, loading }: { jobs: RestoreJob[]; loading: boolea
                 <>
                     {row.original.dry_run ? t('pages.backups.restore.kindPreview') : t('pages.backups.restore.kindRestore')}
                     {row.original.force && (
-                        <span className="badge badge-warning" style={{ marginLeft: '0.4rem' }}>
+                        <span className="badge badge-warning badge-quiet" style={{ marginLeft: '0.4rem' }}>
                             {t('pages.backups.restore.forced')}
                         </span>
                     )}

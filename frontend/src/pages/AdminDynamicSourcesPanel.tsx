@@ -282,7 +282,19 @@ export function AdminDynamicSourcesPanel() {
 
   const activityColumns = useMemo<ColumnDef<AuditEvent, unknown>[]>(() => [
     { accessorKey: 'created_at', header: t('pages.dynamicSources.activity.time'), cell: ({ row }) => formatDateTime(row.original.created_at, settings) },
-    { accessorKey: 'status', header: t('pages.dynamicSources.columns.status'), cell: ({ row }) => <span className={row.original.status === 'failed' ? 'badge badge-danger' : row.original.status === 'success' ? 'badge badge-success' : 'badge badge-info'}>{t(`pages.auditLogs.statuses.${row.original.status}`)}</span> },
+    {
+      accessorKey: 'status',
+      header: t('pages.dynamicSources.columns.status'),
+      cell: ({ row }) => (
+        <span className={
+          row.original.status === 'failed' ? 'badge badge-danger'
+            : row.original.status === 'success' ? 'badge badge-success'
+              : 'badge badge-info'
+        }>
+          {t(`pages.auditLogs.statuses.${row.original.status}`)}
+        </span>
+      ),
+    },
     { accessorKey: 'summary', header: t('pages.dynamicSources.activity.event') },
   ], [settings, t])
 

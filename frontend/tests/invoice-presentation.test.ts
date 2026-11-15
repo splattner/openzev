@@ -44,6 +44,31 @@ async function mount(body: ReactNode) {
 }
 
 describe('shared invoice presentation', () => {
+    it('distinguishes paid, cancelled and the icon-free review flag in the admin list', async () => {
+        api.list.mockResolvedValue([
+            { ...invoice, status: 'cancelled', needs_data_review: true, open_data_impact_count: 1 },
+            { ...invoice, id: 'i2', invoice_number: 'INV-2', status: 'paid' },
+        ])
+        const { container } = await mount(createElement(AdminInvoicesContent))
+        const row = [...container.querySelectorAll('tbody tr')].find(row => row.querySelector('a')?.textContent === 'INV-1')!
+        expect(row.querySelector('.badge-danger')?.textContent).toBe('invoice.status.cancelled')
+        const review = row.querySelector('.badge-warning')!
+        expect(review.textContent).toBe('pages.invoices.dataReview.badge')
+        expect(review.querySelector('svg')).toBeNull()
+        expect(container.querySelector('.badge-success')?.textContent).toBe('invoice.status.paid')
+    })
+
+    it.each([
+        ['paid', '12.30', 'invoice.status.paid', 'badge badge-success'],
+        ['cancelled', '0.00', 'invoice.status.cancelled', 'badge badge-danger'],
+        ['sent', '1.00', 'invoice.status.partlyPaid', 'badge badge-tag'],
+        ['draft', '0.00', 'invoice.status.draft', 'badge badge-tag'],
+    ] as const)('renders the %s badge with paid amount %s', async (status, paidChf, label, className) => {
+        const { container } = await mount(createElement(InvoiceStatusBadge, { status, paidChf }))
+        expect(container.querySelector('span')?.textContent).toBe(label)
+        expect(container.querySelector('span')?.className).toBe(className)
+    })
+
     it.each([
         ['draft', '0.00', 'invoice.status.draft'],
         ['approved', '0.00', 'invoice.status.approved'],

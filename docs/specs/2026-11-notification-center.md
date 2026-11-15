@@ -201,6 +201,7 @@ several communities can tell them apart.
 **File:** `frontend/src/components/NotificationBell.tsx`, mounted in the header of `Layout.tsx`.
 
 - Count: `useQuery({ queryKey: queryKeys.notifications.unreadCount(), queryFn: fetchUnreadNotificationCount, refetchInterval: 60_000, refetchIntervalInBackground: false })`.
+- The unread badge uses `--danger-700` fill and `--surface-card` counter text.
 - Panel: a popover (dialog semantics, focus managed, Escape closes) opened from the bell; loads
   `queryKeys.notifications.list({ unread: false })` when opened. Each row shows an icon, the rendered
   line, the community name when the account has more than one, and a relative time; unread rows are

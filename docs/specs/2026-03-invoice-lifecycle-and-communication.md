@@ -1411,6 +1411,9 @@ ready distinctions; a stored file remains usable after a failed render. A
 participant has no such states: a delivered invoice always has its copy, and
 My documents retains cached rows after a refetch failure. Eligibility and
 read/write visibility stay with the existing action helpers and consumers.
+Staff tables use `InvoiceStatusBadge`: success for paid, danger for cancelled,
+and a neutral tag otherwise (SPEC-2026-08 §15). The admin Status cell shows
+Data review separately, with the review-count explanation in its tooltip.
 BillingEmailsPage keeps ScopeGuard mounted while its invoice query loads or
 fails, so cached-scope warnings and retry remain available.
 
@@ -1584,7 +1587,7 @@ visibility, restored access, and strict selection with a second membership.
   their controls. Row actions are outlined; billing overflow triggers are
   explicitly icon-only with translated accessible names.
 - Filters are **All**, **Drafts**, **Approved**, **Sent** and **Issues** with
-  counts. Sent means the exact sent status, excluding paid. Pressing All or
+  counts. A positive Issues count retains its emphasis while selected (SPEC-2026-08 §15). Sent means the exact sent status, excluding paid. Pressing All or
   the active segment clears filtering. A zero-count segment, or one counting
   the whole period (the same rows as All), is left out unless active, so an
   emptied selection can still be released. Empty filtered results

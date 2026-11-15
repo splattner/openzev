@@ -39,6 +39,9 @@ figure per band, in the order of the prices), *Prices and schedule change from
 later version. **Ended tariffs** opens by itself when you follow a link to the past
 version of a tariff that has ended. The headings carry no counts.
 
+Where the community adds upstream VAT on invoices, a plain note above the list
+explains that the displayed prices are net.
+
 Each category is a rate card, set like the tariff overview PDF, with one row
 per tariff:
 
@@ -70,7 +73,7 @@ you fill in a band, the form shows whether the version's bands together cover
 every hour of the year. A version of a few weeks is only checked against the
 days it can contain.
 
-A red badge next to the name means warnings: a gap between
+Warnings next to the name identify a gap between
 versions, a failed price fetch, or **Hours without a band** — some hours of the
 year have no band of their own and are billed at the fallback band (see below). Rows under **Ended tariffs** are grey but readable.
 Click a row to open the tariff's detail pane beside the list, where **Edit**
@@ -257,7 +260,7 @@ moment, negative prices included.
   the dates the average covers (the most recent 30 days) under **Applies**,
   beside its average price. These dates are not the tariff's validity, which
   the **Valid** column shows. If the source's last scheduled fetch
-  failed, a red **Price fetch failed** badge appears next to the name, with
+  failed, **Price fetch failed** appears next to the name, with
   the failure shown as a tooltip.
 - You can also link a plain energy tariff to an existing dynamic source by
   hand, from the tariff's edit form — useful once a source has already been
@@ -271,7 +274,7 @@ stored coverage and usage. Usage counts cover the whole platform.
 
 Below the source, the pane charts the fetched prices of the last 30 days of the
 tariff's validity without opening anything. If the source has **no price for
-time that has already passed**, a yellow notice says so as dates (for example
+time that has already passed**, a warning names the dates (for example
 *No prices for 03.10.2026 – 05.10.2026*), the chart shades those stretches red
 and breaks the line there, and **Exact missing intervals** lists the timestamps.
 Invoice generation stops for a period that needs a missing price, so fetch the
@@ -810,7 +813,7 @@ the tariffs.
   states its share and the grid price it was taken of.
 - **What is missing is marked.** A stretch where a category has a gap in its own
   history (nothing in force between two versions), or where a tariff cannot be
-  priced here, is shaded red and named under the chart, because the total there
+  priced here, is shaded red and explained under the chart, because the total there
   is **understated**. A category that simply starts later, or was discontinued, is
   not a gap.
 - **Dynamic tariffs are included as a monthly average.** A dynamic tariff has a

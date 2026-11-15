@@ -15,7 +15,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { DynamicTariffSource, TariffSeries } from '../src/types/api'
+import type { DynamicTariffSource, MeteringPoint, TariffSeries } from '../src/types/api'
 import {
   assertPdfLoaded,
   closePdfSidebar,
@@ -211,6 +211,23 @@ test.describe('User Guide Screenshots', () => {
     await navigateTo(page, '/metering-points')
     await page.waitForSelector('table, .card', { timeout: 10_000 })
     await screenshotFull(page, '04-metering-points')
+  })
+
+  test('04c-metering-point-inactive', async ({ page }) => {
+    // Keep the seeded inventory intact for the other captures.
+    await page.route(url => url.pathname === '/api/v1/zev/metering-points/', async route => {
+      const response = await route.fetch()
+      const body = await response.json() as { results: MeteringPoint[] }
+      body.results = body.results.map(point => point.meter_id === 'CH-DEMO-CONS-0003'
+        ? { ...point, is_active: false } : point)
+      await route.fulfill({ response, json: body })
+    })
+    await navigateTo(page, '/metering-points')
+    const row = page.locator('.metering-point-row.is-inactive')
+    await expect(row).toHaveCount(1)
+    await expect(row.locator('.metering-point-id > .badge-neutral')).toHaveText('Inaktiv')
+    await expect(row.locator('.badge')).toHaveCount(1)
+    await screenshotFull(page, '04c-metering-point-inactive')
   })
 
   // 04b — Metering Points with Assign Participant modal, captured against the

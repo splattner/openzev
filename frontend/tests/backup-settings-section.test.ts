@@ -280,10 +280,21 @@ describe('encryption status banner', () => {
         expect(container.querySelector('.info-banner')?.textContent).toContain('pages.backups.status.encrypted')
     })
 
-    it('warns loudly that backups are not encrypted, and does not claim they are', async () => {
-        setup({ statusData: status({ encrypted: false, encryption_required: false, encryption_key_fingerprint: '' }) })
+    it('warns when unencrypted backups are permitted and the backup is not stale', async () => {
+        setup({ statusData: status({ encrypted: false, encryption_required: false, encryption_key_fingerprint: '', stale: false }) })
         const container = await render()
-        expect(container.querySelector('.warning-banner')?.textContent).toContain('pages.backups.status.unencryptedTitle')
+        expect(container.querySelector('.warning-text')?.textContent).toContain('pages.backups.status.unencryptedTitle')
+        expect(container.querySelector('.error-banner')).toBeNull()
+        expect(container.querySelector('.info-banner')).toBeNull()
+    })
+
+    it('places the plain encryption note after an urgent stale-backup warning', async () => {
+        setup({ statusData: status({ encrypted: false, encryption_required: false, encryption_key_fingerprint: '', stale: true }) })
+        const container = await render()
+        const note = container.querySelector('.warning-text')!
+        expect(note.textContent).toContain('pages.backups.status.unencryptedTitle')
+        expect(note.querySelector('strong')?.textContent).toBe('pages.backups.status.unencryptedTitle')
+        expect(container.querySelector('.error-banner')!.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
         expect(container.querySelector('.info-banner')).toBeNull()
     })
 

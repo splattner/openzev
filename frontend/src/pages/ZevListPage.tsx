@@ -949,7 +949,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                         )}
                                         {zev.disabled_at && (
                                             <span
-                                                className="badge badge-danger"
+                                                className="badge badge-danger badge-quiet"
                                                 title={t('pages.zevs.disabledSince', { date: formatShortDate(zev.disabled_at, settings) })}
                                             >
                                                 {t('pages.zevs.disabledBadge')}

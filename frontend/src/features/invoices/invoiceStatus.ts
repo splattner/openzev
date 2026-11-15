@@ -45,7 +45,7 @@ export function paymentState(
   return invoice.due_date && invoice.due_date < today ? 'overdue' : 'due'
 }
 
-/** Neutral staff-table tag; cancelled labels use plain red text. */
+/** Neutral staff-table tag for workflow states without an emphasized status. */
 export const INVOICE_STATUS_BADGE_CLASS = 'badge badge-tag'
 
 export function nextInvoiceWorkflowAction(invoice: { status: string }): 'approve' | 'send-email' | 'mark-paid' | null {

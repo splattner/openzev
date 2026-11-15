@@ -13,22 +13,25 @@
   min-width: 240px;
   max-width: 420px;
   padding: 0.75rem 1rem;
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  color: var(--white);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
   font-size: 0.875rem;
   font-weight: 600;
   box-shadow: var(--shadow-overlay);
 }
 
-.toast-info {
-  background: var(--interactive);
-}
-
 .toast-success {
-  background: var(--success-600);
+  background: var(--brand-pale);
+  border-color: var(--brand-glow);
+  color: var(--brand-mid);
 }
 
 .toast-error {
-  background: var(--danger-700);
+  background: var(--surface-card);
+  border-color: var(--border-strong);
+  border-left: 3px solid var(--danger-700);
+  color: var(--text-primary);
 }
 

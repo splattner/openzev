@@ -272,11 +272,16 @@ describe('MeteringPointsList', () => {
         expect(holder.textContent).toContain('pages.meteringPoints.earlierAssignments:1')
     })
 
-    it('asks nothing for an inactive meter nobody holds', () => {
+    it('marks an inactive row with a neutral badge and keeps its details available', () => {
         const view = render({ points: [point('m4', { is_active: false })], groups: null })
+        const row = view.querySelector<HTMLElement>('.metering-point-row.is-inactive')!
+        expect(row.querySelector('.metering-point-id > .badge-neutral')!.textContent).toBe('pages.meteringPoints.inactive')
+        expect(row.querySelectorAll('.badge')).toHaveLength(1)
         const holder = view.querySelector('.metering-point-holder')!
         expect(holder.querySelector('button')).toBeNull()
         expect(holder.textContent).toBe('—')
+        act(() => row.querySelector<HTMLButtonElement>('.metering-point-expand')!.click())
+        expect(view.querySelector('.metering-point-detail')).not.toBeNull()
     })
 
     it('removes the selected assignment through a direct button and confirmation', () => {

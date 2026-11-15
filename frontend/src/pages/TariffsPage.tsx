@@ -461,7 +461,7 @@ export function TariffsPage() {
                 <Notice tone="error" onRetry={() => void seriesQuery.refetch()} isRetrying={seriesQuery.isFetching}>{t('common.error')}</Notice>
             ) : <>
             {selectedZev?.vat_mode === 'inclusive' && (
-                <div className="info-banner">{t('pages.tariffs.vatInclusiveNotice')}</div>
+                <p className="muted m-0">{t('pages.tariffs.vatInclusiveNotice')}</p>
             )}
 
             {selectedZevId && (

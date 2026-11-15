@@ -84,8 +84,9 @@
 }
 
 .filter-tab--attention .filter-tab-count {
-  background: var(--danger-100);
+  background: var(--surface-card);
   color: var(--danger-700);
+  font-weight: 650;
 }
 
 /* ── Management toolbars: controls set directly on the page ────────────────

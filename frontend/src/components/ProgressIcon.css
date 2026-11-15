@@ -22,8 +22,9 @@
   color: var(--brand-mid);
 }
 
-.invoice-progress-icon--issue {
-  color: var(--danger-600);
+.invoice-progress-icon--issue,
+.invoice-progress-legend-mark--issue {
+  color: var(--danger-700);
 }
 
 .invoice-progress-icon--open {
@@ -96,8 +97,3 @@
 .invoice-progress-legend-mark--active {
   color: var(--interactive);
 }
-
-.invoice-progress-legend-mark--issue {
-  color: var(--danger-600);
-}
-

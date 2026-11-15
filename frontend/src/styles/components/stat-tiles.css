@@ -241,7 +241,7 @@
 }
 
 .stat-card--danger .stat-value {
-  color: var(--danger-600);
+  color: var(--danger-700);
 }
 
 /* Flat: inside .card, no chrome. */

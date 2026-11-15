@@ -77,7 +77,7 @@ export function RestorePlanView({ plan }: { plan: RestorePlan }) {
                     {plan.conflicts.map((conflict, index) => (
                         <div key={`${conflict.kind}-${index}`} className={conflict.overridable ? 'warning-banner' : 'error-banner'}>
                             <div>
-                                <span className={`badge ${conflict.overridable ? 'badge-warning' : 'badge-danger'}`}>
+                                <span className={`badge ${conflict.overridable ? 'badge-warning badge-quiet' : 'badge-danger badge-quiet'}`}>
                                     {conflict.overridable
                                         ? t('pages.backups.restore.plan.needsForce')
                                         : t('pages.backups.restore.plan.cannotOverride')}

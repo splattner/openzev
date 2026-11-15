@@ -40,26 +40,6 @@ export function BackupSettingsSection() {
                 <section className="card page-stack">
                     <p className="muted m-0">{t('pages.backups.intro')}</p>
 
-                    {status?.encryption_key_problem ? (
-                        <div className="error-banner">
-                            {t('pages.backups.status.keyProblem', { problem: status.encryption_key_problem })}
-                        </div>
-                    ) : status && !status.encrypted && status.encryption_required ? (
-                        <div className="error-banner">
-                            <strong>{t('pages.backups.status.blockedTitle')}</strong>
-                            <div>{t('pages.backups.status.blocked')}</div>
-                        </div>
-                    ) : status && !status.encrypted ? (
-                        <div className="warning-banner">
-                            <strong>{t('pages.backups.status.unencryptedTitle')}</strong>
-                            <div>{t('pages.backups.status.unencrypted')}</div>
-                        </div>
-                    ) : status ? (
-                        <div className="info-banner">
-                            {t('pages.backups.status.encrypted', { fingerprint: status.encryption_key_fingerprint })}
-                        </div>
-                    ) : null}
-
                     {status?.stale && (
                         <div className="error-banner">
                             <strong>{t('pages.backups.status.staleTitle')}</strong>
@@ -74,12 +54,25 @@ export function BackupSettingsSection() {
                         </div>
                     )}
 
-                    <p className="muted m-0">
-                        {t('pages.backups.restoreNotice', {
-                            restoreCommand: 'python manage.py openzev_restore --mode instance --from <archive>',
-                            command: 'python manage.py openzev_backup_verify',
-                        })}
-                    </p>
+                    {status?.encryption_key_problem ? (
+                        <div className="error-banner">
+                            {t('pages.backups.status.keyProblem', { problem: status.encryption_key_problem })}
+                        </div>
+                    ) : status && !status.encrypted && status.encryption_required ? (
+                        <div className="error-banner">
+                            <strong>{t('pages.backups.status.blockedTitle')}</strong>
+                            <div>{t('pages.backups.status.blocked')}</div>
+                        </div>
+                    ) : status && !status.encrypted ? (
+                        <div className="warning-text" role="status">
+                            <p className="m-0"><strong>{t('pages.backups.status.unencryptedTitle')}</strong></p>
+                            <p className="m-0">{t('pages.backups.status.unencrypted')}</p>
+                        </div>
+                    ) : status ? (
+                        <div className="info-banner">
+                            {t('pages.backups.status.encrypted', { fingerprint: status.encryption_key_fingerprint })}
+                        </div>
+                    ) : null}
                 </section>
 
                 <section className="stat-grid stat-grid--wide">
@@ -107,6 +100,12 @@ export function BackupSettingsSection() {
             <BackupDestinationsSection status={status} />
             <BackupScheduleSection status={status} />
             <BackupJobsSection status={status} />
+            <p className="muted m-0">
+                {t('pages.backups.restoreNotice', {
+                    restoreCommand: 'python manage.py openzev_restore --mode instance --from <archive>',
+                    command: 'python manage.py openzev_backup_verify',
+                })}
+            </p>
             <BackupRestoreSection status={status} />
         </div>
     )

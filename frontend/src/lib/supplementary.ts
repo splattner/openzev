@@ -88,8 +88,8 @@ export function capabilityProblem(source: SupplementarySource, capability: 'hist
 
 export const STATUS_BADGE_CLASS: Record<StatusTone, string> = {
     success: 'badge badge-success',
-    warning: 'badge badge-warning',
-    danger: 'badge badge-danger',
+    warning: 'badge badge-warning badge-quiet',
+    danger: 'badge badge-danger badge-quiet',
     neutral: 'badge badge-neutral',
 }
 

@@ -530,7 +530,8 @@ The participants **Kein Messpunkt** treatment is the reference for a problem:
 red issue text, a real link for authorised users, no filled capsule; a read-only
 user sees the same text without a click affordance. Routine state does not earn
 colour, colour never carries meaning alone, and neutral tags stay valid. This is
-usage guidance; badge shape and palette do not change.
+usage guidance. Shared badge and notice treatments are defined in SPEC-2026-08 §15;
+`.badge-quiet` changes emphasis while the warning/danger class keeps its meaning.
 
 **Shipped (phase 6).** `components/IssueText` is the shared form of the
 reference treatment: coloured text with a warning icon, a link (`to`), a button
@@ -550,7 +551,8 @@ there are any). Billing rows in the card layout name the next step in words
 beside the icons. Kept as state, because the state is the information: job and
 delivery statuses (backups, restore, imports, audit log), current/upcoming/
 ended versions and assignments, and counts that describe a filtered population
-(list filter tabs).
+(list filter tabs). The admin invoice Data review flag is shown separately from
+the workflow status.
 
 ### 10.2 Feedback and wording
 

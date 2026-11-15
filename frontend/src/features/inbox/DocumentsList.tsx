@@ -19,7 +19,7 @@ export function StandingBadge({ document }: { document: DeliveredDocument }) {
   const standing = documentStanding(document)
   if (!standing) return null
   return (
-    <span className={`badge ${standing === 'superseded' ? 'badge-neutral' : 'badge-warning'}`}>
+    <span className={`badge ${standing === 'superseded' ? 'badge-neutral' : 'badge-warning badge-quiet'}`}>
       {t(`inbox.standing.${standing}`)}
     </span>
   )

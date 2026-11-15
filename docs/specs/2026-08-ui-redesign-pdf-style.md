@@ -143,7 +143,7 @@ Semantic examples (final map decided in Phase 0; names below are normative):
 - `--text-primary` → `var(--ink)`; `--text-body` → `var(--ink-soft)`; `--text-muted` → `var(--muted)`
 - `--border-default` → `var(--line)`; `--border-subtle` → `var(--line-subtle)`
 - `--interactive` → `var(--brand-mid)`; `--interactive-hover` → `var(--brand)`; `--focus-ring` → `var(--brand-mid)` 2px / 2px offset
-- `--status-neutral/info/success/warning/danger` for the `.badge-*` remap (desaturated fills, never gold-on-white); the invoice-workflow `--status-draft/open/paid/overdue/cancelled` aliases went with the per-status badge classes (invoice statuses map through `invoiceStatusBadgeClass`, §15)
+- `--status-neutral` supplies neutral status fills; `--status-danger` remains for the public invoice cancellation notice. Badge treatments use the shared classes in §15; the unused info/success/warning status aliases are removed.
 - `--sidebar-bg` → `var(--brand-deep)` (§15.2); `--sidebar-active` → `var(--brand-pale)`; `--sidebar-hover` → `var(--brand)`; `--sidebar-line` → `var(--brand-mid)` (hairlines and scrollbar on the sidebar)
 - §15 additions: `--text-heading` → `var(--brand-deep)` (h1–h4, as the documents set headings), `--border-strong` → `var(--line-strong)` (control borders: inputs, secondary buttons), `--surface-sunken` → `var(--zebra)` (table header band, hover, segmented tracks), `--accent-rule` → `var(--brand-mid)` (the header rule, active tab), `--sidebar-text` → `var(--brand-accent)` (sage, 7.9:1 on `--brand-deep`)
 
@@ -241,10 +241,15 @@ The PDF language is an excellent print system and a mediocre spec for a dense bi
 
 ### 5.2 Gold usage (WCAG AA)
 
-`--gold #bfa05a` on white `#fff` is contrast `~2.8:1`. WCAG AA requires `4.5:1` for normal text (`3:1` for large/bold ≥18pt/14pt-bold) — gold-on-white **fails** and would block the Phase 4 contrast audit. The PDF already obeys this: gold is only `savings-row.highlight .savings-value` on `var(--brand-deep)` at `9pt/900` inside `.amount-card` (`invoice_pdf.html:180-184`). Binding rule:
+`--gold #bfa05a` on white `#fff` is contrast `~2.5:1`. WCAG AA requires `4.5:1` for normal text (`3:1` for large/bold ≥18pt/14pt-bold) — gold-on-white **fails** and would block the Phase 4 contrast audit. The PDF already obeys this: gold is only `savings-row.highlight .savings-value` on `var(--brand-deep)` at `9pt/900` inside `.amount-card` (`invoice_pdf.html:180-184`). Binding rule:
 
-- `--gold` is decorative/display only. Permitted on `var(--brand-deep)` / `var(--brand)` at `≥16pt` or `≥14pt/700`, or as thin accent bars/dots that are not text and never carry a state alone. The sidebar has no gold mark: its current page is the pale `--sidebar-active` row with `--brand-deep` `600` text.
-- Never as text color on `#fff` / `var(--surface)` / `var(--brand-pale)` / `var(--zebra)`. Status pills in dense tables use desaturated fills (`--brand-pale`, `var(--success-100)`, `var(--danger-100)`, etc. — status hexes live in `primitives`, §4.1) with `--ink-soft` text — the same rule the PDF follows.
+- `--gold` may be a background behind contrasting dark text or a decorative rule
+  or dot; words must also convey any state. On dark brand surfaces it may be
+  display text at `≥16pt` or `≥14pt/700`. The sidebar uses its pale active row,
+  without a gold mark.
+- Never use raw `--gold` as text on white or other light surfaces. Dark-gold
+  warning text uses `--warning-800`; gold fills use a contrasting dark foreground.
+  Status, count and notice treatments are defined in §15, including these uses.
 - Manual axe-core / browser contrast check in Phase 4 must pass at AA+ (see §9).
 
 ### 5.3 Screen quality bar (review checklist on every PR)
@@ -1063,8 +1068,10 @@ contracts are unchanged.
   narrower or wider cut of the default's list, so an equal count does not
   mean the same list), and a default tab left on its own renders no group
   at all — tabs that cannot change the list would only add clutter. An
-  `attention` tab shows its count in the danger tone while it is above 0
-  (`frontend/tests/filter-tabs.test.ts`, 6 tests). The group is as tall as a field
+  `attention` tab defaults to red count text; metering points use a gold circle
+  and invoice Problems use a pale red count background (§15 below).
+  Visibility and selection are covered by `frontend/tests/filter-tabs.test.ts` (6 tests).
+  The group is as tall as a field
   (`--field-height`). `.list-filters` is one wrapping line: a search input
   (full width on phones), further tab groups and compact selects, labelled by
   `aria-label`.
@@ -1134,7 +1141,7 @@ contracts are unchanged.
   - Band windows: an unnamed `band` uses its window as its name and prints that window once. Non-flat bands without both time bounds are the catch-all of their months and weekdays and say "all other hours" (`pages.tariffs.rateCard.allOtherHours`), preserving any weekday/season text, for energy and percentage rates alike; an unlabelled `band` catch-all is named "all other hours" once instead of repeating it. Tariffs without a catch-all keep the first-band fallback (§3.2 of the billing-engine spec). The PDFs use the same wording (`tariff_other_hours` in `invoices/contract_translations.py`).
   - Interaction and permissions: the name button owns the open action (`aria-expanded`, row click stays for the row); the row for the series and version shown in the pane is `.is-selected`. The row has no write actions: Edit and version actions live in the detail pane. Warnings beside the name only (gap count, "Price fetch failed"). History rows read greyed (`.is-ended`).
   - Responsive: the list measures its own container. Below 56rem a row is a small card with one block per band, each with its own CHF, so wrapping cannot detach a price from its hours; validity last. The shared `.invoice-rows` header hiding is overridden for `.tariff-list`, so the category band stays on cards.
-- Detail pane (`DetailPane` in `components/DetailPane.tsx`, styles in `styles/components/detail-pane.css`; used by `TariffDetailPane` and the audit log's `AuditEventPane`, SPEC-2026-10-tariff-split-view §5, §6): in flow beside the list on a wide page (`.detail-split[data-layout='wide']`, sticky, scrolling on its own), the whole area on a narrow one with the list `hidden`. A `section` named by its `h2`, without `aria-modal`; no scrim, scroll lock or focus trap. The header shows the name, one muted facts line and only the fetch-failure pill; the body shows the version block (validity window, status badge, Edit, the price of a tariff without bands, notes), the gap warning, the dynamic source (details in a disclosure), the bands (icon-only edit/delete), then the version picker (current, scheduled, past folded; hidden for a single version; a `⋮` menu per row) and the price history in a disclosure.
+- Detail pane (`DetailPane` in `components/DetailPane.tsx`, styles in `styles/components/detail-pane.css`; used by `TariffDetailPane` and the audit log's `AuditEventPane`, SPEC-2026-10-tariff-split-view §5, §6): in flow beside the list on a wide page (`.detail-split[data-layout='wide']`, sticky, scrolling on its own), the whole area on a narrow one with the list `hidden`. A `section` named by its `h2`, without `aria-modal`; no scrim, scroll lock or focus trap. The header shows the name, one muted facts line and only the fetch-failure issue text; the body shows the version block (validity window, status badge, Edit, the price of a tariff without bands, notes), the gap warning, the dynamic source (details in a disclosure), the bands (icon-only edit/delete), then the version picker (current, scheduled, past folded; hidden for a single version; a `⋮` menu per row) and the price history in a disclosure.
 - Buttons: the primary `.button` is flat `--brand-deep` with a small forest
   drop shadow, no gradient or inner highlight; hover lightens it to
   `--brand`.
@@ -1143,17 +1150,35 @@ contracts are unchanged.
 - Row actions: see §7.4. `.button-secondary.button-destructive` and compact
   danger buttons are the quiet destructive style (imports' "Delete imports",
   admin invoice/ZEV rows); confirm dialogs keep the solid red.
-- Status pills: fill + hairline of the next tone, sentence case. Colour is reserved for state; attributes (meter type, roles, counts)
-  are outlined `.badge-tag`s (white, `--border-strong` hairline,
-  `--text-body`), so a row shows one coloured pill — its state — among quiet
-  tags. The tariff list and pane header set their attributes as a muted
-  text line instead (see the tariff list above). Tariff validity `scheduled` is info (the blue of
-  "upcoming" elsewhere); an inactive metering point is neutral, not danger. Invoice staff tables use one quiet neutral
-  tag (`INVOICE_STATUS_BADGE_CLASS`) for workflow states. Detail headers use
-  `InvoiceStatusBadge variant="plain"` text (draft and partly paid in dark gold,
-  approved, sent and paid in green, cancelled in red);
-  cancelled labels also use red text in staff tables. Participants see their payment
-  state instead. Issued PDFs do not print a workflow status pill.
+- Status labels use sentence case and the shared rounded `.badge` shape.
+  Choose the base class by meaning; add `.badge-quiet` when an outlined status
+  is sufficient in context. The modifier changes emphasis, not severity: danger
+  remains red. Attributes use `.badge-tag`; actionable problems use `IssueText`.
+
+  | Treatment | Fill / border / text | Use |
+  |---|---|---|
+  | `.badge-neutral`, `.badge-info` | `--status-neutral` / `--border-default` / `--ink-soft` | Neutral or informational status |
+  | `.badge-success`, `.badge-brand` | `--brand-pale` / `--brand-glow` / `--brand-mid` | Positive status |
+  | `.badge-warning` | 15% `--gold` mixed with card / 55% `--gold` mixed with default border / `--warning-800` | Review or caution status |
+  | `.badge-danger` | 35% `--danger-100` mixed with card / 35% `--danger-700` mixed with default border / `--danger-700` | Failed, cancelled or missing status |
+  | `.badge-warning.badge-quiet` | Card / `--border-strong` / `--text-primary`, weight 650 | Outlined review status |
+  | `.badge-danger.badge-quiet` | Card / `--danger-700` / `--danger-700`, weight 650 | Outlined failure status |
+  | `.badge-tag` | Card / `--border-strong` / `--text-body`, weight 500 | Attributes, not states |
+
+  Neutral/info and success/brand remain aliases for existing consumers.
+  Inactive metering points use neutral pills and grey rows with readable
+  supporting text; controls and details remain usable. Inventory deactivation
+  does not stop billing.
+  Data-quality labels use success for Complete, quiet warning for Partial and danger for Missing.
+  Staff invoice tables use success for paid, danger for cancelled and a neutral tag
+  for other workflow states; Data review is separate. Plain detail labels retain
+  their existing colours. Participants see their payment state; issued PDFs omit workflow status.
+- Attention counts retain page-specific emphasis: invoices use a 70% `--danger-100`
+  card mix and `--danger-700` text; metering uses an 80% `--gold` card mix and
+  `--brand-ink` text, including while selected. All error red is `--danger-700`.
+- Error notices, toasts and log blocks have a red left rule on a card surface;
+  warning/info notices use the sunken surface and success uses sage. Optional
+  configuration guidance uses plain `.warning-text` (`--warning-800`).
 
 - Dialogs (`FormModal`): `--radius-xl`, `--shadow-overlay`, forest scrim;
   the header is sticky and closes with the documents' rule.
@@ -1184,7 +1209,7 @@ contracts are unchanged.
     Assignment (managers), Last reading, actions, all fixed or fractional so the
     column heads stay over their columns; the heads are the tables' band —
     `--brand-deep`, white 11px small caps — in the one rule `.data-table thead th`
-    shares with `.metering-point-columns`): the meter ID with badges only for the unusual (Inactive, No current assignment,
+    shares with `.metering-point-columns`): the meter ID with labels only for the unusual (Inactive as a grey pill, No current assignment,
     Surplus metering, a supplementary source in `error` / `reconnect_required`),
     the location (or "No location set"), the
     meter type only as a muted icon before the ID (`.metering-point-type`; its
@@ -1210,8 +1235,9 @@ contracts are unchanged.
     menu labels include the point ID. Attention points show the data-quality reason
     in Last reading as a named link (amber for gaps/no readings, red for data at risk).
     Missing-current-assignment warnings appear in Assignment. Healthy, unknown-only
-    and inactive points are unmarked. Neither a row nor
-    the header is tinted. The row opens on a click anywhere outside its controls, except one that ends a
+    and inactive points carry no data-quality warning. Inactive rows use the
+    neutral grey treatment described above; active rows and the header carry
+    no health tint. The row opens on a click anywhere outside its controls, except one that ends a
     text selection (copying the meter ID).
   - **Details** (`.metering-point-detail`, two `.metering-detail-card`s, the
     assignments twice as wide as the measurement; the Measurement card alone for a

@@ -128,6 +128,9 @@ Draft → Approved → Sent → Paid
   is no cancel button in the UI, and an invoice with payments cannot be
   cancelled.
 
+The platform invoice list shows **Data review** separately from the invoice status:
+it flags a review need.
+
 Once an invoice has been approved it keeps its number for good: if it is
 cancelled later, generating the period again creates a new invoice next to it
 instead of replacing it, so no invoice number ever goes missing. Only a draft,
@@ -290,7 +293,7 @@ Each row in the table represents one **participant** who had active metering-poi
 | Column | Description |
 |---|---|
 | **Participant** | Current participant name, invoice link and relevant participation dates. Meter locations distinguish several participations held by the same party. Problems appear below the name. |
-| **Progress** | Metering data → Invoice → Approved → Sent → Paid. Checks show completed steps, spinners show pending work, and warning marks show problems. The legend below the table sheet explains the icons. |
+| **Progress** | Metering data → Invoice → Approved → Sent → Paid. Checks show completed steps, spinners show pending work, and red warning marks show problems. The legend below the table sheet explains the icons. |
 | **Amount (CHF)** | The invoice amount; *-* without a live invoice. |
 | **Actions** | The next step and **More**. Viewers and managers of disabled communities retain **Review conflict** and **Open PDF**. |
 
@@ -349,7 +352,8 @@ generation conflict, a failed PDF, a failed email or no email address). Select o
 those rows; select it again, **All** or **Show all rows** to clear it. A
 category with no rows, or with all of them, is left out. If the selected category empties,
 the page explains why and offers **Show all rows**. Paid invoices appear
-under **All** only. Changing period or community clears the filter.
+under **All** only. The **Issues** count remains visible while there are problems,
+including when the filter is selected. Changing period or community clears the filter.
 
 The **batch actions** in the command bar always act on the whole period,
 including rows hidden by a filter. The recommended next step is the page's one

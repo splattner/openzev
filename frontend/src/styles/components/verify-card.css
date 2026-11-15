@@ -12,9 +12,9 @@
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.05em;
-  background: var(--success-100);
-  color: var(--success-700);
-  border: 1px solid var(--success-200);
+  background: var(--brand-pale);
+  color: var(--brand-mid);
+  border: 1px solid var(--brand-glow);
   border-radius: 999px;
   padding: 0.2rem 0.75rem;
   width: fit-content;

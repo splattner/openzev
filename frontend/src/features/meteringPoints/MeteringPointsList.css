@@ -182,6 +182,26 @@
   background: var(--surface);
 }
 
+/* Match ended tariff rows without fading their controls or losing text contrast. */
+.metering-point-row.is-inactive,
+.metering-point-row.is-inactive > td {
+  background: color-mix(in srgb, var(--status-neutral) 60%, var(--surface-card));
+}
+
+.metering-point-row.is-inactive:hover,
+.metering-point-row.is-inactive:hover > td,
+.metering-point-card.is-expanded > .metering-point-row.is-inactive,
+.metering-point-card.is-expanded > .metering-point-row.is-inactive > td {
+  background: color-mix(in srgb, var(--status-neutral) 80%, var(--surface-card));
+}
+
+.metering-point-row.is-inactive > .metering-point-title :is(.metering-point-id-main > strong, .metering-point-type, .metering-point-subtitle),
+.metering-point-row.is-inactive .metering-point-id > .muted,
+.metering-point-row.is-inactive > .metering-point-holder > :is(.metering-holder-name, .metering-holder-more, .muted),
+.metering-point-row.is-inactive > .metering-point-last {
+  color: color-mix(in srgb, var(--text-body) 50%, var(--text-muted));
+}
+
 .metering-point-title {
   display: grid;
   gap: 0.15rem;

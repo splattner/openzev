@@ -677,12 +677,15 @@ Viewers read linked tariffs/history; existing-source maintenance is admin-only.
 
 `DynamicSourceSummary` in the tariff detail pane shows the linked source's
 label, fetch status, disabled state, last success and user-safe fetch error
-up front, and the endpoint, protocol, component/product, stored range/point
-count and global linked-tariff/ZEV totals in a “Source details” disclosure. A positive point count shows stored coverage and a gap
+up front. Failed fetches use the shared red `badge-danger` pill, matching
+failed source statuses in the admin source table, its activity dialog and audit logs.
+The endpoint, protocol, component/product, stored range/point
+count and global linked-tariff/ZEV totals sit in a “Source details” disclosure. A positive point count shows stored coverage and a gap
 hint; zero points show “No stored prices yet.” Last success is shown only when
 its timestamp is present. The history panel is scoped to the shown tariff's validity.
 When the stored series has no price for time that has already passed, the summary
-also shows a warning notice (`missing` prop, fed by `useElapsedPriceGaps` through
+also shows plain dark-gold warning text (`warning-text`, polite `status`, no box;
+`missing` prop, fed by `useElapsedPriceGaps` through
 `DynamicSourceSection`): the merged missing date ranges in the business timezone, in
 bold, as the notice's heading (“No prices for 03.10.2026 – 05.10.2026”; there is no separate title), a line saying invoice generation stops
 for a period that needs a missing price (§9); the exact timestamps are not listed.

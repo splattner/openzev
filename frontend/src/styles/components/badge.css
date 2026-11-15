@@ -1,5 +1,4 @@
-/* Status pills — the document's status pill: a pale fill, a hairline of the
-   next tone, sentence case for scanning in tables. */
+/* Status pills: pale fill, hairline, sentence case for table scanning. */
 
 .badge {
   display: inline-flex;
@@ -15,8 +14,7 @@
   white-space: nowrap;
 }
 
-/* A badge that opens something: a real button, so keyboard and screen readers get it. */
-
+/* A badge that opens something stays a real button for keyboard and screen readers. */
 button.badge-button {
   cursor: pointer;
   font-family: inherit;
@@ -31,48 +29,48 @@ button.badge-button:focus-visible {
   outline-offset: 2px;
 }
 
-.badge-neutral {
+.badge-neutral,
+.badge-info {
   background: var(--status-neutral);
   border-color: var(--border-default);
   color: var(--ink-soft);
 }
 
-.badge-info {
-  background: var(--status-info);
-  border-color: var(--info-200);
-  color: var(--ink-soft);
-}
-
-.badge-success {
-  background: var(--status-success);
-  border-color: var(--success-200);
-  color: var(--success-700);
-}
-
-.badge-danger {
-  background: var(--status-danger);
-  border-color: var(--danger-300);
-  color: var(--danger-700);
-}
-
-.badge-warning {
-  background: var(--status-warning);
-  border-color: var(--warning-200);
-  color: var(--warning-800);
-}
-
-/* The status pill printed on the invoice (shared_pdf_base.html
-   `.document-status`). */
-
+.badge-success,
 .badge-brand {
   background: var(--brand-pale);
   border-color: var(--brand-glow);
   color: var(--brand-mid);
 }
 
-/* Attributes, not states: what a record is (billing mode, energy type, meter
-   type, role, kind), set quiet and outlined, so the coloured pills beside
-   them can say what is going on (current, scheduled, needs attention). */
+.badge-danger {
+  background: color-mix(in srgb, var(--danger-100) 35%, var(--surface-card));
+  border-color: color-mix(in srgb, var(--danger-700) 35%, var(--border-default));
+  color: var(--danger-700);
+}
+
+.badge-warning {
+  background: color-mix(in srgb, var(--gold) 15%, var(--surface-card));
+  border-color: color-mix(in srgb, var(--gold) 55%, var(--border-default));
+  color: var(--warning-800);
+}
+
+/* Quiet status labels keep the severity but omit the tinted fill. */
+.badge-warning.badge-quiet {
+  background: var(--surface-card);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+  font-weight: 650;
+}
+
+.badge-danger.badge-quiet {
+  background: var(--surface-card);
+  border-color: var(--danger-700);
+  color: var(--danger-700);
+  font-weight: 650;
+}
+
+/* Attributes, not states (billing mode, energy type, role). */
 
 .badge-tag {
   background: var(--surface-card);
