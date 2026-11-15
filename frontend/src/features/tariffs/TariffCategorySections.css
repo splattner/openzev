@@ -43,7 +43,7 @@
   background: var(--surface);
 }
 
-/* The series whose drawer is open — so it stays identifiable once you've
+/* The series whose detail pane is open — so it stays identifiable once you've
    scrolled or the list re-sorts under you. */
 
 .tariff-table tbody tr.is-selected > td:first-child {
@@ -87,15 +87,12 @@
   cursor: pointer;
 }
 
+/* Truncate notes; full text is available in the tooltip. */
+
 .tariff-table-notes {
   margin-top: 0.125rem;
   font-size: 0.8125rem;
   color: var(--text-muted);
-}
-
-/* One line, as on the PDF; the full note is its tooltip and in the drawer. */
-
-.tariff-table-notes {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -171,13 +168,12 @@ td.tariff-table-valid {
   /* Small card: tariff on top, one block per band, validity last. */
   .tariff-table,
   .tariff-table thead,
-  .tariff-table thead tr,
   .tariff-table tbody {
     display: block;
   }
 
-  .tariff-table thead th:first-child {
-    display: block;
+  .tariff-table thead th.sortable-header {
+    width: auto;
   }
 
   /* The shared row table hides its header on cards; here the category
@@ -192,6 +188,8 @@ td.tariff-table-valid {
   }
 
   .invoice-rows.tariff-list .tariff-table thead tr {
+    display: flex;
+    flex-wrap: wrap;
     background: var(--brand-deep);
   }
 

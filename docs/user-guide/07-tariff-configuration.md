@@ -2,7 +2,8 @@
 
 This guide covers setting up tariffs and pricing in OpenZEV.
 
-Column headings sort tariffs within their categories. Price uses the lowest
+Column headings sort tariffs within their categories. In card view, sorting
+controls appear beside the category name and wrap when needed. Price uses the lowest
 listed CHF rate for a multi-band tariff; unavailable prices stay last. Unit sorts
 by kWh, month or year. **Applies** stays a plain heading because it can describe
 several schedules. Import

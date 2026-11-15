@@ -22,8 +22,8 @@ const later: TariffVersion = { ...next, id: 'later', valid_from: '2028-01-01', v
 const grid: TariffSeries = { zev: '42', name: 'Grid', category: 'energy', billing_mode: 'energy',
   energy_type: 'grid', version_count: 3, active_version_id: 'current', gaps: [], versions: [later, next, current] }
 
-async function tariffs(page: Page, series: TariffSeries[]) {
-  await mockApi(page)
+async function tariffs(page: Page, series: TariffSeries[], language = 'en') {
+  await mockApi(page, { language })
   await page.route('**/api/v1/tariffs/tariffs/series/**', route => route.fulfill({ json: series }))
 }
 
@@ -120,6 +120,58 @@ for (const language of ['en', 'de', 'fr']) {
       await expect(partial.locator('td.tariff-table-bands')).toBeVisible({ visible: width <= 896 })
       await page.screenshot({ path: testInfo.outputPath(`tariffs-${language}-container-${width}.png`), fullPage: true })
     }
+  })
+}
+
+for (const language of ['en', 'de', 'fr']) {
+  test(`category headers keep sorting controls visible across card breakpoints in ${language}`, async ({ page }, testInfo) => {
+    const local: TariffSeries = { ...grid, name: 'Local', energy_type: 'local', version_count: 1, active_version_id: 'local',
+      versions: [{ ...current, id: 'local', name: 'Local', energy_type: 'local' }] }
+    await tariffs(page, [grid, local], language)
+    await page.route('**/api/v1/notifications/unread-count/', route => route.fulfill({ json: { count: 0 } }))
+    await page.route('**/api/v1/metering/live/enabled/', route => route.fulfill({ json: { enabled: false } }))
+    await page.goto('/tariffs?tariff=42%3AGrid&version=current')
+    await expect(page.locator('.detail-pane')).toBeVisible()
+    await expect(page.locator('html')).toHaveAttribute('lang', `${language}-CH`)
+    await page.evaluate(() => document.fonts.ready)
+    const list = page.locator('.tariff-list')
+    const header = list.locator('thead')
+    const controls = header.getByRole('button')
+    const rem = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize))
+    await expect(controls).toHaveCount(4)
+    for (const width of [25 * rem, 46 * rem - 1, 46 * rem, 46 * rem + 1, 50 * rem, 56 * rem - 1, 56 * rem, 56 * rem + 1]) {
+      await list.evaluate((element, size) => {
+        element.style.boxSizing = 'content-box'
+        element.style.width = `${size}px`
+      }, width)
+      await expect(list).toHaveCSS('width', `${width}px`)
+      await expect(list.locator('td.numeric').first()).toBeVisible({ visible: width > 56 * rem })
+      await expect(list.locator('td.tariff-table-bands').first()).toBeVisible({ visible: width <= 56 * rem })
+      const bounds = (await header.boundingBox())!
+      const first = (await controls.first().boundingBox())!
+      for (const control of await controls.all()) {
+        await expect(control).toBeVisible()
+        const box = (await control.boundingBox())!
+        expect(box.x).toBeGreaterThanOrEqual(bounds.x - 1)
+        expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width + 1)
+        expect(box.y).toBeGreaterThanOrEqual(bounds.y - 1)
+        expect(box.y + box.height).toBeLessThanOrEqual(bounds.y + bounds.height + 1)
+        if (width >= 46 * rem - 1) expect(Math.abs(box.y - first.y), `Header at ${width}px`).toBeLessThanOrEqual(1)
+      }
+    }
+    await controls.first().click()
+    await controls.first().click()
+    await expect(list.locator('.tariff-select').first()).toHaveText('Local')
+    await list.evaluate(element => element.removeAttribute('style'))
+    await page.emulateMedia({ forcedColors: 'active' })
+    expect(await page.evaluate(() => matchMedia('(forced-colors: active)').matches)).toBe(true)
+    await controls.first().focus()
+    for (const control of await controls.all()) {
+      await expect(control).toBeFocused()
+      await expect(control).toBeVisible()
+      await page.keyboard.press('Tab')
+    }
+    await page.screenshot({ path: testInfo.outputPath(`tariff-headers-forced-colors-${language}.png`), fullPage: true })
   })
 }
 
