@@ -1,5 +1,47 @@
 import { test, expect, type Page } from '@playwright/test'
-import { API_BASE, getAdminToken, impersonateDemoParticipant, navigateTo } from './helpers'
+import { API_BASE, getAdminToken, impersonateDemoParticipant, navigateTo, pinDemoZev } from './helpers'
+
+for (const [name, path, selector] of [
+  ['participants', '/participants', '.participant-rows'],
+  ['billing', '/billing/invoices', '.invoice-rows'],
+  ['documents', '/documents', '.table-card:has(.doc-wide)'],
+  ['admin invoices', '/admin/invoices', '.card:has(.data-table)'],
+]) {
+  test(`${name} table meets its sheet edges across breakpoints`, async ({ page }, testInfo) => {
+    const errors: string[] = []
+    page.on('pageerror', error => errors.push(error.message))
+    page.on('console', message => {
+      // Optional source discovery returns 404 when its feature is disabled.
+      if (message.location().url.endsWith('/metering/supplementary/sources/eligible/') && message.text().includes('404')) return
+      if (message.type() === 'error') errors.push(message.text())
+    })
+    await pinDemoZev(page)
+    await navigateTo(page, path)
+    const sheet = page.locator(selector).first()
+    await expect(sheet.locator('tbody tr').first()).toBeAttached()
+    for (const width of [1440, 940, 400]) {
+      await page.setViewportSize({ width, height: 900 })
+      if (width === 400) {
+        await expect.poll(() => page.locator('#app-sidebar').evaluate(element => element.getBoundingClientRect().right)).toBeLessThanOrEqual(0)
+      }
+      if (name !== 'admin invoices') {
+        expect(await sheet.evaluate(element => {
+          const bounds = element.getBoundingClientRect()
+          return element.querySelector('thead')!.getBoundingClientRect().top - bounds.top - element.clientTop
+        }), `header gap at ${width}px`).toBeCloseTo(0, 0)
+      }
+      if (name === 'admin invoices' || (name === 'documents' && width > 640)) {
+        expect(await sheet.evaluate(element => {
+          const table = element.querySelector('.data-table, .table-scroll')!
+          return element.getBoundingClientRect().bottom - table.getBoundingClientRect().bottom - element.clientTop
+        }), `bottom gap at ${width}px`).toBeCloseTo(0, 0)
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+      await page.screenshot({ path: testInfo.outputPath(`table-${width}.png`), fullPage: true })
+    }
+    expect(errors).toEqual([])
+  })
+}
 
 const PROBE_PREFIX = 'Layout Probe '
 const PROBE_COUNT = 10

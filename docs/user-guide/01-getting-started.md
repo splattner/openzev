@@ -684,6 +684,10 @@ one row preserves the selected order for when more rows return. On phones,
 sortable headings remain above the record cards. Calculation layouts such as
 invoice line items and the hour/minute readings grid keep their fixed order.
 
+Participant and billing lists keep their heading band at the top edge of the
+table panel when rows stack. Wider document and admin invoice tables scroll
+sideways using the scrollbar at the panel's bottom edge.
+
 ## API Access
 
 OpenZEV provides a complete REST API for programmatic access:

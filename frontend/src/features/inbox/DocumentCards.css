@@ -90,6 +90,15 @@
   display: none;
 }
 
+/* The hidden phone cards follow the desktop table, so it is not :last-child. */
+@media (min-width: 641px) {
+  .table-card > .doc-wide {
+    margin-bottom: calc(-1 * var(--sheet-pad-block));
+    border-bottom-left-radius: calc(var(--radius-lg) - 1px);
+    border-bottom-right-radius: calc(var(--radius-lg) - 1px);
+  }
+}
+
 @media (max-width: 640px) {
   .doc-filter-wide {
     display: none;

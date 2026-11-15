@@ -175,11 +175,6 @@
     padding-bottom: calc(var(--sheet-pad-block) + 0.2rem);
   }
 
-  /* Stacked rows keep the sheet's top inset; dividers run edge to edge. */
-  .table-card.invoice-rows > table:first-child {
-    margin-top: 0;
-  }
-
   .table-card.invoice-rows tbody tr {
     padding-inline: var(--sheet-pad-inline);
   }
