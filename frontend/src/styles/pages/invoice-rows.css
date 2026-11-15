@@ -145,6 +145,7 @@
   }
 
   .invoice-rows thead th.sortable-header {
+    position: relative;
     display: block;
     width: auto;
   }

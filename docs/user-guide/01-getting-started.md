@@ -681,7 +681,7 @@ Action columns cannot be sorted.
 
 Sort controls appear only with at least two filtered rows. Filtering down to
 one row preserves the selected order for when more rows return. On phones,
-sortable headings remain above the record cards. Calculation layouts such as
+sortable headings wrap into separate lines above the record cards. Calculation layouts such as
 invoice line items and the hour/minute readings grid keep their fixed order.
 
 Participant and billing lists keep their heading band at the top edge of the

@@ -19,9 +19,9 @@ for (const [name, path, selector] of [
     await navigateTo(page, path)
     const sheet = page.locator(selector).first()
     await expect(sheet.locator('tbody tr').first()).toBeAttached()
-    for (const width of [1440, 940, 400]) {
+    for (const width of [1440, 940, 400, 360]) {
       await page.setViewportSize({ width, height: 900 })
-      if (width === 400) {
+      if (width <= 400) {
         await expect.poll(() => page.locator('#app-sidebar').evaluate(element => element.getBoundingClientRect().right)).toBeLessThanOrEqual(0)
       }
       if (name !== 'admin invoices') {
@@ -29,6 +29,12 @@ for (const [name, path, selector] of [
           const bounds = element.getBoundingClientRect()
           return element.querySelector('thead')!.getBoundingClientRect().top - bounds.top - element.clientTop
         }), `header gap at ${width}px`).toBeCloseTo(0, 0)
+        await expect.poll(() => sheet.locator('thead th').evaluateAll(cells => {
+          const boxes = cells.map(cell => cell.getBoundingClientRect()).filter(box => box.width && box.height)
+          return boxes.every((a, index) => boxes.slice(index + 1).every(b =>
+            Math.min(a.right, b.right) - Math.max(a.left, b.left) <= 0.5 ||
+            Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) <= 0.5))
+        }), { message: `headings overlap at ${width}px` }).toBe(true)
       }
       if (name === 'admin invoices' || (name === 'documents' && width > 640)) {
         expect(await sheet.evaluate(element => {
