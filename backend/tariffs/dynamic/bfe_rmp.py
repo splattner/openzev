@@ -106,6 +106,8 @@ def _price(raw: object, *, label: str) -> Decimal | None:
     try:
         chf_per_mwh = Decimal(str(raw).strip())
         value = (chf_per_mwh / Decimal(1000)).quantize(PRICE_QUANTUM)
+        if not value.is_finite():
+            raise ValueError
         return value
     except (InvalidOperation, DivisionByZero, ValueError) as exc:
         raise DynamicTariffResponseError(

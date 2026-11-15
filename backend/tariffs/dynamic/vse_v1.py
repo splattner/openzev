@@ -140,6 +140,8 @@ def _price(raw: object, *, label: str) -> Decimal:
         if isinstance(raw, bool) or not isinstance(raw, (int, float, str)):
             raise ValueError
         value = Decimal(str(raw)).quantize(PRICE_QUANTUM)
+        if not value.is_finite():
+            raise ValueError
         return value
     except (InvalidOperation, ValueError) as exc:
         raise DynamicTariffResponseError(

@@ -184,6 +184,9 @@ be re-enabled, fetched or used for billing; create a named replacement. Raw
 | `valid_from` / `valid_to` | `DateTimeField` | UTC, half-open interval |
 | `price_chf_per_kwh` | `DecimalField(8, 5)` | **Signed** |
 
+The v1, v2 and BFE parsers reject NaN and infinite prices with
+`component_value_invalid`. Finite negative prices remain valid.
+
 `UniqueConstraint(source, valid_from)` (whose backing index also serves ordered
 source lookups) plus `CheckConstraint(valid_to > valid_from)`.
 `ordering = ["source", "valid_from", "id"]` (total, for paginated walks).

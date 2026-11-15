@@ -34,7 +34,8 @@ TESTDATA = Path(__file__).parent / "dynamic" / "testdata"
 @pytest.mark.parametrize("case,code", [
     ("missing", "timestamp_missing"), ("timestamp", "timestamp_invalid"),
     ("offset", "timestamp_offset_missing"), ("interval", "price_interval_invalid"),
-    ("overlap", "price_intervals_overlap"),
+    ("overlap", "price_intervals_overlap"), ("NaN", "component_value_invalid"),
+    ("Infinity", "component_value_invalid"), ("-Infinity", "component_value_invalid"),
 ])
 def test_actionable_parser_failures_carry_stable_codes_and_parameters(version, case, code):
     component = [{"unit": "CHF_kWh", "value": 0.1}] if version == "v1_0_5" else {
@@ -75,6 +76,15 @@ def test_returned_product_identity_has_an_actionable_error(name, code):
     if name:
         assert caught.value.params == {"expected": "demo", "actual": "other"}
 
+
+@pytest.mark.parametrize("value", ["NaN", "Infinity", "-Infinity"])
+def test_nonfinite_bfe_prices_are_rejected_with_an_actionable_field(value):
+    from .dynamic.bfe_rmp import parse_tariff_response as parse_bfe
+
+    with pytest.raises(DynamicTariffResponseError) as caught:
+        parse_bfe(f"Year,Month,Price_pv_CHF_MWh\n2026,1,{value}\n", tariff_name="pv")
+    assert caught.value.code == "component_value_invalid"
+    assert caught.value.params == {"field": "CSV[0].Price_pv_CHF_MWh", "received": repr(value)}
 
 
 def fixture(name: str) -> dict:
