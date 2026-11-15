@@ -375,6 +375,12 @@ communities: two ZEVs on the same operator product fetch once, together.
   every 404 as empty, including a removed product; verify the URL when gaps
   persist. Rechecking capabilities preserves this setting. **410** always fails.
 
+Fetch failure explanations use your selected interface language in tariff details,
+status tooltips and source administration. Older saved failures may show a general
+message until the next fetch records a specific cause. The synthetic demo source
+uses an intentionally unreachable `.invalid` address; keep it disabled and use
+its seeded prices rather than fetching that address.
+
 ### Recovering a refused price series
 
 - **BilledPriceChanged:** an operator changed a price or interval already

@@ -10,6 +10,7 @@ coverage.
 import json
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from itertools import cycle
 from pathlib import Path
 from unittest import mock
 
@@ -166,8 +167,8 @@ class TestStorePoints:
 class TestEvidenceProtection:
     def test_overwriting_a_billed_interval_is_refused(self):
         from tariffs.dynamic.fetch import BilledPriceChanged
-        from testing import factories
         from tariffs.models import EnergyType
+        from testing import factories
 
         source = make_source()
         tariff = factories.TariffFactory(dynamic_source=source, energy_type=EnergyType.GRID)
@@ -369,6 +370,7 @@ class TestEvidenceProtection:
         source.refresh_from_db()
         assert source.last_fetch_status == FetchStatus.FAILED
         assert "already priced an invoice" in source.last_fetch_error
+        assert source.last_fetch_diagnostics[0]["code"] == "billed_price_changed"
         assert DynamicPricePoint.objects.get().price_chf_per_kwh == Decimal("0.10000")
 
     def test_a_window_that_could_not_be_fetched_is_reported_not_dropped(self):
@@ -394,13 +396,17 @@ class TestEvidenceProtection:
         assert source.recovery_from is None
 
     def test_an_unexpected_error_is_recorded_and_audited(self):
-        source = make_source()
+        source = make_source(last_fetch_diagnostics=[{
+            "code": "host_unresolved", "params": {"host": "old.example.test"},
+            "message": "Old failure", "field": None, "path": [],
+        }])
         with mock.patch("tariffs.dynamic.fetch.fetch_window", side_effect=RuntimeError("boom")),                 mock.patch("tariffs.tasks._audit_best_effort") as audit:
             with pytest.raises(RuntimeError):
                 fetch_dynamic_prices_impl(str(source.pk))
         source.refresh_from_db()
         assert source.last_fetch_status == FetchStatus.FAILED
         assert "RuntimeError" in source.last_fetch_error
+        assert source.last_fetch_diagnostics == []
         audit.assert_called_once()
 
     @pytest.mark.parametrize("backfill,previous_days,fail_first", [
@@ -479,6 +485,7 @@ class TestAdminCreation:
 
     def test_price_points_are_read_only_in_the_admin(self):
         from django.contrib import admin as django_admin
+
         from tariffs.admin import DynamicPricePointAdmin
 
         model_admin = DynamicPricePointAdmin(DynamicPricePoint, django_admin.site)
@@ -531,6 +538,79 @@ class TestCoverageGaps:
 
 
 class TestRefreshSource:
+    def test_parser_cause_and_field_survive_recording_a_failed_fetch(self):
+        from tariffs.dynamic.fetch import PriceSeriesConflict
+
+        source = make_source()
+        payload = {"prices": [{
+            "start_timestamp": "2026-06-15T00:00:00Z",
+            "end_timestamp": "2026-06-15T00:15:00Z",
+            "grid": [{"unit": "CHF_kWh", "value": "bad"}],
+        }]}
+        with served(payload), pytest.raises(PriceSeriesConflict):
+            refresh_source(source, now=datetime(2026, 6, 15, 9, tzinfo=UTC))
+        source.refresh_from_db()
+        assert source.last_fetch_diagnostics[0]["code"] == "component_value_invalid"
+        assert source.last_fetch_diagnostics[0]["params"] == {
+            "field": "prices[0].grid[0].value", "received": "'bad'",
+        }
+
+    def test_stored_diagnostics_keep_only_three_distinct_bounded_failures(self):
+        source = make_source()
+        failures = [TariffFetchError(
+            "Safe explanation " * 50, code="host_unresolved", params={"host": f"host-{index}.invalid"},
+        ) for index in range(4)]
+        with mock.patch("tariffs.dynamic.fetch.fetch_window", side_effect=cycle([
+            failures[0], TariffFetchError("Different wording", code="host_unresolved",
+                                               params={"host": "host-0.invalid"}), *failures[1:],
+        ])):
+            with pytest.raises(TariffFetchError):
+                refresh_source(source, backfill=True, now=datetime(2026, 6, 15, 9, tzinfo=UTC))
+        source.refresh_from_db()
+        assert [entry["params"]["host"] for entry in source.last_fetch_diagnostics] == [
+            "host-0.invalid", "host-1.invalid", "host-2.invalid",
+        ]
+        assert all(set(entry) == {"code", "params"} for entry in source.last_fetch_diagnostics)
+
+    def test_unresolved_host_diagnostics_survive_window_aggregation(self):
+        source = make_source()
+        failure = TariffFetchError(
+            "The host dynamic-tariffs.openzev.invalid could not be resolved. Check the address for a typo.",
+            code="host_unresolved", params={"host": "dynamic-tariffs.openzev.invalid"},
+            log_detail="Private resolver detail",
+        )
+        with mock.patch("tariffs.dynamic.fetch.fetch_tariff_document", side_effect=failure):
+            with pytest.raises(TariffFetchError):
+                refresh_source(source, backfill=True, now=datetime(2026, 6, 15, 9, tzinfo=UTC))
+        source.refresh_from_db()
+        assert source.last_fetch_diagnostics == [{
+            "code": "host_unresolved", "params": {"host": "dynamic-tariffs.openzev.invalid"},
+        }]
+        assert "Private resolver detail" not in json.dumps(source.last_fetch_diagnostics)
+
+        with served(fixture("vse_v1_gap")):
+            refresh_source(source, now=datetime(2026, 6, 16, 9, tzinfo=UTC))
+        source.refresh_from_db()
+        assert source.last_fetch_error == ""
+        assert source.last_fetch_diagnostics == []
+
+    @pytest.mark.parametrize("code", ["invalid_dynamic_response", "billed_price_changed", "price_series_conflict"])
+    def test_refusal_diagnostics_survive_window_aggregation(self, code):
+        from tariffs.dynamic.fetch import BilledPriceChanged, PriceSeriesConflict
+        from tariffs.dynamic.vse_v1 import DynamicTariffResponseError
+
+        source = make_source()
+        failure = {
+            "invalid_dynamic_response": DynamicTariffResponseError("Invalid price intervals"),
+            "billed_price_changed": BilledPriceChanged("Price already used for billing"),
+            "price_series_conflict": PriceSeriesConflict("Overlapping prices"),
+        }[code]
+        with mock.patch("tariffs.dynamic.fetch.fetch_window", side_effect=failure):
+            with pytest.raises(PriceSeriesConflict):
+                refresh_source(source, backfill=True, now=datetime(2026, 6, 15, 9, tzinfo=UTC))
+        source.refresh_from_db()
+        assert source.last_fetch_diagnostics[0]["code"] == code
+
     def test_a_plain_refresh_reaches_back_a_day_and_forward_two(self):
         # The window is in UTC while operators publish in local time, so
         # starting at UTC midnight would clip the first hours of the Swiss day.

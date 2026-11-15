@@ -1,12 +1,14 @@
 from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from drf_spectacular.utils import extend_schema_field
 from .dynamic.adapters import DynamicApiVersion
 from .dynamic.models import DynamicTariffSource
 from .dynamic.services import tariff_has_dynamic_billing_evidence
 from .models import BillingMode, EnergyType, PeriodType, Tariff, TariffPeriod
 from .periods import has_window, is_catch_all, months_of, weekdays_of
 from .errors import TariffValidationMixin, error_detail, model_validation_error
+from .dynamic.diagnostics import normalize_fetch_diagnostics
 from .dynamic.protocol import V2_PRODUCT_REQUIRED
 
 
@@ -527,6 +529,11 @@ class VseTariffImportResultSerializer(serializers.Serializer):
     errors = VseTariffImportAppliedErrorSerializer(many=True)
 
 
+class DynamicFetchDiagnosticSerializer(serializers.Serializer):
+    code = serializers.CharField()
+    params = serializers.DictField()
+
+
 class DynamicTariffSourceSerializer(serializers.ModelSerializer):
     """Public configuration and operational summary for a shared source."""
 
@@ -534,7 +541,12 @@ class DynamicTariffSourceSerializer(serializers.ModelSerializer):
     linked_tariff_count = serializers.IntegerField(read_only=True, default=0)
     linked_zev_count = serializers.IntegerField(read_only=True, default=0)
     supports_backfill = serializers.BooleanField(read_only=True)
+    last_fetch_diagnostics = serializers.SerializerMethodField()
     aggregated_tariff_types = serializers.SerializerMethodField()
+
+    @extend_schema_field(DynamicFetchDiagnosticSerializer(many=True))
+    def get_last_fetch_diagnostics(self, obj):
+        return normalize_fetch_diagnostics(obj.last_fetch_diagnostics)
 
     def get_aggregated_tariff_types(self, obj):
         from .dynamic.components import aggregated_tariff_types
@@ -545,7 +557,7 @@ class DynamicTariffSourceSerializer(serializers.ModelSerializer):
         model = DynamicTariffSource
         fields = [
             "id", "label", "url", "api_version", "tariff_type", "tariff_name", "enabled",
-            "last_fetch_status", "last_fetch_at", "last_success_at", "last_fetch_error",
+            "last_fetch_status", "last_fetch_at", "last_success_at", "last_fetch_error", "last_fetch_diagnostics",
             "covers_from", "covers_to", "recovery_from", "point_count", "linked_tariff_count", "linked_zev_count",
             "supports_backfill", "empty_on_not_found", "aggregated_tariff_types", "created_at", "updated_at",
         ]

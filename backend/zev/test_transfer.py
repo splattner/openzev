@@ -1178,7 +1178,7 @@ class DynamicSourceImportTests(TestCase):
     def test_a_blank_v2_source_is_rejected_even_without_tariffs(self):
         from zev.transfer.importer import _Collector, _dynamic_source_for
 
-        with self.assertRaisesRegex(ValueError, "require a product name"):
+        with self.assertRaisesRegex(ValueError, "product name"):
             _dynamic_source_for({"dynamic_source": {
                 "label": "Blank", "url": "https://example.test/prices", "api_version": "v2_0_0",
                 "tariff_type": "grid", "tariff_name": "",
@@ -1275,6 +1275,7 @@ class SchemaParityTests(TestCase):
             "last_fetch_at",
             "last_success_at",
             "last_fetch_error",
+            "last_fetch_diagnostics",
             "covers_from",
             "covers_to",
             "recovery_from",

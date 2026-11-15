@@ -1199,6 +1199,11 @@ export type DynamicApiVersion = 'v1_0_5' | 'v2_0_0' | 'bfe_rmp'
 /** The technology column a BFE reference-market-price source reads. */
 export type BfeRmpTechnology = 'pv' | 'wasserkraft' | 'windenergie' | 'biomasse'
 
+export interface DynamicFetchDiagnostic {
+    code: string
+    params: Record<string, unknown>
+}
+
 /**
  * A shared price series, fetched from one operator endpoint. Global, not
  * scoped to any one ZEV — two communities on the same product share one
@@ -1216,6 +1221,7 @@ export interface DynamicTariffSource {
     last_fetch_at: string | null
     last_success_at: string | null
     last_fetch_error: string
+    last_fetch_diagnostics?: DynamicFetchDiagnostic[]
     /** Extent of the stored series; null before anything has been fetched. */
     covers_from: string | null
     covers_to: string | null

@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, DivisionByZero, InvalidOperation
 from zoneinfo import ZoneInfo
 
-from .vse_v1 import DynamicTariffResponseError, PricePoint
+from .vse_v1 import DynamicTariffResponseError, PricePoint, _reject_overlaps
 
 TARIFF_TYPES = ("feed_in",)
 
@@ -105,22 +105,13 @@ def _price(raw: object, *, label: str) -> Decimal | None:
         return None
     try:
         chf_per_mwh = Decimal(str(raw).strip())
-    except InvalidOperation as exc:
-        raise DynamicTariffResponseError(f"{label} is not a number: {raw!r}.") from exc
-    try:
-        return (chf_per_mwh / Decimal(1000)).quantize(PRICE_QUANTUM)
-    except (InvalidOperation, DivisionByZero) as exc:
-        raise DynamicTariffResponseError(f"{label} is not a number: {raw!r}.") from exc
-
-
-def _reject_overlaps(points: list[PricePoint]) -> None:
-    for earlier, later in zip(points, points[1:]):
-        if later.valid_from < earlier.valid_to:
-            raise DynamicTariffResponseError(
-                "Two price periods overlap "
-                f"({earlier.valid_from.isoformat()} → {earlier.valid_to.isoformat()} and "
-                f"{later.valid_from.isoformat()} → {later.valid_to.isoformat()})."
-            )
+        value = (chf_per_mwh / Decimal(1000)).quantize(PRICE_QUANTUM)
+        return value
+    except (InvalidOperation, DivisionByZero, ValueError) as exc:
+        raise DynamicTariffResponseError(
+            f"{label} is not a number: {raw!r}.",
+            code="component_value_invalid", params={"field": label, "received": repr(raw)[:200]},
+        ) from exc
 
 
 def parse_tariff_response(text: str, *, tariff_name: str) -> ParsedSeries:
@@ -148,10 +139,12 @@ def parse_tariff_response(text: str, *, tariff_name: str) -> ParsedSeries:
     for index, row in enumerate(reader):
         valid_from, valid_to = _period_interval(row, index)
         if valid_to <= valid_from:
+            start, end = valid_from.isoformat(), valid_to.isoformat()
             raise DynamicTariffResponseError(
-                f"Row {index} ends at or before it starts ({valid_from.isoformat()} → {valid_to.isoformat()})."
+                f"Row {index} ends at or before it starts ({start} → {end}).",
+                code="price_interval_invalid", params={"start": start, "end": end},
             )
-        price = _price(row.get(column), label=f"Row {index} {column}")
+        price = _price(row.get(column), label=f"CSV[{index}].{column}")
         if price is None:
             continue
         series.points.append(PricePoint(valid_from=valid_from, valid_to=valid_to, price_chf_per_kwh=price))

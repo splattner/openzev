@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
+
 # The tariff types the standard defines. ``integrated`` is a *combination* of
 # ``electricity`` and ``grid``, and the fee types are additive on top — which is
 # why choosing one is a billing decision, not a display preference. See the
@@ -88,18 +89,31 @@ def parse_timestamp(raw: object, *, label: str) -> datetime:
     shifts by an hour twice a year. Prices are stored as UTC instants (ADR 0026).
     """
     if not isinstance(raw, str) or not raw.strip():
-        raise DynamicTariffResponseError(f"{label} is missing.")
+        raise DynamicTariffResponseError(
+            ('%(field)s is missing.') % {'field': label},
+            code="timestamp_missing", params={"field": label},
+        )
     try:
         text = raw.strip()
         if text.endswith(("Z", "z")):
             text = text[:-1] + "+00:00"
         parsed = datetime.fromisoformat(text)
     except ValueError as exc:
-        raise DynamicTariffResponseError(f"{label} is not an ISO-8601 timestamp: {raw!r}.") from exc
+        raise DynamicTariffResponseError(
+            ('%(field)s is not an ISO-8601 timestamp: %(received)s.') % {
+                'field': label,
+                'received': repr(raw),
+            },
+            code="timestamp_invalid", params={"field": label, "received": raw[:200]},
+        ) from exc
     if parsed.tzinfo is None:
         raise DynamicTariffResponseError(
-            f"{label} has no UTC offset: {raw!r}. The standard requires one, because a "
-            "price without a zone cannot be matched to a meter reading."
+            ('%(field)s has no UTC offset: %(received)s. The standard requires one, because a '
+                'price without a zone cannot be matched to a meter reading.') % {
+                'field': label,
+                'received': repr(raw),
+            },
+            code="timestamp_offset_missing", params={"field": label},
         )
     return parsed
 
@@ -122,12 +136,19 @@ def _price(raw: object, *, label: str) -> Decimal:
     Negative grid-usage prices are the point of a dynamic tariff, not an error:
     Production captures include negative grid prices around the solar peak.
     """
-    if isinstance(raw, bool) or not isinstance(raw, (int, float, str)):
-        raise DynamicTariffResponseError(f"{label} is not a number: {raw!r}.")
     try:
-        return Decimal(str(raw)).quantize(PRICE_QUANTUM)
+        if isinstance(raw, bool) or not isinstance(raw, (int, float, str)):
+            raise ValueError
+        value = Decimal(str(raw)).quantize(PRICE_QUANTUM)
+        return value
     except (InvalidOperation, ValueError) as exc:
-        raise DynamicTariffResponseError(f"{label} is not a number: {raw!r}.") from exc
+        raise DynamicTariffResponseError(
+            ('%(field)s is not a number: %(received)s.') % {
+                'field': label,
+                'received': repr(raw),
+            },
+            code="component_value_invalid", params={"field": label, "received": repr(raw)[:200]},
+        ) from exc
 
 
 def _reject_version_2(component: object, tariff_type: str) -> None:
@@ -141,8 +162,10 @@ def _reject_version_2(component: object, tariff_type: str) -> None:
     """
     if isinstance(component, dict):
         raise DynamicTariffResponseError(
-            f"This endpoint answers with schema version 2, where {tariff_type!r} is an "
-            "object rather than a list of prices. OpenZEV reads version 1 only."
+            ('This endpoint answers with schema version 2, where %(tariff_type)s is an object '
+                'rather than a list of prices. OpenZEV reads version 1 only.') % {
+                'tariff_type': repr(tariff_type),
+            }
         )
 
 
@@ -160,20 +183,28 @@ def _billable_value(component: object, *, tariff_type: str, label: str) -> tuple
     if component is None:
         return None, []
     if not isinstance(component, list):
-        raise DynamicTariffResponseError(f"{label} is not a list of prices.")
+        raise DynamicTariffResponseError(('%(field)s is not a list of prices.') % {
+            'field': label,
+        })
 
     price: Decimal | None = None
     dropped: list[str] = []
-    for entry in component:
+    for index, entry in enumerate(component):
         if not isinstance(entry, dict):
-            raise DynamicTariffResponseError(f"{label} holds something that is not a price.")
+            raise DynamicTariffResponseError(('%(field)s holds something that is not a price.') % {
+                'field': label,
+            })
         unit = str(entry.get("unit") or "").strip()
         if unit == BILLABLE_UNIT:
             if price is not None:
                 raise DynamicTariffResponseError(
-                    f"{label} carries more than one {BILLABLE_UNIT} price; which one applies is undefined."
+                    ('%(field)s carries more than one %(unit)s price; which one applies is '
+                        'undefined.') % {
+                        'field': label,
+                        'unit': BILLABLE_UNIT,
+                    }
                 )
-            price = _price(entry.get("value"), label=f"{label} value")
+            price = _price(entry.get("value"), label=f"{label}[{index}].value")
         elif unit:
             dropped.append(unit)
         elif "value" in entry:
@@ -187,16 +218,24 @@ def _dropped_unit_warnings(tariff_type: str, units: set[str]) -> list[str]:
     demand = sorted(u for u in units if u.startswith("CHF_kW_"))
     if demand:
         warnings.append(
-            f"The {tariff_type} series also publishes a demand charge ({', '.join(demand)}) "
-            "which is not billed: OpenZEV does not meter demand."
+            ('The %(tariff_type)s series also publishes a demand charge (%(units)s) which is '
+                'not billed: OpenZEV does not meter demand.') % {
+                'tariff_type': tariff_type,
+                'units': ', '.join(demand),
+            }
         )
     if "CHF_kVarh" in units:
         warnings.append(
-            f"The {tariff_type} series also publishes a reactive-energy charge (CHF_kVarh) which is not billed."
+            ('The %(tariff_type)s series also publishes a reactive-energy charge (CHF_kVarh) '
+                'which is not billed.') % {
+                'tariff_type': tariff_type,
+            }
         )
     if "<missing unit>" in units:
         warnings.append(
-            f"The {tariff_type} series contains a price with no unit; it was not billed."
+            ('The %(tariff_type)s series contains a price with no unit; it was not billed.') % {
+                'tariff_type': tariff_type,
+            }
         )
     fixed = sorted(
         u for u in units
@@ -204,8 +243,12 @@ def _dropped_unit_warnings(tariff_type: str, units: set[str]) -> list[str]:
     )
     if fixed:
         warnings.append(
-            f"The {tariff_type} series also publishes a fixed charge ({', '.join(fixed)}) which is not "
-            "billed here: add it as a monthly or yearly fee tariff, which does not need a time series."
+            ('The %(tariff_type)s series also publishes a fixed charge (%(units)s) which is '
+                'not billed here: add it as a monthly or yearly fee tariff, which does not need a'
+                ' time series.') % {
+                'tariff_type': tariff_type,
+                'units': ', '.join(fixed),
+            }
         )
     return warnings
 
@@ -220,30 +263,39 @@ def parse_tariff_response(payload: object, *, tariff_type: str) -> ParsedSeries:
     because only the caller knows which window was asked for.
     """
     if tariff_type not in TARIFF_TYPES:
-        raise DynamicTariffResponseError(f"Unknown tariff type {tariff_type!r}.")
+        raise DynamicTariffResponseError(('Unknown tariff type %(tariff_type)s.') % {
+            'tariff_type': repr(tariff_type),
+        })
     if not isinstance(payload, dict):
-        raise DynamicTariffResponseError("The response is not a JSON object.")
+        raise DynamicTariffResponseError(('The response is not a JSON object.'))
 
     raw_prices = payload.get("prices")
     if raw_prices is None:
-        raise DynamicTariffResponseError("The response has no 'prices'.")
+        raise DynamicTariffResponseError(("The response has no 'prices'."))
     if not isinstance(raw_prices, list):
-        raise DynamicTariffResponseError("The response's 'prices' is not a list.")
+        raise DynamicTariffResponseError(("The response's 'prices' is not a list."))
 
     series = ParsedSeries(publication_timestamp=_publication_timestamp(payload.get("publication_timestamp")))
     dropped_units: set[str] = set()
 
     for index, raw in enumerate(raw_prices):
         if not isinstance(raw, dict):
-            raise DynamicTariffResponseError(f"Price entry {index} is not an object.")
-        valid_from = parse_timestamp(raw.get("start_timestamp"), label=f"Price entry {index} start_timestamp")
-        valid_to = parse_timestamp(raw.get("end_timestamp"), label=f"Price entry {index} end_timestamp")
+            raise DynamicTariffResponseError(('Price entry %(index)s is not an object.') % {
+                'index': index,
+            })
+        valid_from = parse_timestamp(raw.get("start_timestamp"), label=f"prices[{index}].start_timestamp")
+        valid_to = parse_timestamp(raw.get("end_timestamp"), label=f"prices[{index}].end_timestamp")
         if valid_to <= valid_from:
             raise DynamicTariffResponseError(
-                f"Price entry {index} ends at or before it starts ({valid_from.isoformat()} → {valid_to.isoformat()})."
+                ('Price entry %(index)s ends at or before it starts (%(start)s → %(end)s).') % {
+                    'index': index,
+                    'start': valid_from.isoformat(),
+                    'end': valid_to.isoformat(),
+                },
+                code="price_interval_invalid", params={"start": valid_from.isoformat(), "end": valid_to.isoformat()},
             )
         price, dropped = _billable_value(
-            raw.get(tariff_type), tariff_type=tariff_type, label=f"Price entry {index} {tariff_type}",
+            raw.get(tariff_type), tariff_type=tariff_type, label=f"prices[{index}].{tariff_type}",
         )
         dropped_units.update(dropped)
         if price is None:
@@ -261,8 +313,15 @@ def _reject_overlaps(points: list[PricePoint]) -> None:
     for earlier, later in zip(points, points[1:]):
         if later.valid_from < earlier.valid_to:
             raise DynamicTariffResponseError(
-                "Two price intervals overlap "
-                f"({earlier.valid_from.isoformat()} → {earlier.valid_to.isoformat()} and "
-                f"{later.valid_from.isoformat()} → {later.valid_to.isoformat()}); "
-                "which price applies is undefined."
+                ('Price intervals overlap (%(start)s → %(end)s and %(other_start)s → '
+                    '%(other_end)s).') % {
+                    'start': earlier.valid_from.isoformat(),
+                    'end': earlier.valid_to.isoformat(),
+                    'other_start': later.valid_from.isoformat(),
+                    'other_end': later.valid_to.isoformat(),
+                },
+                code="price_intervals_overlap", params={
+                    "start": earlier.valid_from.isoformat(), "end": earlier.valid_to.isoformat(),
+                    "other_start": later.valid_from.isoformat(), "other_end": later.valid_to.isoformat(),
+                },
             )

@@ -36,7 +36,7 @@ class DynamicTariffSourceAdmin(admin.ModelAdmin):
     list_filter = ("api_version", "tariff_type", "last_fetch_status")
     search_fields = ("label", "url", "tariff_name")
     readonly_fields = (
-        "last_fetch_status", "last_fetch_at", "last_success_at", "last_fetch_error",
+        "last_fetch_status", "last_fetch_at", "last_success_at", "last_fetch_error", "last_fetch_diagnostics",
         "covers_from", "covers_to", "created_at", "updated_at",
         "recovery_from",
     )

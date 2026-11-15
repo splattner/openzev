@@ -1,7 +1,7 @@
 import { isAxiosError } from 'axios'
 import { formatApiError, splitIndexedErrors } from '../../lib/api/errors'
 import { formatShortDate } from '../../lib/appSettings'
-import type { AppSettings, TariffValidationError } from '../../types/api'
+import type { AppSettings, DynamicTariffSource, TariffValidationError } from '../../types/api'
 import { MONTH_KEYS } from './recurrence'
 import { FIXED_PRICE_LABELS } from './labels'
 import type { Translate } from '../../lib/translate'
@@ -48,6 +48,17 @@ export const tariffErrorKeys: Record<string, string> = {
   invalid_url: 'invalidUrl',
   import_url: 'importUrl',
   download_failed: 'downloadFailed',
+  timestamp_missing: 'timestampMissing',
+  timestamp_invalid: 'timestampInvalid',
+  timestamp_offset_missing: 'timestampOffsetMissing',
+  component_value_invalid: 'componentValueInvalid',
+  price_interval_invalid: 'priceIntervalInvalid',
+  price_intervals_overlap: 'priceIntervalsOverlap',
+  product_response_missing: 'productResponseMissing',
+  product_mismatch: 'productMismatch',
+  invalid_dynamic_response: 'invalidDynamicResponse',
+  billed_price_changed: 'billedPriceChanged',
+  price_series_conflict: 'priceSeriesConflict',
   import_json: 'importJson',
   reference_missing: 'referenceMissing',
   duplicate_date: 'duplicateDate',
@@ -103,9 +114,21 @@ const parameterKeys: Record<string, string[]> = {
   duplicate_date: ['name', 'date'], name_exists: ['name'], overlap: ['name'], series_identity: ['name'],
   source_in_use: ['tariff_count', 'community_count'],
   confirmation_mismatch: ['name'], host_unresolved: ['host'], http_status: ['status'], document_size: ['size'],
+  timestamp_missing: ['field'], timestamp_invalid: ['field', 'received'], timestamp_offset_missing: ['field'],
+  component_value_invalid: ['field', 'received'], price_interval_invalid: ['start', 'end'],
+  price_intervals_overlap: ['start', 'end', 'other_start', 'other_end'], product_mismatch: ['expected', 'actual'],
   history_limit: ['count'], max_digits: ['count'], max_decimal_places: ['count'], max_whole_digits: ['count'],
   max_length: ['count'], min_length: ['count'], min_value: ['value'], max_value: ['value'],
 }
+
+export const fetchErrorCodes = [
+  'host_unresolved', 'http_status', 'download_failed', 'invalid_url', 'public_url',
+  'import_url', 'import_json', 'document_size', 'invalid_dynamic_response',
+  'billed_price_changed', 'price_series_conflict', 'product_required',
+  'timestamp_missing', 'timestamp_invalid', 'timestamp_offset_missing',
+  'component_value_invalid', 'price_interval_invalid', 'price_intervals_overlap',
+  'product_response_missing', 'product_mismatch',
+]
 
 function translationOptions(code: string, params: Record<string, unknown>, settings?: AppSettings) {
   const options: Record<string, unknown> = {}
@@ -114,6 +137,7 @@ function translationOptions(code: string, params: Record<string, unknown>, setti
     const value = params[key]
     if (['count', 'status', 'size', 'tariff_count', 'community_count'].includes(key)) {
       if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return null
+      if (key === 'size' && value > Number.MAX_SAFE_INTEGER) return null
       if (key !== 'size' && !Number.isInteger(value)) return null
       if (key === 'status' && (value < 100 || value > 599)) return null
     } else if (key === 'value') {
@@ -189,6 +213,24 @@ function formatCodedError(error: TariffValidationError, t: Translate, settings?:
 
 function codedErrors(value: unknown): TariffValidationError[] | null {
   return Array.isArray(value) && value.every(isCodedError) ? value : null
+}
+
+/** Up to three distinct translated fetch causes; empty when none is usable. */
+export function dynamicFetchMessages(diagnostics: unknown, t: Translate): string[] {
+  const messages: string[] = []
+  for (const entry of Array.isArray(diagnostics) ? diagnostics : []) {
+    if (entry === null || typeof entry !== 'object' || !fetchErrorCodes.includes(entry.code)
+      || entry.params === null || typeof entry.params !== 'object' || Array.isArray(entry.params)) continue
+    // An empty message makes unusable parameters come back as '' instead of a guess.
+    const text = formatCodedError({ code: entry.code, params: entry.params, field: null, path: [], message: '' }, t)
+    if (text && !messages.includes(text)) messages.push(text)
+    if (messages.length === 3) break
+  }
+  return messages
+}
+
+export function formatDynamicFetchError(source: Pick<DynamicTariffSource, 'last_fetch_diagnostics'>, t: Translate): string {
+  return dynamicFetchMessages(source.last_fetch_diagnostics, t).join(' ') || t('pages.dynamicSources.fetchFailed')
 }
 
 export function formatTariffError(error: unknown, fallback: string, t: Translate, settings?: AppSettings): string {
