@@ -225,6 +225,8 @@ their own community under **ZEV settings → People & access**.
 each:
 
 - **Account** — name, username, email and the account's **platform role**.
+  Inactive accounts have a grey row and an **Inactive** label; their
+  action buttons remain available, including **Activate** in the menu.
 - **Communities** — one chip per community the account belongs to, marked
   *Manager*, *Viewer*, *Participant* or *Former participant*. A manager through a
   role says which: *Manager · Issuer* or *Manager · Representative*. An account

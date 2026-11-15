@@ -1166,9 +1166,9 @@ contracts are unchanged.
   | `.badge-tag` | Card / `--border-strong` / `--text-body`, weight 500 | Attributes, not states |
 
   Neutral/info and success/brand remain aliases for existing consumers.
-  Inactive metering points use neutral pills and grey rows with readable
-  supporting text; controls and details remain usable. Inventory deactivation
-  does not stop billing.
+  Inactive accounts and metering points use neutral pills and grey rows with
+  readable supporting text; controls and details remain usable. Metering-point
+  inventory deactivation does not stop billing.
   Data-quality labels use success for Complete, quiet warning for Partial and danger for Missing.
   Staff invoice tables use success for paid, danger for cancelled and a neutral tag
   for other workflow states; Data review is separate. Plain detail labels retain

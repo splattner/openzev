@@ -439,12 +439,12 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                             ]
 
                             return (
-                                <tr key={account.id}>
+                                <tr key={account.id} className={account.is_active ? 'account-row' : 'account-row is-inactive'}>
                                     <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
-                                            <strong>{accountDisplayName(account)}</strong>
+                                            <strong className="account-name">{accountDisplayName(account)}</strong>
                                             <span className="badge badge-tag">{roleLabel(account.role)}</span>
-                                            {!account.is_active && <span className="badge badge-warning">{t('pages.accounts.inactive')}</span>}
+                                            {!account.is_active && <span className="badge badge-neutral">{t('pages.accounts.inactive')}</span>}
                                         </div>
                                         <div className="muted">{account.username} · {account.email || '-'}</div>
                                     </td>

@@ -73,6 +73,7 @@
 @import '../components/PeriodSelector.css' layer(pages);
 @import '../features/meteringPoints/MeteringPointsList.css' layer(pages);
 @import '../pages/MeteringPointsPage.css' layer(pages);
+@import '../pages/AdminAccountsPage.css' layer(pages);
 @import '../features/meteringPoints/MeteringPointTypeLegend.css' layer(pages);
 @import '../features/tariffs/TariffCategorySections.css' layer(pages);
 @import '../features/tariffs/TariffOverview.css' layer(pages);
