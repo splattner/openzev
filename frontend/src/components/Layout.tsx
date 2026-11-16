@@ -192,6 +192,7 @@ export function Layout() {
     }, [isUserMenuOpen, isMobileMenuOpen])
 
     const displayName = `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || user?.username || ''
+    const impersonationLabel = t('nav.impersonatingAs', { name: displayName })
     // What the shell shows follows the account's relation to the selected
     // community, not a platform role (#761).
     const canManage = isZevScope
@@ -244,6 +245,34 @@ export function Layout() {
             >
                 {t('nav.skipToContent')}
             </a>
+            {isImpersonating && impersonator && (
+                <div className="impersonation-banner" role="status" inert={isMobile && isMobileMenuOpen}>
+                    <span title={impersonationLabel}>
+                        {impersonationLabel}
+                    </span>
+                    <button
+                        type="button"
+                        className="button button-primary"
+                        disabled={isStoppingImpersonation}
+                        onClick={async () => {
+                            try {
+                                setIsStoppingImpersonation(true)
+                                await stopImpersonation()
+                                navigate('/admin/accounts')
+                            } catch (error) {
+                                const message = apiErrorPayload(error)?.code === 'impersonation_session_expired'
+                                    ? 'auth.adminSessionExpired'
+                                    : 'common.error'
+                                pushToast(t(message), 'error')
+                            } finally {
+                                setIsStoppingImpersonation(false)
+                            }
+                        }}
+                    >
+                        {t('nav.stopImpersonation')}
+                    </button>
+                </div>
+            )}
             <div
                 className={`sidebar-overlay${isMobileMenuOpen ? ' visible' : ''}`}
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -473,35 +502,6 @@ export function Layout() {
                     </div>
 
                     <NotificationBell />
-
-                    {isImpersonating && impersonator && (
-                        <div className="impersonation-banner" role="status">
-                            <span>
-                                {t('nav.impersonatingAs', { name: displayName || user?.username })}
-                            </span>
-                            <button
-                                type="button"
-                                className="button button-secondary"
-                                disabled={isStoppingImpersonation}
-                                onClick={async () => {
-                                    try {
-                                        setIsStoppingImpersonation(true)
-                                        await stopImpersonation()
-                                        navigate('/admin/accounts')
-                                    } catch (error) {
-                                        const message = apiErrorPayload(error)?.code === 'impersonation_session_expired'
-                                            ? 'auth.adminSessionExpired'
-                                            : 'common.error'
-                                        pushToast(t(message), 'error')
-                                    } finally {
-                                        setIsStoppingImpersonation(false)
-                                    }
-                                }}
-                            >
-                                {t('nav.stopImpersonation')}
-                            </button>
-                        </div>
-                    )}
                 </header>
                 <main id="main-content" ref={mainRef} className="content-main" tabIndex={-1}>
                     <Outlet />

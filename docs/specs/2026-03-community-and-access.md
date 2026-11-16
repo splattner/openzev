@@ -1875,9 +1875,12 @@ settings deliberately live behind the account row, not in the main navigation
 `is-current` (the current nav row's pale forest), so the sidebar still shows
 where the user is. In the collapsed rail the trigger shows only the selector
 mark (the name as its tooltip) and expands the sidebar before opening. There is no account control in the page header: `header.top-nav`
-holds only the mobile app bar (`.mobile-bar`, ≤768px: menu button plus the
-decorative logo lockup, sticky) and, during impersonation, the impersonation
-banner; on desktop it is empty otherwise.
+holds the mobile app bar (`.mobile-bar`, ≤768px: menu button plus the
+decorative logo lockup, sticky) and the notification bell. During impersonation,
+a sticky gold strip spans the full viewport above both sidebar and content,
+identifies the account in use, and keeps the stop button at the right. The phone
+navigation scrim dims the strip while it is inert. Focused page controls scroll
+clear of the sticky strip and mobile app bar.
 My documents, the one participant page that lists across
 every membership, shows the community name only when the account has exactly
 one membership (`soleCommunityName(user)`, from `/auth/me` `memberships`) and

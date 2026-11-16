@@ -99,11 +99,11 @@
   .sidebar,
   .sidebar.collapsed {
     position: fixed;
-    top: 0;
+    top: var(--shell-banner-height);
     left: 0;
     bottom: 0;
     width: min(17.5rem, 86vw);
-    height: 100dvh;
+    height: calc(100dvh - var(--shell-banner-height));
     z-index: 200;
     transform: translateX(-100%);
     transition: transform 0.25s ease;
@@ -162,21 +162,18 @@
     padding: 0 1rem 1.5rem;
   }
 
+  .content-main,
+  .content-main :focus {
+    scroll-margin-top: calc(var(--shell-banner-height) + 4.25rem);
+  }
+
   /* The app bar: a full-bleed white strip, pinned while the page scrolls. */
   .top-nav {
     position: sticky;
-    top: 0;
+    top: var(--shell-banner-height);
     z-index: 150;
     width: auto;
     margin: 0 -1rem 1.25rem;
-  }
-
-  .top-nav:has(.impersonation-banner) {
-    margin-bottom: 1rem;
-  }
-
-  .top-nav .impersonation-banner {
-    margin: 0 1rem;
   }
 
   /* In the app bar, at its right edge. */
@@ -189,7 +186,7 @@
 
   .notification-panel {
     position: fixed;
-    top: 3.75rem;
+    top: calc(var(--shell-banner-height) + 3.75rem);
     right: 1rem;
     left: 1rem;
     width: auto;
