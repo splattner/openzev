@@ -1,10 +1,39 @@
 import { createSortedRowModel, rowSortingFeature, tableFeatures, useTable, type SortingState } from '@tanstack/react-table'
-import { useMemo, useState, type ThHTMLAttributes } from 'react'
+import { createContext, useContext, useLayoutEffect, useMemo, useState, type HTMLAttributes, type ThHTMLAttributes } from 'react'
 import { useTranslation } from 'react-i18next'
 
 const features = tableFeatures({ rowSortingFeature, sortedRowModel: createSortedRowModel() })
 
 type SortValue = string | number | null | undefined
+const HeaderFitsContext = createContext(true)
+
+export function SingleLineTableHead({ children, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
+    const [head, setHead] = useState<HTMLTableSectionElement | null>(null)
+    const [fits, setFits] = useState(true)
+
+    useLayoutEffect(() => {
+        if (!head || typeof ResizeObserver === 'undefined') return
+        const row = head.rows[0]
+        const measure = () => {
+            const boxes = Array.from(row.querySelectorAll('.sortable-header'), cell => cell.getBoundingClientRect()).filter(box => box.width && box.height)
+            setFits(boxes.every(box => Math.abs(box.top - boxes[0].top) < 1))
+        }
+        measure()
+        const observer = new ResizeObserver(measure)
+        observer.observe(row)
+        return () => observer.disconnect()
+    }, [head])
+
+    useLayoutEffect(() => {
+        if (!fits && head?.contains(document.activeElement)) head.closest('table')?.focus()
+    }, [fits, head])
+
+    return (
+        <HeaderFitsContext.Provider value={fits}>
+            <thead {...props} ref={setHead} className={`single-line-table-head ${props.className ?? ''}`} data-header-fits={fits}>{children}</thead>
+        </HeaderFitsContext.Provider>
+    )
+}
 
 function preserveHeaderFocus(button: HTMLButtonElement | null) {
     if (!button) return
@@ -18,13 +47,15 @@ export function SortableHeader({ direction, onSort, primary = true, children, ..
     onSort?: (event: unknown) => void
     primary?: boolean
 }) {
+    const fits = useContext(HeaderFitsContext)
+    const sortContent = <>{children}<span aria-hidden="true">{direction === 'asc' ? '▲' : direction === 'desc' ? '▼' : ''}</span></>
     return (
         <th {...props} className={`sortable-header ${props.className ?? ''}`} tabIndex={-1} aria-sort={onSort && primary && direction ? (direction === 'asc' ? 'ascending' : 'descending') : undefined}>
-            {onSort ? (
+            {onSort && fits ? (
                 <button type="button" ref={preserveHeaderFocus} className="data-table-sort" onClick={onSort}>
-                    {children}<span aria-hidden="true">{direction === 'asc' ? '▲' : direction === 'desc' ? '▼' : ''}</span>
+                    {sortContent}
                 </button>
-            ) : children}
+            ) : onSort ? <span className="data-table-sort">{sortContent}</span> : children}
         </th>
     )
 }

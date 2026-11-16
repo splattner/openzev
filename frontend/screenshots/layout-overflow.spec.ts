@@ -25,16 +25,18 @@ for (const [name, path, selector] of [
         await expect.poll(() => page.locator('#app-sidebar').evaluate(element => element.getBoundingClientRect().right)).toBeLessThanOrEqual(0)
       }
       if (name !== 'admin invoices') {
-        expect(await sheet.evaluate(element => {
-          const bounds = element.getBoundingClientRect()
-          return element.querySelector('thead')!.getBoundingClientRect().top - bounds.top - element.clientTop
-        }), `header gap at ${width}px`).toBeCloseTo(0, 0)
-        await expect.poll(() => sheet.locator('thead th').evaluateAll(cells => {
-          const boxes = cells.map(cell => cell.getBoundingClientRect()).filter(box => box.width && box.height)
-          return boxes.every((a, index) => boxes.slice(index + 1).every(b =>
+        await expect.poll(() => sheet.evaluate(element => {
+          const head = element.querySelector('thead')!
+          if (getComputedStyle(head).clipPath === 'inset(50%)') return !head.querySelector('button')
+          const gap = head.getBoundingClientRect().top - element.getBoundingClientRect().top - element.clientTop
+          const boxes = Array.from(head.querySelectorAll('th.sortable-header'), cell => cell.getBoundingClientRect())
+            .filter(box => box.width && box.height)
+          const singleLine = !head.classList.contains('single-line-table-head') || boxes.every(box => Math.abs(box.top - boxes[0].top) < 1)
+          const noOverlap = boxes.every((a, index) => boxes.slice(index + 1).every(b =>
             Math.min(a.right, b.right) - Math.max(a.left, b.left) <= 0.5 ||
             Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) <= 0.5))
-        }), { message: `headings overlap at ${width}px` }).toBe(true)
+          return Math.abs(gap) < 0.5 && singleLine && noOverlap
+        }), { message: `header wraps, overlaps or leaves a gap at ${width}px` }).toBe(true)
       }
       if (name === 'admin invoices' || (name === 'documents' && width > 640)) {
         expect(await sheet.evaluate(element => {
@@ -46,6 +48,42 @@ for (const [name, path, selector] of [
       await page.screenshot({ path: testInfo.outputPath(`table-${width}.png`), fullPage: true })
     }
     expect(errors).toEqual([])
+  })
+}
+
+for (const language of ['en', 'de', 'fr', 'it']) {
+  test(`participant headings disappear instead of wrapping in ${language}`, async ({ page }, testInfo) => {
+    await page.addInitScript(lang => localStorage.setItem('openzev.language', lang), language)
+    await pinDemoZev(page)
+    await navigateTo(page, '/participants')
+    const sheet = page.locator('.participant-rows')
+    const table = sheet.getByRole('table')
+    const names = () => sheet.locator('.invoice-row-name strong').allTextContents()
+    const original = await names()
+    const collator = new Intl.Collator(language, { numeric: true })
+    for (const width of [1440, 400, 940, 360]) {
+      await page.setViewportSize({ width, height: 900 })
+      await expect(sheet.locator('thead')).toHaveAttribute('data-header-fits', width > 400 ? 'true' : 'false')
+      await expect(table.getByRole('columnheader')).toHaveCount(6)
+      if (width <= 400) {
+        await expect(sheet.locator('thead')).toHaveCSS('clip-path', 'inset(50%)')
+        await expect(sheet.locator('thead button')).toHaveCount(0)
+        await expect(table).toBeFocused()
+        await expect.poll(names).toEqual(original)
+      } else {
+        const header = sheet.locator('thead th').first()
+        await header.locator('button').click()
+        await expect.poll(names).toEqual([...original].sort(collator.compare))
+        await header.locator('button').click()
+        await expect.poll(names).toEqual([...original].sort((a, b) => collator.compare(b, a)))
+        await header.locator('button').click()
+        await expect.poll(names).toEqual(original)
+        await header.locator('button').focus()
+        const tops = await sheet.locator('thead th.sortable-header').evaluateAll(cells => cells.map(cell => cell.getBoundingClientRect().top))
+        expect(new Set(tops).size).toBe(1)
+      }
+      await page.screenshot({ path: testInfo.outputPath(`participants-${language}-${width}.png`), fullPage: true })
+    }
   })
 }
 

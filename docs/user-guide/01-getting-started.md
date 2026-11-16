@@ -681,12 +681,13 @@ Action columns cannot be sorted.
 
 Sort controls appear only with at least two filtered rows. Filtering down to
 one row preserves the selected order for when more rows return. On phones,
-sortable headings wrap into separate lines above the record cards. Calculation layouts such as
+participant and billing rows become cards. Their heading bar and sorting controls
+hide when the headings no longer fit on one line. The current order stays in place;
+widen the window to use the sorting controls again. Calculation layouts such as
 invoice line items and the hour/minute readings grid keep their fixed order.
 
-Participant and billing lists keep their heading band at the top edge of the
-table panel when rows stack. Wider document and admin invoice tables scroll
-sideways using the scrollbar at the panel's bottom edge.
+Scroll wide document and admin invoice tables horizontally using the scrollbar
+at the panel's bottom edge.
 
 ## API Access
 

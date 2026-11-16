@@ -104,7 +104,7 @@ defined by shared frontend primitives and CSS contracts.
 | `frontend/src/components/EmailLogsModal.tsx` | `EmailLogsModal` | Uses `FormModal` for delivery history with retry actions and semantic status badges. |
 | `frontend/src/components/PeriodSelector.tsx` | `PeriodSelector` | Billing-interval navigation and optional custom ranges. Callers own period URL state and the aligned navigation floor. `compact` (whole periods) renders labelled chevron buttons around a one-line trigger naming the period via `billingPeriodName` (`lib/billingPeriod.ts`), with the exact dates in its tooltip and menu; the year's other names sit invisibly in the same cell so the trigger keeps a stable width. A whole-period selector (`allowCustomRange={false}`) steps from any range to the nearest whole periods (`adjacentBillingPeriod`); in `compact` mode a range that is not a whole period keeps its dates under a warning badge (`common.periodSelector.notBillingPeriod`), elsewhere under the **Custom** info badge. |
 | `frontend/src/components/YearPicker.tsx` | `YearPicker` | Native year control with `years`, `value`, `onChange`, optional `disabled`, required translated `label`, optional `id`, `visibleLabel` (default true), and `className`. It generates an associated id when omitted; hidden labels use `aria-label`. Range/default/rollover policy stays with the caller. |
-| `frontend/src/components/tableSorting.tsx` | `SortableHeader`, `useTableSorting` | Shared accessible headings and raw-value TanStack sorting for record tables with custom row/card markup; contract and coverage in §7.2. |
+| `frontend/src/components/tableSorting.tsx` | `SortableHeader`, `SingleLineTableHead`, `useTableSorting` | Shared accessible headings and raw-value TanStack sorting for record tables with custom row/card markup; contract and coverage in §7.2. |
 | `frontend/src/components/InvoicePresentation.tsx` | `InvoiceLink`, `InvoiceStatusBadge`, `InvoiceAmount`, `InvoicePdfCell`, `InvoiceActionButton`, `InvoiceRowActions` | Typed invoice cells/actions shared by period rows, own invoices, and the admin DataTable. `InvoiceStatusBadge` supports `variant="plain"` for the detail header; its default badge presentation remains for tables. `InvoiceActionButton`/`InvoiceRowActions` take `variant` (`primary` default, `secondary` outlined where a page-level primary action leads). `InvoiceAmount` takes `currency` (default true); `false` drops "CHF" for a column whose header names it. Callers own row models, eligibility and permission checks; no shared pagination layer. |
 | `frontend/src/components/PageHeader.tsx` | `PageHeader` | Page title (`h1`, `tabIndex={-1}`: the focus target after navigation, not a tab stop), a plain-text `title`, optional `eyebrow`, `scopeNote` (access label after the eyebrow, e.g. a viewer's read-only access; not in the tab title), `description` and `actions`. Sets `document.title` through `useDocumentTitle` (`frontend/src/lib/useDocumentTitle.ts`): `app.documentTitleScoped` ("Billing · Muster ZEV – OpenZEV") when the eyebrow is text, else `app.documentTitle`. Keep it outside data/scope state branches. Embedded pages use the host page title. |
 | `frontend/src/components/Notice.tsx` | `Notice` | Errors use `alert`, warnings use `status`; optional role override and retry with busy feedback. |
@@ -473,7 +473,11 @@ refresh when their names or other dependencies change.
 
 Sort the complete loaded result before client-side pagination and within
 existing groups. Apply the two-row threshold to each rendered table. On narrow
-layouts, sortable headings stay above the record cards. Sorting preserves
+layouts, sortable headings stay above the record cards. Participant and period
+invoice rows use `SingleLineTableHead`: the heading band stays only while its labels
+fit on one line; otherwise the band and sorting controls are hidden. Semantic
+column headers and the current sort order are retained. Widening restores the
+controls; if a focused sort button disappears, focus moves to the table. Sorting preserves
 selection, group membership, source-row labels, row actions and downloads;
 it does not change permissions or API queries.
 

@@ -98,7 +98,7 @@ for (const language of ['en', 'de', 'fr', 'it']) {
     await page.addInitScript(lang => localStorage.setItem('openzev.language', lang), language)
     await page.setViewportSize({ width: 1280, height: 768 })
     await page.goto('/billing/invoices')
-    const table = page.locator('main table')
+    const table = page.locator('.invoice-rows table')
     await expect(table.locator('tbody tr')).toHaveCount(5)
     await expect(table.locator('thead th')).toHaveCount(4)
     // Nothing in a cell spills over its neighbours, however long.
@@ -140,9 +140,9 @@ for (const language of ['en', 'de', 'fr', 'it']) {
     const firstRow = table.locator('tbody tr').first()
     expect(await firstRow.evaluate(element => getComputedStyle(element).display)).toBe('grid')
     // Cards stay a table for assistive technology, column headers included.
-    await expect(page.getByRole('table')).toHaveCount(1)
-    await expect(page.getByRole('columnheader')).toHaveCount(4)
-    await expect(page.getByRole('row')).toHaveCount(6)
+    await expect(table).toHaveCount(1)
+    await expect(table.getByRole('columnheader')).toHaveCount(4)
+    await expect(table.getByRole('row')).toHaveCount(6)
     const name = await firstRow.locator('.invoice-row-name').boundingBox()
     const total = await firstRow.locator('.invoice-row-total').boundingBox()
     expect(Math.abs(name!.y - total!.y)).toBeLessThan(8)
