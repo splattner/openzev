@@ -190,10 +190,12 @@ describe('Overview period cards', () => {
         expect(container.querySelector('a[href="/unavailable"]')).toBeNull()
     })
 
-    it('links every pending detail step even when their destinations are identical', () => {
+    it('keeps pending links and completed checks in independent disclosures', () => {
         const readiness = period()
+        readiness.next_action = 'generate'
         const invoicesLink = '/billing/invoices?period_start=2026-06-01&period_end=2026-06-30'
         readiness.steps = [
+            { key: 'generated', status: 'todo', count: 0, total: 1, link: invoicesLink },
             { key: 'sent', status: 'todo', count: 1, link: invoicesLink },
             { key: 'paid', status: 'todo', count: 3, total: 3, link: invoicesLink },
             { key: 'tariffs', status: 'ok', count: 0 },
@@ -207,6 +209,21 @@ describe('Overview period cards', () => {
         ])
         expect(linkedSteps.every((link) => link.getAttribute('href') === invoicesLink)).toBe(true)
         expect(container.querySelectorAll('.overview-period-verified li')).toHaveLength(2)
+        const pending = container.querySelector<HTMLDetailsElement>('details:not(.overview-period-verified)')!
+        const verified = container.querySelector<HTMLDetailsElement>('.overview-period-verified')!
+        expect(pending.querySelector('summary')?.textContent).toBe('pages.overview.cards.details')
+        expect(verified.querySelector('summary')?.textContent).toBe('pages.overview.cards.verified')
+        expect(pending.parentElement).toBe(verified.parentElement)
+        expect(pending.textContent).not.toContain('pages.dashboard.cockpit.stepLabels.tariffs')
+        expect(verified.textContent).not.toContain('pages.dashboard.cockpit.stepLabels.sent')
+        expect(pending.open).toBe(false)
+        expect(verified.open).toBe(false)
+        act(() => verified.querySelector('summary')!.click())
+        expect(verified.open).toBe(true)
+        expect(pending.open).toBe(false)
+        act(() => pending.querySelector('summary')!.click())
+        expect(pending.open).toBe(true)
+        expect(verified.open).toBe(true)
     })
 
     it('does not double-count delivery failures reported by readiness and attention', () => {
@@ -216,5 +233,55 @@ describe('Overview period cards', () => {
         const container = render(groupPeriodCards([readiness], [alert('email_failed')]).open[0])
         expect(container.querySelector('.overview-period-work')?.textContent).toContain('pages.overview.cards.failed:1')
         expect(container.textContent).not.toContain('stepDetails.emailFailedTodo')
+    })
+
+    it('shows collapsed completed checks without pending details and omits zero-count charges', () => {
+        const readiness = period()
+        readiness.next_action = 'generate'
+        readiness.steps = [
+            { key: 'generated', status: 'todo', count: 1, link: '/billing/invoices' },
+            { key: 'metering', status: 'ok', count: 1 },
+            { key: 'charges', status: 'ok', count: 0 },
+        ]
+        const container = render(groupPeriodCards([readiness], []).open[0])
+        const verified = container.querySelector<HTMLDetailsElement>('.overview-period-verified')
+        expect(verified?.querySelectorAll('li')).toHaveLength(1)
+        expect(verified?.open).toBe(false)
+        expect(verified?.querySelector('summary')?.textContent).toBe('pages.overview.cards.verified')
+        expect(container.querySelectorAll('details')).toHaveLength(1)
+        act(() => verified?.querySelector('summary')?.click())
+        expect(verified?.open).toBe(true)
+        expect(verified?.textContent).toContain('pages.dashboard.cockpit.stepLabels.metering')
+    })
+
+    it('retains every completed check when no primary or pending work remains', () => {
+        const readiness = period()
+        readiness.steps = [
+            { key: 'generated', status: 'done', count: 1, total: 1 },
+            { key: 'charges', status: 'done', count: 2 },
+        ]
+        const entry = groupPeriodCards([readiness], []).completed[0]
+        expect(primaryPeriodStep(entry)).toBeUndefined()
+        const container = render(entry)
+        const verified = container.querySelector<HTMLDetailsElement>('.overview-period-verified')!
+        expect(verified.open).toBe(false)
+        expect(container.querySelectorAll('details')).toHaveLength(1)
+        expect([...verified.querySelectorAll('li > span:last-child')].map((item) => item.textContent)).toEqual([
+            'pages.dashboard.cockpit.stepLabels.generated',
+            'pages.dashboard.cockpit.stepLabels.charges',
+        ])
+    })
+
+    it('keeps a zero-count charge actionable when a draft needs regeneration', () => {
+        const readiness = period()
+        readiness.next_action = 'generate'
+        readiness.steps = [{ key: 'charges', status: 'todo', count: 0,
+            detail_data: { stale_drafts: 1 }, link: '/billing/invoices' }]
+        const entry = groupPeriodCards([readiness], []).open[0]
+        expect(primaryPeriodStep(entry)?.key).toBe('charges')
+        const container = render(entry)
+        expect(container.querySelector('.overview-period-card > a')?.getAttribute('href')).toBe('/billing/invoices')
+        expect(container.querySelector('.overview-period-work')?.textContent).toContain('stepDetails.chargesTodo:1')
+        expect(container.querySelector('.overview-period-verified')).toBeNull()
     })
 })

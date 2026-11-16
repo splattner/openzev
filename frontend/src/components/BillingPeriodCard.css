@@ -103,22 +103,10 @@
 
 .overview-period-verified {
   margin-top: 0.75rem;
-  padding: 0.65rem 0.75rem;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 0.5rem;
-}
-
-.overview-detail-label {
-  margin: 0 0 0.4rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-muted);
 }
 
 .overview-period-verified ul {
   display: grid;
-  gap: 0;
   margin: 0;
 }
 

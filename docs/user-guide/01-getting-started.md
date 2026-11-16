@@ -610,6 +610,10 @@ If logged in as a community's manager:
 
 ![Manager Overview](screenshots/02-dashboard.png)
 
+Expand **Checked and complete** to view completed checks:
+
+![Completed billing checks expanded](screenshots/02d-dashboard-completed-checks.png)
+
 ![Manager Energy balance](screenshots/02c-energy-balance.png)
 
 Energy-flow cards name the selected community in both Energy balance and the
