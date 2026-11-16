@@ -44,6 +44,17 @@ const DEMO_PARTICIPANT_EMAIL = 'anna@openzev.local'
 // Helpers
 // ---------------------------------------------------------------------------
 
+export function collectBrowserErrors(page: Page) {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  page.on('console', message => {
+    // Optional source discovery returns 404 when its feature is disabled.
+    if (message.location().url.endsWith('/metering/supplementary/sources/eligible/') && message.text().includes('404')) return
+    if (message.type() === 'error') errors.push(message.text())
+  })
+  return errors
+}
+
 /** Navigate, then wait for network idle, webfonts and no visible loading placeholder. */
 export async function navigateTo(page: Page, urlPath: string) {
   await page.goto(`${BASE}${urlPath}`, { waitUntil: 'networkidle' })

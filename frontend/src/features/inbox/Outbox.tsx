@@ -251,7 +251,7 @@ export function Outbox() {
                           {t(`inbox.kind.${document.kind}`)} · {documentYear(document)}
                         </small>
                       </td>
-                      <td>{participantCell(entry)}</td>
+                      <td className="doc-participant-cell">{participantCell(entry)}</td>
                       <td>
                         {formatShortDate(document.delivered_at.slice(0, 10), settings)}
                         {document.delivered_by_name && (

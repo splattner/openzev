@@ -1,4 +1,4 @@
-import { SortableHeader, useTableSorting } from '../../components/tableSorting'
+import { ResponsiveTableHead, SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faChevronRight, faClock } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
@@ -66,8 +66,8 @@ export function TariffCategorySections({
     return (
         <div className="table-card invoice-rows tariff-list">
             {tariffSections.map((section) => (
-                <table key={section.category} className="tariff-table">
-                    <thead>
+                <table key={section.category} className="tariff-table" tabIndex={-1}>
+                    <ResponsiveTableHead>
                         <tr>
                             <SortableHeader {...sorting.header('name', section.rows.length)} scope="col">
                                 {t(`pages.tariffs.categories.${section.category}` as Parameters<typeof t>[0])}
@@ -85,7 +85,7 @@ export function TariffCategorySections({
                                 <span className="visually-hidden">{t('pages.tariffs.viewDetails')}</span>
                             </th>
                         </tr>
-                    </thead>
+                    </ResponsiveTableHead>
                     <tbody>
                         {section.rows.map(({ series, version: shown, upcomingVersion }) => {
                             const seriesKey = seriesKeyOf(series)

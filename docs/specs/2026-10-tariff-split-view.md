@@ -95,7 +95,8 @@ completion must not select or reopen anything (`useWriteScope`, reference spec �
   `kWh`, `month` or `year` unit, independent of fee allocation; a bandless energy
   tariff has no unit and stays last. Applies is a plain heading because its
   multi-line schedules and percentage descriptions have no single ordering.
-  Sort headings remain available above phone cards. Opening a row still selects
+  Cards retain only their category heading; sorting controls return in table
+  layout. Opening a row still selects
   its original version.
 - Plain validity dates, not rounded validity pills. No tariff, fee, band or
   version totals unless they help a concrete task (reference spec §10.1).
@@ -264,7 +265,7 @@ Values and decisions the pilot produced (reference spec §13, open question 3).
 | Pane breakpoint | The list and the pane sit side by side when the **tariff content area is at least 62rem (992px) wide** (`SPLIT_MIN_REM` in `TariffsPage.tsx`, measured on the area itself by `useMinWidth`, not the viewport). Below it the pane takes the whole area. Checked with the shell's sidebar open at viewports 1440 (content 1152px: list about 640px, pane 28–34rem), 1280 (content 992px: two panes, list in card mode at about 424px), 1200 (one pane) and 400. |
 | Pane width | `minmax(28rem, 34rem)` beside a flexible list. |
 | Dialog sizes | Not confirmed here: the pilot removed three tariff dialogs (create/edit, version, band) rather than sizing them. The provisional `FormModal` sizes stay provisional until phase 4. |
-| Table treatment | `.table-card.invoice-rows.tariff-list` uses the shared sheet styles with tariff-specific cards at list widths up to 56rem. Category and sortable headings remain visible in a wrapping flex row with content-sized cells, including between the shared 46rem and tariff 56rem breakpoints. |
+| Table treatment | `.table-card.invoice-rows.tariff-list` uses the shared sheet styles with tariff-specific cards at list widths up to 56rem. Only the category heading remains visible in cards; other semantic column headers are visually clipped and all sorting controls are omitted. Full headings and controls return above 56rem. |
 | Pane navigation | Opening from the list pushes one entry marked `state.tariffPane`; X takes it back with `navigate(-1)`. A direct link has no such entry, so X removes the parameters in place. Switching tariff or version replaces the entry and keeps the marker. A link to a tariff that no longer exists clears the parameters. A renamed tariff is found by the version in the URL, which the page then rewrites to the new name. |
 | Escape | In the pane, Escape cancels an open form (guarded) and otherwise closes the pane. An event already handled by a menu or picker (`defaultPrevented`) is left alone. X always closes the pane. |
 | Dirty guard | `useDraftGuard`: pane actions (`run`), the router blocker for Back/Forward and links, `beforeunload` for reload. A save in flight counts as unsaved and the prompt says it may still complete. Scope, permission and account changes clear the selection and every draft without asking. Phase 2 moved the pane-independent part into `components/useDraftGuard.ts` (`useDraftConfirm`, `useRouterDraftBlock`), which `FormModal` also uses; `useDraftGuard` stays the pane's combination of both. Delete is not a way around it: the open form replaces the version cards, so no delete control exists while a form holds a draft or a save is in flight, and a save let go by a discard cannot reopen a form or move the selection (session counter, below). Import is not guarded because it cannot touch the draft: its dialog opens over the form, the refetch behind it does not reseed the form, and Save still writes to the tariff the form was opened on. `tariffs-page-guard.test.ts` pins these with the real page. |
@@ -305,9 +306,9 @@ browser; `tariff-presentation.spec.ts` asserts, against mocked data:
   pane.
 
 The category-header regression in `tariff-presentation.spec.ts` checks English,
-German and French at a narrow card width, both container breakpoints (46rem and
-56rem), and immediately either side. It verifies visible, contained sort controls,
-card/table mode, sorting, keyboard order and forced-colours emulation.
+German and French at a narrow card width and immediately either side of the
+56rem container breakpoint. It verifies category-only card headings, restored table sorting controls,
+card/table mode, sorting, keyboard focus recovery and forced-colours emulation.
 
 Not yet verified: a screen-reader pass, a full-screen forced-colours review and
 long translated labels beyond the existing narrow-band and category-header checks.

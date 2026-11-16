@@ -81,7 +81,7 @@
 
 /* Cards: who and share, then where and since when, then status and the menu. */
 
-@container (max-width: 46rem) {
+@container (max-width: 56rem) {
   .invoice-rows.participant-rows tbody tr {
     grid-template:
       'who total' auto

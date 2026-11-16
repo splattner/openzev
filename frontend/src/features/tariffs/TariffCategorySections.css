@@ -172,7 +172,9 @@ td.tariff-table-valid {
     display: block;
   }
 
-  .tariff-table thead th.sortable-header {
+  .tariff-list .tariff-table thead th {
+    position: relative;
+    display: block;
     width: auto;
   }
 
@@ -189,7 +191,6 @@ td.tariff-table-valid {
 
   .invoice-rows.tariff-list .tariff-table thead tr {
     display: flex;
-    flex-wrap: wrap;
     background: var(--brand-deep);
   }
 
@@ -199,17 +200,13 @@ td.tariff-table-valid {
   }
 
   /* Out of sight, not out of the accessibility tree. */
-  .tariff-table thead th:not(:first-child, .sortable-header) {
+  .tariff-list .tariff-table thead th:not(:first-child) {
     position: absolute;
     width: 1px;
     height: 1px;
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
-  }
-
-  .tariff-table thead th.tariff-table-bands {
-    display: table-cell;
   }
 
   .tariff-list .tariff-table tbody tr {

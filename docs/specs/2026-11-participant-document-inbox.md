@@ -286,6 +286,8 @@ Decision for this spec, to be honoured by #793:
 ### 7.1 Participant *My documents* page
 
 Document tables provide column sorting by raw title, community, delivery timestamp, amount and status; the outbox adds recipient sorting and preserves each broadcast group. The first recipient’s name is the outbox recipient key. The same ordered records feed desktop rows and phone cards, with headings visible above cards. Downloads and withdrawal actions retain their record identity. See [management-page design §7.2](2026-04-frontend-management-page-design.md#72-information-architecture-rules).
+Document tables fit their sheet. Outbox recipients wrap long names and
+unbroken text; phone cards replace body rows at ≤640px.
 
 **Files:** `frontend/src/pages/DocumentsPage.tsx`, `frontend/src/features/inbox/DocumentsList.tsx`, `documentPresentation.ts`, and the shared `DocumentCards.css`.
 

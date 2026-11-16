@@ -180,7 +180,7 @@ for (const scope of ['viewer', 'disabled-manager'] as const) {
       ],
     })
     await page.goto('/billing/invoices')
-    await expect(page.locator('tbody tr')).toHaveCount(3)
+    await expect(page.locator('.invoice-rows tbody tr')).toHaveCount(3)
     // A covered row names the invoice that bills it, as a link.
     await expect(page.locator('.invoice-progress-covered')).toHaveCount(2)
     await expect(page.locator('.invoice-progress-covered').first()).toContainText('Already billed R-1')
@@ -192,10 +192,10 @@ for (const scope of ['viewer', 'disabled-manager'] as const) {
     await expect(page.locator('.invoice-batch-actions, .invoice-row-actions').getByRole('button', { name: /Generate|Approve|Send/ })).toHaveCount(0)
     // Filtering stays available to read-only accounts.
     await page.getByRole('button', { name: 'Issues 1', exact: true }).click()
-    await expect(page.locator('tbody tr')).toHaveCount(1)
-    await expect(page.locator('tbody')).toContainText('Participant B')
+    await expect(page.locator('.invoice-rows tbody tr')).toHaveCount(1)
+    await expect(page.locator('.invoice-rows tbody')).toContainText('Participant B')
     await page.getByRole('button', { name: 'All 3', exact: true }).click()
-    await expect(page.locator('tbody tr')).toHaveCount(3)
+    await expect(page.locator('.invoice-rows tbody tr')).toHaveCount(3)
     await page.locator('.invoice-progress-covered a').first().click()
     await expect(page).toHaveURL(/\/billing\/invoices\/1$/)
     await page.getByRole('link', { name: 'Back to Invoices', exact: true }).click()
@@ -219,8 +219,8 @@ test('row filtering leaves the whole-period batch payload and pending controls i
   await expect(filters).toHaveCount(5)
   // Show approved rows, while the recommended approval acts on the hidden draft.
   await filters.nth(2).click()
-  await expect(page.locator('tbody tr')).toHaveCount(1)
-  await expect(page.locator('tbody')).toContainText('Participant B')
+  await expect(page.locator('.invoice-rows tbody tr')).toHaveCount(1)
+  await expect(page.locator('.invoice-rows tbody')).toContainText('Participant B')
   await expect(page.getByText(/Batch actions apply to the whole period/)).toBeVisible()
   const request = page.waitForRequest('**/api/v1/invoices/invoices/approve-all/')
   await page.getByRole('button', { name: 'Approve 1 invoice', exact: true }).click()
@@ -229,7 +229,7 @@ test('row filtering leaves the whole-period batch payload and pending controls i
   await expect(page.getByRole('button', { name: 'Download all PDFs (1)', exact: true })).toBeDisabled()
   await expect(page.getByRole('button', { name: 'More batch actions', exact: true })).toBeDisabled()
   finish()
-  await expect(page.locator('tbody tr')).toHaveCount(2)
+  await expect(page.locator('.invoice-rows tbody tr')).toHaveCount(2)
   await expect(page.getByRole('button', { name: 'Send 2 invoices', exact: true })).toBeEnabled()
 })
 
@@ -247,12 +247,12 @@ test('a PDF retry leaves the Issues filter and count together', async ({ page })
   })
   await page.goto('/billing/invoices')
   await page.getByRole('button', { name: 'Issues 1', exact: true }).click()
-  await expect(page.locator('tbody tr')).toHaveCount(1)
-  await page.locator('tbody').getByRole('button', { name: 'More', exact: true }).click()
+  await expect(page.locator('.invoice-rows tbody tr')).toHaveCount(1)
+  await page.locator('.invoice-rows tbody').getByRole('button', { name: 'More', exact: true }).click()
   await page.getByRole('menuitem', { name: /generate PDF/i }).click()
   // While the retry runs the old failure is no longer news: not in the row,
   // not in the filter, not in its count.
-  await expect(page.locator('tbody tr')).toHaveCount(0)
+  await expect(page.locator('.invoice-rows tbody tr')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Issues 0', exact: true })).toBeVisible()
   finish()
   await page.getByRole('button', { name: 'All 2', exact: true }).click()

@@ -1,4 +1,4 @@
-import { SingleLineTableHead, SortableHeader, useTableSorting } from '../../components/tableSorting'
+import { ResponsiveTableHead, SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { useTranslation } from 'react-i18next'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faBuilding, faSpinner } from '@fortawesome/free-solid-svg-icons'
@@ -44,14 +44,14 @@ export function InvoicePeriodRowsTable({
         {/* Explicit roles keep table semantics when narrow containers turn
             the table into cards with display: block. */}
         <table role="table" tabIndex={-1}>
-          <SingleLineTableHead role="rowgroup">
+          <ResponsiveTableHead role="rowgroup">
             <tr role="row">
               <SortableHeader {...sorting.header('participant')} role="columnheader" scope="col">{t('pages.invoices.col.participant')}</SortableHeader>
               <SortableHeader {...sorting.header('progress')} role="columnheader" scope="col">{t('pages.invoices.col.progress')}</SortableHeader>
               <SortableHeader {...sorting.header('amount')} role="columnheader" scope="col" className="numeric">{t('pages.invoices.col.amount')}</SortableHeader>
               <th role="columnheader" scope="col" className="invoice-actions-cell">{t('pages.invoices.col.actions')}</th>
             </tr>
-          </SingleLineTableHead>
+          </ResponsiveTableHead>
           <tbody role="rowgroup">
             {sorting.rows.map((row) => {
               const invoice = row.invoice

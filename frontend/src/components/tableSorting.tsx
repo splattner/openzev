@@ -5,33 +5,37 @@ import { useTranslation } from 'react-i18next'
 const features = tableFeatures({ rowSortingFeature, sortedRowModel: createSortedRowModel() })
 
 type SortValue = string | number | null | undefined
-const HeaderFitsContext = createContext(true)
+const TableSortingControlsContext = createContext(true)
 
-export function SingleLineTableHead({ children, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
+export function ResponsiveTableHead({ children, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
     const [head, setHead] = useState<HTMLTableSectionElement | null>(null)
-    const [fits, setFits] = useState(true)
+    const [cardLayout, setCardLayout] = useState(false)
 
     useLayoutEffect(() => {
-        if (!head || typeof ResizeObserver === 'undefined') return
-        const row = head.rows[0]
+        const table = head?.closest('table')
+        if (!head || !table) return
         const measure = () => {
-            const boxes = Array.from(row.querySelectorAll('.sortable-header'), cell => cell.getBoundingClientRect()).filter(box => box.width && box.height)
-            setFits(boxes.every(box => Math.abs(box.top - boxes[0].top) < 1))
+            setCardLayout(getComputedStyle(head).getPropertyValue('--table-card-layout').trim() === '1')
         }
         measure()
+        if (typeof ResizeObserver === 'undefined') {
+            // shortcut: without ResizeObserver, only viewport changes refresh; add a polyfill if legacy container resizing is required.
+            window.addEventListener('resize', measure)
+            return () => window.removeEventListener('resize', measure)
+        }
         const observer = new ResizeObserver(measure)
-        observer.observe(row)
+        observer.observe(table.parentElement ?? table)
         return () => observer.disconnect()
     }, [head])
 
     useLayoutEffect(() => {
-        if (!fits && head?.contains(document.activeElement)) head.closest('table')?.focus()
-    }, [fits, head])
+        if (cardLayout && head?.contains(document.activeElement)) head.closest('table')?.focus()
+    }, [cardLayout, head])
 
     return (
-        <HeaderFitsContext.Provider value={fits}>
-            <thead {...props} ref={setHead} className={`single-line-table-head ${props.className ?? ''}`} data-header-fits={fits}>{children}</thead>
-        </HeaderFitsContext.Provider>
+        <TableSortingControlsContext.Provider value={!cardLayout}>
+            <thead {...props} ref={setHead} className={`responsive-table-head ${props.className ?? ''}`} data-card-layout={cardLayout}>{children}</thead>
+        </TableSortingControlsContext.Provider>
     )
 }
 
@@ -47,15 +51,14 @@ export function SortableHeader({ direction, onSort, primary = true, children, ..
     onSort?: (event: unknown) => void
     primary?: boolean
 }) {
-    const fits = useContext(HeaderFitsContext)
-    const sortContent = <>{children}<span aria-hidden="true">{direction === 'asc' ? '▲' : direction === 'desc' ? '▼' : ''}</span></>
+    const showControls = useContext(TableSortingControlsContext)
     return (
         <th {...props} className={`sortable-header ${props.className ?? ''}`} tabIndex={-1} aria-sort={onSort && primary && direction ? (direction === 'asc' ? 'ascending' : 'descending') : undefined}>
-            {onSort && fits ? (
+            {onSort && showControls ? (
                 <button type="button" ref={preserveHeaderFocus} className="data-table-sort" onClick={onSort}>
-                    {sortContent}
+                    {children}<span aria-hidden="true">{direction === 'asc' ? '▲' : direction === 'desc' ? '▼' : ''}</span>
                 </button>
-            ) : onSort ? <span className="data-table-sort">{sortContent}</span> : children}
+            ) : children}
         </th>
     )
 }
