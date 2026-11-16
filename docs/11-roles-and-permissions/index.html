@@ -2839,7 +2839,9 @@ their own community under <strong>ZEV settings → People &amp; access</strong>.
 <p><strong>Platform → Accounts → Users</strong> lists every account on the platform, one row
 each:</p>
 <ul>
-<li><strong>Account</strong> — name, username, email and the account's <strong>platform role</strong>.</li>
+<li><strong>Account</strong> — name, username, email and the account's <strong>platform role</strong>.
+  Inactive accounts have a grey row and an <strong>Inactive</strong> label; their
+  action buttons remain available, including <strong>Activate</strong> in the menu.</li>
 <li><strong>Communities</strong> — one chip per community the account belongs to, marked
   <em>Manager</em>, <em>Viewer</em>, <em>Participant</em> or <em>Former participant</em>. A manager through a
   role says which: <em>Manager · Issuer</em> or <em>Manager · Representative</em>. An account
@@ -2981,7 +2983,8 @@ Audit log</strong>) and to <strong>managers</strong> for their own communities (
 <strong>Setup → Settings → Audit log</strong>).</p>
 <p>Each event is named in your language ("Rechnung genehmigen", "Dokument zugestellt")
 with what it concerned and who did it; events that were refused or failed carry
-a badge. Search, category, actor, status and a date range narrow the list in one
+a status label.
+Search, category, actor, status and a date range narrow the list in one
 row. Click an event to see its details; the technical codes, IDs and the stored
 log text are under <strong>Technical details</strong>. Administrators also have <strong>Technical
 filters</strong> (action code, object type, object ID) on the platform log.</p>
@@ -3065,7 +3068,8 @@ and all recovery codes for that user, and is recorded in the audit log. An admin
 or recover your secrets, and cannot set up a factor on your behalf.</p>
 <p>The server needs an encryption key (<code>MFA_ENCRYPTION_KEYS</code>) before authenticator apps can be enrolled
 or a requirement can be set, and the passkey domain settings (<code>WEBAUTHN_RP_ID</code>, <code>WEBAUTHN_ORIGIN</code>)
-must match the address users open OpenZEV on. See <code>backend/.env.example</code> and the Helm chart README.</p>
+must match the address users open OpenZEV on. When the MFA key is missing, the
+Security settings explain this above the disabled policy controls. See <code>backend/.env.example</code> and the Helm chart README.</p>
 <h2 id="email-address-and-sessions">Email Address and Sessions<a class="headerlink" href="#email-address-and-sessions" title="Permanent link">&para;</a></h2>
 <h3 id="changing-your-email-address">Changing your email address<a class="headerlink" href="#changing-your-email-address" title="Permanent link">&para;</a></h3>
 <p>Your email address is what you sign in with and where sign-in links are sent, so changing

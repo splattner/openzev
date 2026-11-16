@@ -2148,8 +2148,9 @@ a key with:</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"</span>
 </code></pre></div>
 <ul>
-<li>The backup page shows a warning until a key is set, and every backup records
-  whether it was encrypted.</li>
+<li>When unencrypted backups are permitted, the page warns that backups are not
+  encrypted, below any urgent stale-backup warning. Missing required or unusable
+  keys remain blocking errors. Every backup records whether it was encrypted.</li>
 <li>Backups are encrypted with AES-256-GCM. Several keys can be listed, comma
   separated: the first encrypts, every one can decrypt. To rotate, add the new
   key <strong>in front</strong>, take fresh backups, and drop the old key only once no backup

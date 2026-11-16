@@ -1921,7 +1921,8 @@ the metering points by building and, with several buildings, the toolbar offers 
 <p><img alt="Metering points page" src="../screenshots/04-metering-points.png" /></p>
 <p>The tabs above the list count the metering points and show one view at a time:
 <strong>All</strong>, <strong>Active</strong>, <strong>Inactive</strong>, <strong>Needs attention</strong> and <strong>Unassigned</strong> (no participant today);
-click the active tab again to show all. <strong>Needs attention</strong> includes active points
+click the active tab again to show all. The gold <strong>Needs attention</strong> count includes
+warnings, not just severe errors. <strong>Needs attention</strong> includes active points
 with no readings, confirmed data gaps, or readings without a current assignment.
 Unavailable quality or assignment information is not counted as a confirmed problem;
 loading and retry notices explain when results may be incomplete. This view covers
@@ -1944,6 +1945,9 @@ Sorting stays within each building, and a group with one meter shows plain headi
 address, so a bookmark or shared link opens the same view.</p>
 <p>If a refresh fails, the last loaded list and any open form stay available.
 Use <strong>Retry</strong> in the warning to refresh the list.</p>
+<p>Inactive metering points use a grey row and a grey <strong>Inactive</strong> pill. Their
+actions and details remain available:</p>
+<p><img alt="Inactive metering point" src="../screenshots/04c-metering-point-inactive.png" /></p>
 <h2 id="metering-point-types">Metering Point Types<a class="headerlink" href="#metering-point-types" title="Permanent link">&para;</a></h2>
 <p>OpenZEV supports three metering point types:</p>
 <table>
@@ -2197,6 +2201,8 @@ easy to tell apart from a participant's own consumption.</p>
 <p>A participant only shares readings from days they were actually a member. A
 mid-period joiner pays nothing towards community energy measured before their
 join date, and a leaver's share stops on their leave date.</p>
+<p>Data-health messages such as <strong>No readings</strong> and <strong>Data gaps</strong> use
+plain text with a warning icon; select them to open data quality.</p>
 <blockquote>
 <p><strong>Note:</strong> <strong>Active</strong> is an inventory status. Deactivating a community or personal
 metering point does not stop its energy billing or per-point fees. Assignment
@@ -2210,7 +2216,7 @@ dates control the billing window; historical readings remain available.</p>
   (or "No location set"). A legend below the list names the icons: a bolt is
   <em>Consumption</em>, a solar panel <em>Production</em>, left-right arrows <em>Bidirectional</em>
   (only the types you have are listed)</li>
-<li>Badges only for what is unusual: <strong>Inactive</strong>, <strong>No current assignment</strong> (the meter
+<li>Labels only for what is unusual: <strong>Inactive</strong> (grey pill), <strong>No current assignment</strong> (the meter
   has readings but nobody is assigned to it), <strong>Surplus metering</strong> when
   <a href="#generation-behind-the-meter">Generation behind the meter</a> is ticked, and the
   status of a connected energy data source when it needs attention</li>

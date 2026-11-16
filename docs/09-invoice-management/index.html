@@ -2427,6 +2427,8 @@ and an old link to an invoice or to the former <strong>My invoices</strong> page
   is no cancel button in the UI, and an invoice with payments cannot be
   cancelled.</li>
 </ul>
+<p>The platform invoice list shows <strong>Data review</strong> separately from the invoice status:
+it flags a review need.</p>
 <p>Once an invoice has been approved it keeps its number for good: if it is
 cancelled later, generating the period again creates a new invoice next to it
 instead of replacing it, so no invoice number ever goes missing. Only a draft,
@@ -2578,7 +2580,7 @@ community's start falls back to the default. A failed refresh retains the loaded
 </tr>
 <tr>
 <td><strong>Progress</strong></td>
-<td>Metering data → Invoice → Approved → Sent → Paid. Checks show completed steps, spinners show pending work, and warning marks show problems. The legend below the table sheet explains the icons.</td>
+<td>Metering data → Invoice → Approved → Sent → Paid. Checks show completed steps, spinners show pending work, and red warning marks show problems. The legend below the table sheet explains the icons.</td>
 </tr>
 <tr>
 <td><strong>Amount (CHF)</strong></td>
@@ -2668,7 +2670,8 @@ generation conflict, a failed PDF, a failed email or no email address). Select o
 those rows; select it again, <strong>All</strong> or <strong>Show all rows</strong> to clear it. A
 category with no rows, or with all of them, is left out. If the selected category empties,
 the page explains why and offers <strong>Show all rows</strong>. Paid invoices appear
-under <strong>All</strong> only. Changing period or community clears the filter.</p>
+under <strong>All</strong> only. The <strong>Issues</strong> count remains visible while there are problems,
+including when the filter is selected. Changing period or community clears the filter.</p>
 <p>The <strong>batch actions</strong> in the command bar always act on the whole period,
 including rows hidden by a filter. The recommended next step is the page's one
 filled button and names how many invoices it touches (for example <em>Approve 4
