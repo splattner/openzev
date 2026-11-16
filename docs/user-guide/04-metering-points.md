@@ -23,7 +23,8 @@ the metering points by building and, with several buildings, the toolbar offers 
 
 The tabs above the list count the metering points and show one view at a time:
 **All**, **Active**, **Inactive**, **Needs attention** and **Unassigned** (no participant today);
-click the active tab again to show all. **Needs attention** includes active points
+click the active tab again to show all. The gold **Needs attention** count includes
+warnings, not just severe errors. **Needs attention** includes active points
 with no readings, confirmed data gaps, or readings without a current assignment.
 Unavailable quality or assignment information is not counted as a confirmed problem;
 loading and retry notices explain when results may be incomplete. This view covers
@@ -47,6 +48,11 @@ address, so a bookmark or shared link opens the same view.
 
 If a refresh fails, the last loaded list and any open form stay available.
 Use **Retry** in the warning to refresh the list.
+
+Inactive metering points use a grey row and a grey **Inactive** pill. Their
+actions and details remain available:
+
+![Inactive metering point](screenshots/04c-metering-point-inactive.png)
 
 ## Metering Point Types
 
@@ -281,6 +287,9 @@ A participant only shares readings from days they were actually a member. A
 mid-period joiner pays nothing towards community energy measured before their
 join date, and a leaver's share stops on their leave date.
 
+Data-health messages such as **No readings** and **Data gaps** use
+plain text with a warning icon; select them to open data quality.
+
 > **Note:** **Active** is an inventory status. Deactivating a community or personal
 > metering point does not stop its energy billing or per-point fees. Assignment
 > dates control the billing window; historical readings remain available.
@@ -294,7 +303,7 @@ Each meter on the **Metering Points** page is one row that shows, at a glance
   (or "No location set"). A legend below the list names the icons: a bolt is
   *Consumption*, a solar panel *Production*, left-right arrows *Bidirectional*
   (only the types you have are listed)
-- Badges only for what is unusual: **Inactive**, **No current assignment** (the meter
+- Labels only for what is unusual: **Inactive** (grey pill), **No current assignment** (the meter
   has readings but nobody is assigned to it), **Surplus metering** when
   [Generation behind the meter](#generation-behind-the-meter) is ticked, and the
   status of a connected energy data source when it needs attention

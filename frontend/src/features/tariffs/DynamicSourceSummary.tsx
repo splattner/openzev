@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import { formatDateTime } from '../../lib/appSettings'
 import type { AppSettings, DynamicPriceHistory, DynamicTariffSource } from '../../types/api'
 import { Disclosure } from '../../components/Disclosure'
-import { Notice } from '../../components/Notice'
 import { missingPriceDates, missingRangeLabel } from './dynamicPriceGaps'
 
 /**
@@ -38,12 +37,12 @@ export function DynamicSourceSummary({ source, settings, canOperate, missing = [
             )}
             {source.last_fetch_status === 'failed' && source.last_fetch_error && <p className="text-error m-0">{source.last_fetch_error}</p>}
             {missing.length > 0 && (
-                <Notice tone="warning">
+                <div className="warning-text" role="status">
                     {missingPriceDates(missing).map((dates) => (
                         <p key={dates.from} className="m-0"><strong>{missingRangeLabel(dates, settings, t)}</strong></p>
                     ))}
-                    <p className="muted m-0">{t('pages.dynamicSources.history.missingEffect')}</p>
-                </Notice>
+                    <p className="m-0">{t('pages.dynamicSources.history.missingEffect')}</p>
+                </div>
             )}
             <Disclosure lazy summary={t('pages.dynamicSources.sourceDetails')}>
                 <div className="tariff-source-summary">

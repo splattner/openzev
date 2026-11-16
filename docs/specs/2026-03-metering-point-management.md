@@ -431,7 +431,7 @@ operational history must be preserved:
 - Deactivation does **not** affect billing either, as of #408. `is_active` is
   a present-state boolean and the billing engine reasons per billed month, so
   consulting it let a deactivation today rewrite what a past period cost. It is
-  now purely an inventory status: the list badge and active/inactive filter, and
+  now purely an inventory status: the grey row, grey Inactive pill and active/inactive filter, and
   the Django admin filter. See `SPEC-2026-tariffs-billing` §4.6.5.
 - **To stop billing a meter, close its assignment** (`valid_to`) rather than
   deactivating it. That is the field that carries a date, so the fee stops from
@@ -648,6 +648,8 @@ python -m pytest -q
   `frontend/tests/metering-point-secondary-id.test.ts` and
   `frontend/tests/metering-draft-scope.test.ts`.
 - Assignment date-range picker with overlap/containment feedback
+- The Needs attention count includes missing assignments and incomplete/no data,
+  not only severe errors; its presentation follows SPEC-2026-08 §15.
 - Lists support status, attention, search, type and building filters, with sort and filters stored
   in the URL, including same-page navigation. Clickable Meter, Assignment and Last reading
   headings share the menu's `sort` parameter: `meter_id`, `location`, `holder`, `last_reading`,
@@ -666,7 +668,11 @@ python -m pytest -q
   dated assignments.
 - Named row issues use the same attention predicate as filtering/counts: data
   issues link to data quality in Last reading, and missing current assignments
-  are marked in Assignment. Healthy, unknown-only and inactive points are unmarked.
+  are marked in Assignment. Healthy, unknown-only and inactive points carry no
+  data-quality warning. Inactive rows use the neutral grey background and readable
+  grey text of ended tariff rows, with the shared grey `badge-neutral` Inactive
+  pill; their actions and expanded details remain available. Covered by
+  `metering-points-list.test.ts` and the `04c-metering-point-inactive` guide capture.
 - Managers edit points through the row menu, assignments through their details or menu,
   and buildings through the labelled button. Read-only roles have no editing controls.
   Generic assignment actions require exactly one current assignment; inconsistent

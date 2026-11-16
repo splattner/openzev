@@ -213,7 +213,7 @@ Made while implementing phases 1 to 4; each is reflected in the sections below.
     backups, local and S3 destinations, API and CLI requests, scheduled jobs,
     direct runner calls and pre-restore safety backups. Encryption is required by
     default in production and loud where plaintext is still permitted (the schedule
-    warning, `backups.W001`, the health card's unencrypted note, the banner and
+    warning, `backups.W001`, the health card's unencrypted note, the gold-text note and
     the per-job badge); an explicit `BACKUP_REQUIRE_ENCRYPTION=False` remains as
     the one documented opt-out.
 
@@ -952,7 +952,7 @@ newest first on the first click, with undated sources last in either direction.
 
 | Component | Contents |
 |---|---|
-| `BackupSettingsSection` | Composes the tab. An intro; the **encryption banner** — `error-banner` with the specific problem when `encryption_key_problem` is set (evaluated first), `error-banner` ("Backups cannot run" with a server-configuration remedy) when no key is configured while `encryption_required` is true, `warning-banner` when no key is configured while plaintext is permitted, `info-banner` (with the key fingerprint) when one is; a note that restore is not available in the app yet; `StatCard`s for last successful / last failed backup and enabled destinations |
+| `BackupSettingsSection` | Composes the tab. An intro; the **encryption banner** — `error-banner` with the specific problem when `encryption_key_problem` is set (evaluated first), `error-banner` ("Backups cannot run" with a server-configuration remedy) when no key is configured while `encryption_required` is true, configuration guidance (`warning-text`, polite `status`) when no key is configured while plaintext is permitted, `info-banner` (with the key fingerprint) when one is; urgent stale-backup errors precede the optional encryption note; the note remains before destinations and schedules; server restore/verification guidance sits immediately before the restore section; `StatCard`s for last successful / last failed backup and enabled destinations |
 | `BackupDestinationsSection` | Destination table (name, type, target, credential mode, status) with **Test**, **Edit**, **Delete** (`ConfirmDialog`), and a `FormModal` form. The secret input is disabled, with the reason, when no encryption key is configured; blank on edit; a "remove the stored secret" switch appears only when one is stored; an info banner notes when environment credentials override the form. Kind is fixed on edit; Delete remains disabled while its operation is pending, including after confirmation dismissal |
 | `BackupJobsSection` | **Back up now** (scope, community, destination), disabled with a visible reason when the loaded status says creation is blocked (`isBackupCreationBlocked`: a rejected key, or no key while `encryption_required`); the API stays authoritative when the page is stale and its 409 `detail` is shown via `formatApiError`. The job table carries status and encryption badges, **Details** (completed) and **Download** (completed, local archives only); existing archive actions stay usable when creation is blocked. Polls every 3 s only while a job is queued or running, and refreshes the status query when work finishes. Delete-file actions remain disabled until their submitted operation settles |
 | `BackupJobDetailsModal` | Archive name, location, size, SHA-256, encryption, timestamps, record count, per-community table, a warning when invoice PDFs were missing from storage, and a note when the archive is in object storage |
@@ -1318,15 +1318,15 @@ the dev worker.
 - Not verified against a real object store, as before; the beat process itself was not
   left running to watch a schedule fire.
 
-### Frontend (135 tests, phases 1, 3 and 4 plus fail-closed encryption policy and status recovery)
+### Frontend (132 tests, phases 1, 3 and 4 plus fail-closed encryption policy and status recovery)
 
 - `tests/backup-helpers.test.ts` (17) — the payload contract: a blank edit never
   wipes a secret, a clear is explicit, switching kind clears the other kind's
   fields; target formatting; manifest reading; polling and download rules.
-- `tests/backup-settings-section.test.ts` (38) — action focus during pending destination tests and backup checks; natural destination-name and unlimited-retention sorting; chronological start-time sorting across daylight-saving changes; status and integrity priority sorting; independent destination,
+- `tests/backup-settings-section.test.ts` (35) — action focus during pending destination tests and backup checks; natural destination-name and unlimited-retention sorting; chronological start-time sorting across daylight-saving changes; status and integrity priority sorting; independent destination,
   schedule, job and restore access during status loading/failure; status retry,
   cached refetch failure, and the encryption banner in its four states
-  (encrypted; plaintext warning where permitted; "cannot run"
+  (encrypted; plaintext warning where permitted, including non-stale and stale ordering cases; "cannot run"
   where required; rejected key evaluated first); the restore notice (server command for an instance, single-community restore not yet in the app); destination list and empty state;
   secret field disabled without a key; environment-credentials notice; create
   payload; server validation shown inside the form; start-backup rules (blocked

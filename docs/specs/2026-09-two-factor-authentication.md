@@ -634,7 +634,9 @@ gains a checkbox for `mfa_required` ("Require two-factor authentication for ever
 number input for `mfa_grace_period_days`.
 Both are disabled, with an explanatory hint, when `/auth/system-health/` reports the encryption
 key as unconfigured — mirroring the pattern PR #732 used for the dynamic-source picker — and while
-the admin's settings have not loaded yet (`MfaPolicySection`).
+the admin's settings have not loaded yet (`MfaPolicySection`). The missing-key
+explanation is a plain dark-gold paragraph (`warning-text`, polite `status`),
+above the disabled controls, without a warning banner.
 A failed settings fetch shows a load-error notice only while the policy fields are unavailable.
 Its Retry button refetches `/auth/app-settings/` in place and is disabled with busy feedback during the request.
 After a failed refresh, cached policy values remain editable unless the encryption key is missing.

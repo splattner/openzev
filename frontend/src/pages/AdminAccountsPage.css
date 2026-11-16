@@ -1,0 +1,8 @@
+.account-row.is-inactive > td {
+  background: color-mix(in srgb, var(--status-neutral) 60%, var(--surface-card));
+}
+
+.account-row.is-inactive .account-name,
+.account-row.is-inactive > td > .muted {
+  color: color-mix(in srgb, var(--text-body) 50%, var(--text-muted));
+}

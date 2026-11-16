@@ -85,10 +85,10 @@ export function AdminCredentialsPage({ embedded = false }: { embedded?: boolean 
     }
 
     function statusLabel(credential: AdminAccessCredential): { label: string; className: string } {
-        if (credential.status === 'revoked') return { label: t('pages.adminCredentials.statusRevoked'), className: 'badge badge-danger' }
-        if (credential.status === 'expired') return { label: t('pages.adminCredentials.statusExpired'), className: 'badge badge-warning' }
+        if (credential.status === 'revoked') return { label: t('pages.adminCredentials.statusRevoked'), className: 'badge badge-danger badge-quiet' }
+        if (credential.status === 'expired') return { label: t('pages.adminCredentials.statusExpired'), className: 'badge badge-warning badge-quiet' }
         if (apiKeyStatus(credential) === 'expiring') {
-            return { label: t('pages.adminCredentials.statusExpiring'), className: 'badge badge-warning' }
+            return { label: t('pages.adminCredentials.statusExpiring'), className: 'badge badge-warning badge-quiet' }
         }
         return { label: t('pages.adminCredentials.statusActive'), className: 'badge badge-success' }
     }

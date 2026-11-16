@@ -38,7 +38,7 @@ export function InvoiceDeleteModal({ isOpen, isPending, onCancel, onConfirm }: I
         }}
         onClick={(event) => event.stopPropagation()}
       >
-        <h2 style={{ margin: '0 0 1rem 0', color: 'var(--danger-600)' }}>{t('pages.invoices.deleteModal.title')}</h2>
+        <h2 style={{ margin: '0 0 1rem 0', color: 'var(--danger-700)' }}>{t('pages.invoices.deleteModal.title')}</h2>
         <p style={{ margin: '0 0 1.5rem 0', color: 'var(--ink-soft)' }}>
           {t('pages.invoices.deleteModal.message')}
         </p>

@@ -2,7 +2,7 @@ export type FilterTab<T> = {
   value: T
   label: string
   count: number
-  /** Marks the count in the danger tone while it is above zero. */
+  /** Highlights a nonzero count in red; pages can override its severity. */
   attention?: boolean
   /** Not a narrower or wider cut of the default's list, so an equal count
    * does not mean the same list: shown whenever it has a count. */

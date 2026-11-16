@@ -244,10 +244,7 @@ export function TokensSection({ onRevoke, onRotate }: Props) {
                                     {t(`account.tokens.access.${credential.access}`)}
                                 </span>
                                 {status !== 'active' && (
-                                    <span
-                                        className="badge"
-                                        style={{ marginLeft: '0.5rem', background: 'var(--warning-100)', color: 'var(--warning-800)' }}
-                                    >
+                                    <span className="badge badge-warning badge-quiet" style={{ marginLeft: '0.5rem' }}>
                                         {t(status === 'expired' ? 'account.apiKeys.expiredBadge' : 'account.apiKeys.expiringBadge')}
                                     </span>
                                 )}

@@ -39,7 +39,7 @@ const STATUS_BADGE: Record<BackupJobStatus, string> = {
     queued: 'badge-neutral',
     running: 'badge-info',
     completed: 'badge-success',
-    failed: 'badge-danger',
+    failed: 'badge-danger badge-quiet',
 }
 
 const JobActionsContext = createContext<{
@@ -291,7 +291,7 @@ export function BackupJobsSection({ status }: { status: BackupStatus | undefined
                 const job = row.original
                 if (job.status !== 'completed') return '—'
                 return (
-                    <span className={`badge ${job.encrypted ? 'badge-success' : 'badge-warning'}`}>
+                    <span className={`badge ${job.encrypted ? 'badge-success' : 'badge-warning badge-quiet'}`}>
                         {job.encrypted
                             ? t('pages.backups.jobs.encrypted')
                             : t('pages.backups.jobs.notEncrypted')}
@@ -440,7 +440,7 @@ function VerificationBadge({ job }: { job: BackupJob }) {
     if (state === 'never') return <span className="badge badge-neutral">{t('pages.backups.jobs.verification.never')}</span>
     return (
         <>
-            <span className={`badge ${state === 'ok' ? 'badge-success' : 'badge-danger'}`}>
+            <span className={`badge ${state === 'ok' ? 'badge-success' : 'badge-danger badge-quiet'}`}>
                 {t(`pages.backups.jobs.verification.${state}`)}
             </span>
             <div className="muted" style={{ marginTop: '0.25rem', maxWidth: '20rem', overflowWrap: 'anywhere' }}>

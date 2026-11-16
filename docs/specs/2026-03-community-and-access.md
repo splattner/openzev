@@ -1206,13 +1206,18 @@ community. This replaced a participant-first table in which the same account
 repeated per participant row and the role editor on each row silently changed
 the account's role everywhere.
 
-- **Columns:** *Account* (display name, platform-role badge, `Inactive` badge
+- **Columns:** *Account* (display name, platform-role badge, `Inactive` pill (`badge-neutral`)
   when `is_active` is false, `username · email`), *Communities*
   (`AccountMemberships`), *Security* (a badge per `mfa_methods` entry or "No
   two-factor", `AccountMfaComplianceBadge` when `mfa_compliance` is non-null
   and not `"compliant"`, and a muted "Last sign-in `<date>`" /
   "Never signed in" line from `last_login`), *Actions*.
-- **Membership chips** read `Owner|Participant · <community>`. Selecting one
+- **Inactive rows:** `.account-row.is-inactive` uses the metering-point list's
+  neutral grey background and readable grey name/supporting text. Buttons and
+  membership chips retain their normal appearance and remain usable.
+- **Membership chips** show the relation (`Manager`, `Viewer`, `Participant` or
+  `Former participant`), including issuer/representative roles, before the community.
+  Selecting one
   calls `setSelectedZevId(zev)` (as the scope-line community switch does — which also
   saves the admin's `preferred_zev`, as any switch does) and opens
   `/participants?focus=<participant>` (`/participants` when the account is an

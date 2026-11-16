@@ -470,9 +470,10 @@ no cache. Fetched dynamic prices are read, not written (§5.4a).
   a point at every interval boundary and one at the end; `null` before a line's
   first appearance and during a gap so the line breaks). Intervals with
   `missing_categories`, `incomplete` or no slots are shaded red like the existing
-  chart's gaps, with a notice below listing what is missing and from when
-  (`progressionIssues` merges consecutive intervals). Each line also has its own
-  dash pattern. Uses the
+  chart's gaps, with separate dark-gold plain-text warnings below listing what is missing
+  and from when (`progressionIssues` merges consecutive intervals). A hairline
+  separates these spaced notes from the chart; they have no filled or rounded
+  container. Each line also has its own dash pattern. Uses the
   colourblind-safe palette and tokens of `TariffPriceHistoryChart.css`; no raw
   colour literals (hex sweep). Each line is named in a direct legend from its
   rules, so colour is never the only cue. A click on the chart sets `date`.

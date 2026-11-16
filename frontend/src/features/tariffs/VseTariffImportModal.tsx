@@ -46,8 +46,8 @@ const STATUS_BADGE: Record<VseTariffCandidateStatus, string> = {
     new: 'badge-success',
     new_version: 'badge-info',
     duplicate: 'badge-neutral',
-    conflict: 'badge-warning',
-    unsupported: 'badge-danger',
+    conflict: 'badge-warning badge-quiet',
+    unsupported: 'badge-danger badge-quiet',
 }
 
 

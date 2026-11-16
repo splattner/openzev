@@ -45,12 +45,13 @@
 }
 
 .email-log-error {
-  background-color: var(--danger-100);
-  border: 1px solid var(--danger-300);
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--danger-700);
   border-radius: 0.3rem;
   padding: 0.5rem 0.75rem;
   font-size: 0.85rem;
-  color: var(--danger-700);
+  color: var(--text-primary);
   margin-bottom: 0.5rem;
   font-family: monospace;
 }

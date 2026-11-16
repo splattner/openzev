@@ -66,7 +66,7 @@ export function TotpBlock({ device, onRecoveryCodes, onRemove }: Props) {
 
             {isActive ? (
                 <div className="actions-row" style={{ alignItems: 'center' }}>
-                    <span className="badge" style={{ background: 'var(--success-100)', color: 'var(--success-700)' }}>
+                    <span className="badge badge-brand">
                         {t('account.mfa.enabledBadge')}
                     </span>
                     <button

@@ -34,7 +34,7 @@ function formatDirections(directions: string[] | undefined, t: (key: string) => 
 
 function Badge({ label, ok }: { label: string; ok: boolean }) {
     return (
-        <span className={`badge ${ok ? 'badge-success' : 'badge-danger'}`}>
+        <span className={`badge ${ok ? 'badge-success' : 'badge-danger badge-quiet'}`}>
             {label}
         </span>
     )
@@ -336,7 +336,7 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                             </button>
                         </div>
                         {!scopedZevId && (
-                            <p className="muted" style={{ margin: 0, color: 'var(--danger-600)' }}>
+                            <p className="muted" style={{ margin: 0, color: 'var(--danger-700)' }}>
                                 {t('pages.imports.messages.selectZevFirst')}
                             </p>
                         )}
@@ -349,7 +349,7 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                             <>
                                 {targetZev}
                                 {!scopedZevId && (
-                                    <p className="muted" style={{ margin: 0, color: 'var(--danger-600)' }}>{t('pages.imports.messages.selectZevFirst')}</p>
+                                    <p className="muted" style={{ margin: 0, color: 'var(--danger-700)' }}>{t('pages.imports.messages.selectZevFirst')}</p>
                                 )}
                                 <DetectionNotice detection={detection} onRedetect={props.onRedetect} />
 
@@ -563,7 +563,7 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                                 </p>
                                 {targetZev}
                                 {!scopedZevId && (
-                                    <p className="muted" style={{ margin: 0, color: 'var(--danger-600)' }}>{t('pages.imports.messages.selectZevFirst')}</p>
+                                    <p className="muted" style={{ margin: 0, color: 'var(--danger-700)' }}>{t('pages.imports.messages.selectZevFirst')}</p>
                                 )}
                             </>
                         )}

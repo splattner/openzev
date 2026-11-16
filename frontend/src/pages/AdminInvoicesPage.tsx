@@ -11,7 +11,6 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { useToast } from '../lib/toast'
 import { InvoiceActionButton, InvoiceLink, InvoiceStatusBadge } from '../components/InvoicePresentation'
 import type { Invoice } from '../types/api'
-import { IssueText } from '../components/IssueText'
 
 // Stable empty array so the useMemo below keeps a consistent dependency reference.
 const EMPTY_INVOICES: Invoice[] = []
@@ -116,12 +115,12 @@ export function AdminInvoicesContent() {
                         <span className="actions-row actions-row-wrap">
                             <InvoiceStatusBadge status={status} paidChf={invoice.paid_chf} />
                             {invoice.needs_data_review && (
-                                <IssueText
-                                    tone="warning"
+                                <span
+                                    className="badge badge-warning"
                                     title={t('pages.invoices.dataReview.genericNotice', { count: invoice.open_data_impact_count ?? 0 })}
                                 >
                                     {t('pages.invoices.dataReview.badge')}
-                                </IssueText>
+                                </span>
                             )}
                         </span>
                     )

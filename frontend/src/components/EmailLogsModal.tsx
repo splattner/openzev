@@ -19,7 +19,7 @@ interface EmailLogsModalProps {
 const statusClasses: Record<string, string> = {
     pending: 'badge-info',
     sent: 'badge-success',
-    failed: 'badge-danger',
+    failed: 'badge-danger badge-quiet',
 }
 
 export function EmailLogsModal({

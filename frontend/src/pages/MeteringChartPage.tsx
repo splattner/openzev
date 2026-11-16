@@ -491,17 +491,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
                 const mp = ctx.row.original
                 return (
                     <>
-                        <span
-                            style={{
-                                display: 'inline-block',
-                                padding: '0.25rem 0.75rem',
-                                borderRadius: '4px',
-                                fontSize: '0.875rem',
-                                fontWeight: 'bold',
-                                background: mp.severity === 'green' ? 'var(--success-100)' : mp.severity === 'yellow' ? 'var(--warning-100)' : 'var(--danger-100)',
-                                color: mp.severity === 'green' ? 'var(--success-700)' : mp.severity === 'yellow' ? 'var(--warning-800)' : 'var(--danger-700)',
-                            }}
-                        >
+                        <span className={`badge ${mp.severity === 'green' ? 'badge-success' : mp.severity === 'red' ? 'badge-danger' : 'badge-warning badge-quiet'}`}>
                             {t(`meteringDataQuality.severity${mp.severity.charAt(0).toUpperCase() + mp.severity.slice(1)}`)}
                         </span>
                         {mp.assignment_overlap && (

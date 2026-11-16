@@ -9,7 +9,7 @@
 }
 
 .field-error {
-  color: var(--danger-600);
+  color: var(--danger-700);
   font-size: 0.85rem;
 }
 

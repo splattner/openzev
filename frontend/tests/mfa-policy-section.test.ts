@@ -124,6 +124,7 @@ describe('MfaPolicySection', () => {
         await waitForCondition(() => container.querySelector('[role="status"]') !== null, 'missing encryption key warning')
 
         expect(container.querySelector('[role="status"]')?.textContent).toContain('adminSystemSettings.mfaPolicy.keyMissing')
+        expect(container.querySelector('.warning-banner')).toBeNull()
         expect(container.querySelector('[role="alert"]')).toBeNull()
         expect(checkbox().matches(':disabled')).toBe(true)
         expect(graceDays().matches(':disabled')).toBe(true)

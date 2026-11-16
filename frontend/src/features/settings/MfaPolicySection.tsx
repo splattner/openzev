@@ -69,7 +69,7 @@ export function MfaPolicySection() {
                 <p className="muted m-0">{t('adminSystemSettings.mfaPolicy.description')}</p>
             </div>
 
-            {keyMissing && <Notice tone="warning">{t('adminSystemSettings.mfaPolicy.keyMissing')}</Notice>}
+            {keyMissing && <p className="warning-text" role="status">{t('adminSystemSettings.mfaPolicy.keyMissing')}</p>}
             {(isError || isRetrying) && !policyLoaded && (
                 <Notice
                     tone="error"
