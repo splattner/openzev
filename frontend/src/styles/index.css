@@ -111,6 +111,7 @@
 @import '../pages/ZevListPage.css' layer(pages);
 @import '../components/dashboard/OwnSystemKwh.css' layer(pages);
 @import '../components/InvoicePresentation.css' layer(pages);
+@import '../features/imports/ImportWizardModal.css' layer(pages);
 
 @import './layout/responsive.css' layer(responsive);
 

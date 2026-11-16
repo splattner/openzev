@@ -21,26 +21,26 @@ export function ParticipantResultsTable({ participants }: Props) {
 
     return (
         <div className="table-scroll">
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+            <table className="compact-table feasibility-results-table">
                 <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border-default)' }}>
-                        <SortableHeader {...sorting.header('participantName')} style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.feasibility.results.participantName')}</SortableHeader>
-                        <SortableHeader {...sorting.header('participantProduction')} style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{t('pages.feasibility.results.participantProduction')}</SortableHeader>
-                        <SortableHeader {...sorting.header('participantConsumption')} style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{t('pages.feasibility.results.participantConsumption')}</SortableHeader>
-                        <SortableHeader {...sorting.header('producerGain')} style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{t('pages.feasibility.chart.producerGain')}</SortableHeader>
-                        <SortableHeader {...sorting.header('consumerSavingsShort')} style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{t('pages.feasibility.chart.consumerSavingsShort')}</SortableHeader>
-                        <SortableHeader {...sorting.header('netBenefit')} style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{t('pages.feasibility.results.netBenefit')}</SortableHeader>
+                    <tr>
+                        <SortableHeader {...sorting.header('participantName')}>{t('pages.feasibility.results.participantName')}</SortableHeader>
+                        <SortableHeader {...sorting.header('participantProduction')}>{t('pages.feasibility.results.participantProduction')}</SortableHeader>
+                        <SortableHeader {...sorting.header('participantConsumption')}>{t('pages.feasibility.results.participantConsumption')}</SortableHeader>
+                        <SortableHeader {...sorting.header('producerGain')}>{t('pages.feasibility.chart.producerGain')}</SortableHeader>
+                        <SortableHeader {...sorting.header('consumerSavingsShort')}>{t('pages.feasibility.chart.consumerSavingsShort')}</SortableHeader>
+                        <SortableHeader {...sorting.header('netBenefit')}>{t('pages.feasibility.results.netBenefit')}</SortableHeader>
                     </tr>
                 </thead>
                 <tbody>
                     {sorting.rows.map((p) => (
-                        <tr key={p.name} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                            <td style={{ padding: '0.4rem 0.6rem' }}>{p.name}</td>
-                            <td style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{formatKwh(Number(p.annual_production_kwh), { maxDecimals: 0 })} kWh</td>
-                            <td style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{formatKwh(Number(p.annual_consumption_kwh), { maxDecimals: 0 })} kWh</td>
-                            <td style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{formatChf(Number(p.producer_gain_chf))}</td>
-                            <td style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{formatChf(Number(p.consumer_savings_chf))}</td>
-                            <td style={{ textAlign: 'right', padding: '0.4rem 0.6rem', fontWeight: 600 }}>{formatChf(Number(p.net_benefit_chf))}</td>
+                        <tr key={p.name}>
+                            <td>{p.name}</td>
+                            <td>{formatKwh(Number(p.annual_production_kwh), { maxDecimals: 0 })} kWh</td>
+                            <td>{formatKwh(Number(p.annual_consumption_kwh), { maxDecimals: 0 })} kWh</td>
+                            <td>{formatChf(Number(p.producer_gain_chf))}</td>
+                            <td>{formatChf(Number(p.consumer_savings_chf))}</td>
+                            <td>{formatChf(Number(p.net_benefit_chf))}</td>
                         </tr>
                     ))}
                 </tbody>

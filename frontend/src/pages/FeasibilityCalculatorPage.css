@@ -21,6 +21,18 @@
   gap: 1rem;
 }
 
+.feasibility-results-table {
+  font-size: 0.85rem;
+}
+
+.feasibility-results-table :is(th, td):not(:first-child) {
+  text-align: right;
+}
+
+.feasibility-results-table td:last-child {
+  font-weight: 600;
+}
+
 @container (min-width: 64rem) {
   .feasibility-layout:not(.feasibility-layout-wide) {
     grid-template-columns: minmax(20rem, 26.25rem) minmax(0, 1fr);
