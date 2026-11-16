@@ -1,10 +1,57 @@
 import { expect, test } from '@playwright/test'
 import { apiErrors, mockApi, type ApiState } from './page-anatomy-fixtures'
-import type { Invoice, InvoicePeriodParticipantRow } from '../src/types/api'
+import type { AttentionItem, Invoice, InvoicePeriodParticipantRow, ReadinessPeriod } from '../src/types/api'
 
 // Check presentation and scope through the real router with controlled workflow states.
 test.use({ storageState: { cookies: [], origins: [] }, locale: 'en-CH' })
 test.afterEach(({ page }) => expect(apiErrors.get(page) ?? []).toEqual([]))
+
+test('overview warning links retain severity colours and underlines at desktop and narrow widths', async ({ page }, testInfo) => {
+  await mockApi(page)
+  const readiness: ReadinessPeriod = {
+    period: { start: '2026-09-01', end: '2026-09-30', interval: 'monthly', source: 'calendar', ended: true },
+    next_action: 'fix_metering',
+    steps: [
+      { key: 'metering', status: 'warn', count: 1, detail_data: { missing_days: 2 }, link: '/metering/quality' },
+      { key: 'tariffs', status: 'warn', count: 2, total: 30, link: '/tariffs' },
+      { key: 'charges', status: 'warn', count: 1, detail_data: { unbilled_charges: ['Parking'] }, link: '/billing/invoices' },
+    ],
+  }
+  const items: AttentionItem[] = [
+    { id: 'failed', type: 'email_failed', label: 'API fallback', invoice_number: 'R-FAIL',
+      recipient: 'participant@example.test', link: '/billing/invoices/1' },
+    { id: 'validity', type: 'participant_validity', label: 'API fallback', participant_name: 'Participant A',
+      valid_to: '2026-10-31', link: '/participants?focus=p1&field=valid_to' },
+  ]
+  await page.route('**/api/v1/invoices/invoices/readiness/**', route => route.fulfill({
+    json: { zev_id: '42', ...readiness, periods: [readiness] },
+  }))
+  await page.route('**/api/v1/invoices/invoices/attention/**', route => route.fulfill({ json: { zev_id: '42', items } }))
+  await page.goto('/')
+  const red = 'rgb(185, 28, 28)'
+  const gold = 'rgb(133, 77, 14)'
+  const links = [
+    [page.getByRole('link', { name: '2 of 30 day(s) without an energy tariff' }), red],
+    [page.getByRole('link', { name: '1 charge(s) have nobody to bill: Parking' }), gold],
+    [page.getByRole('link', { name: /Invoice R-FAIL.*email.*failed/ }), red],
+    [page.getByRole('link', { name: /Participant A ends.*check meter assignments/ }), gold],
+  ] as const
+  for (const width of [1440, 400]) {
+    await page.setViewportSize({ width, height: 900 })
+    if (width === 400) {
+      await expect.poll(() => page.locator('aside').evaluate(element => element.getBoundingClientRect().right)).toBeLessThanOrEqual(0)
+    }
+    await expect(page.locator('.overview-period-lead')).toHaveCSS('color', gold)
+    await expect(page.locator('.overview-community-notices')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+    for (const [link, color] of links) {
+      await expect(link).toBeVisible()
+      await expect(link).toHaveCSS('color', color)
+      await expect(link).toHaveCSS('text-decoration-line', 'underline')
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
+    await page.screenshot({ path: testInfo.outputPath(`overview-severity-${width}.png`), fullPage: true })
+  }
+})
 
 const period = { period_start: '2026-09-01', period_end: '2026-09-30' }
 const invoice: Invoice = {
