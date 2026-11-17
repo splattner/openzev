@@ -33,12 +33,14 @@ from django.db import DataError, IntegrityError, transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 
+from config.ui_notices import UiNotice, notice_data
 from inbox.models import DeliveredDocument, DocumentKind
 from inbox.services import discard_file, store_file
 from invoices.models import (
     InvoiceReadingImpact,
     Charge, Credit, CreditApplication, Invoice, InvoiceDynamicSourceEvidence, InvoiceItem, InvoicePdfStatus, InvoiceStatus, Payment,
 )
+from tariffs.dynamic.diagnostics import normalize_fetch_diagnostics
 from tariffs.dynamic.evidence import lock_sources, record_invoice_evidence
 from metering.importers.csv_importer import _parse_datetime_utc, _parse_decimal
 from metering.importers.limits import (
@@ -157,7 +159,7 @@ def open_archive(fileobj):
     try:
         zf = zipfile.ZipFile(fileobj)
     except zipfile.BadZipFile as exc:
-        raise ArchiveError("The uploaded file is not a valid ZIP archive.") from exc
+        raise ArchiveError(UiNotice("The uploaded file is not a valid ZIP archive.", "archive_invalid_zip")) from exc
     try:
         infos = validate_zip(
             zf,
@@ -188,7 +190,7 @@ class ImportFailed(Exception):
         shown = len(self.errors)
         if self.total_errors > shown:
             return f"Import rejected: {self.total_errors} problems found (showing the first {shown})."
-        return f"Import rejected: {self.total_errors} problem(s) found."
+        return f"Import rejected: {self.total_errors} {'problem' if self.total_errors == 1 else 'problems'} found."
 
 
 class _Collector:
@@ -206,12 +208,15 @@ class _Collector:
     def add(self, section, position, label, detail):
         self.total += 1
         if len(self.errors) < MAX_REPORTED_ERRORS:
+            errors = _normalise(detail)
             self.errors.append(
                 {
                     "section": section,
                     "position": position,
                     "label": label,
-                    "errors": _normalise(detail),
+                    "errors": errors,
+                    "diagnostics": {field: [notice_data(value) for value in values]
+                                    for field, values in errors.items()},
                 }
             )
 
@@ -232,6 +237,11 @@ def _normalise(detail):
 # ── Reading the archive ────────────────────────────────────────────────────
 
 
+def _unreadable_member(name, exc):
+    code = "archive_corrupt" if isinstance(exc, zipfile.BadZipFile) else "archive_csv_invalid"
+    return UiNotice(f"Unreadable readings file: {exc}", code, member=name)
+
+
 def _read_member(archive, name):
     """Read one member, turning zip-level failures into ``ArchiveError``.
 
@@ -243,7 +253,7 @@ def _read_member(archive, name):
     try:
         return archive.read(name)
     except zipfile.BadZipFile as exc:
-        raise ArchiveError(f"{name} is corrupt or truncated: {exc}") from exc
+        raise ArchiveError(UiNotice(f"{name} is corrupt or truncated: {exc}", "archive_corrupt", member=name)) from exc
 
 
 def _load_json_document(archive, name, *, missing_message):
@@ -655,11 +665,24 @@ def _dynamic_source_for(raw, collector):
         mismatched = [key for key, value in fields.items() if getattr(existing, key) != value]
         if mismatched:
             logger.warning("Dynamic tariff source %s already exists; ignoring %s from archive.", existing.pk, ", ".join(mismatched))
-            collector.warn(f'Price source "{existing.label}" has different settings from the archive; the destination settings were kept.')
+            collector.warn(UiNotice(
+                f'Price source "{existing.label}" has different settings from the archive; the destination settings were kept.',
+                "source_settings_kept",
+                name=existing.label,
+            ))
         if not existing.enabled:
-            collector.warn(f'Price source "{existing.label}" is disabled and will not refresh automatically.')
+            collector.warn(UiNotice(
+                f'Price source "{existing.label}" is disabled and will not refresh automatically.',
+                "source_disabled",
+                name=existing.label,
+            ))
         elif existing.last_fetch_status == FetchStatus.FAILED:
-            collector.warn(f'Price source "{existing.label}" is failing: {existing.last_fetch_error}')
+            collector.warn(UiNotice(
+                f'Price source "{existing.label}" is failing: {existing.last_fetch_error}',
+                "source_fetch_failed",
+                name=existing.label,
+                diagnostics=normalize_fetch_diagnostics(existing.last_fetch_diagnostics),
+            ))
         return existing
     try:
         candidate = DynamicTariffSource(**natural_key, **fields)
@@ -705,9 +728,13 @@ def _import_tariffs(archive, zev, collector, *, format_version):
                 ):
                     if raw.get("periods"):
                         collector.warn(
-                            f'Tariff "{label}" carried price bands from before percentage bands '
-                            "existed; they were never billed and were not imported. A single flat "
-                            "band with the archive's percentage was created instead."
+                            UiNotice(
+                                f'Tariff "{label}" carried price bands from before percentage bands '
+                                "existed; they were never billed and were not imported. A single flat "
+                                "band with the archive's percentage was created instead.",
+                                "percentage_bands_replaced",
+                                name=label,
+                            )
                         )
                     period = TariffPeriod(
                         tariff=tariff, period_type=PeriodType.FLAT, percentage=legacy_percentage,
@@ -737,7 +764,11 @@ def _import_charges(archive, zev, participants_by_archive_id, collector):
         for archive_id in raw.get("participant_ids") or []:
             participant = participants_by_archive_id.get(str(archive_id))
             if participant is None:
-                collector.warn(f'Charge "{label}" named a participant that was not imported; it was left out.')
+                collector.warn(UiNotice(
+                    f'Charge "{label}" named a participant that was not imported; it was left out.',
+                    "charge_participant_omitted",
+                    name=label,
+                ))
                 continue
             bearers.append(participant)
         if fields.get("allocation") == "selected_participants" and not bearers:
@@ -1102,7 +1133,10 @@ def _import_delivered_documents(archive, zev, participants_by_archive_id, collec
     for source_id, successor_id in successors.items():
         successor = created.get(successor_id)
         if successor is None:
-            collector.warn("A superseded document named a successor that was not imported; the link was left out.")
+            collector.warn(UiNotice(
+                "A superseded document named a successor that was not imported; the link was left out.",
+                "successor_omitted",
+            ))
             continue
         DeliveredDocument.objects.filter(pk=created[source_id].pk).update(superseded_by=successor)
     return len(created)
@@ -1194,12 +1228,7 @@ def _import_row_members(archive, directory, model, points_by_meter_id, collector
             # cannot be decoded (a NUL byte, say) must not take the whole
             # import down with an unhandled exception — one file is reported
             # and the rest still gets its chance.
-            collector.add(
-                SECTION_READINGS,
-                None,
-                name,
-                {"__all__": [f"Unreadable readings file: {exc}"]},
-            )
+            collector.add(SECTION_READINGS, None, name, {"__all__": [_unreadable_member(name, exc)]})
 
     return total
 
@@ -1353,7 +1382,7 @@ def _import_supplementary_readings(archive, sources_by_meter_id, collector):
                     total += _bulk_create_supplementary(pending, name, collector)
                 text.detach()
         except (zipfile.BadZipFile, UnicodeDecodeError, csv.Error) as exc:
-            collector.add(SECTION_SUPPLEMENTARY, None, name, {"__all__": [f"Unreadable readings file: {exc}"]})
+            collector.add(SECTION_SUPPLEMENTARY, None, name, {"__all__": [_unreadable_member(name, exc)]})
     return total
 
 
@@ -1625,8 +1654,12 @@ def _run_import(archive, manifest, sections, *, owner, name_override, collector,
         )
         if imported_sources:
             collector.warn(
-                f"{imported_sources} energy data source(s) were imported disconnected, without their keys "
-                "or tokens. Each participant connects theirs again before new data arrives."
+                UiNotice(
+                    f"{imported_sources} energy data source(s) were imported disconnected, without their keys "
+                    "or tokens. Each participant connects theirs again before new data arrives.",
+                    "sources_disconnected",
+                    count=imported_sources,
+                )
             )
 
     if SECTION_INVOICES in sections:
@@ -1664,6 +1697,7 @@ def _run_import(archive, manifest, sections, *, owner, name_override, collector,
 
     _verify_manifest_counts(manifest, summary, collector)
 
+    summary["warning_diagnostics"] = [notice_data(value) for value in collector.warnings]
     return summary
 
 

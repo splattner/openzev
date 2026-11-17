@@ -1199,7 +1199,7 @@ export type DynamicApiVersion = 'v1_0_5' | 'v2_0_0' | 'bfe_rmp'
 /** The technology column a BFE reference-market-price source reads. */
 export type BfeRmpTechnology = 'pv' | 'wasserkraft' | 'windenergie' | 'biomasse'
 
-export interface DynamicFetchDiagnostic {
+export interface ApiDiagnostic {
     code: string
     params: Record<string, unknown>
 }
@@ -1221,7 +1221,7 @@ export interface DynamicTariffSource {
     last_fetch_at: string | null
     last_success_at: string | null
     last_fetch_error: string
-    last_fetch_diagnostics?: DynamicFetchDiagnostic[]
+    last_fetch_diagnostics?: ApiDiagnostic[]
     /** Extent of the stored series; null before anything has been fetched. */
     covers_from: string | null
     covers_to: string | null
@@ -2616,7 +2616,9 @@ export interface VseTariffCandidate {
     series_name: string
     status: VseTariffCandidateStatus
     detail: string
+    detail_diagnostic?: ApiDiagnostic | null
     warnings: string[]
+    warning_diagnostics?: Array<ApiDiagnostic | null>
     recommended: boolean
     effective_valid_to: string | null
 }
@@ -2627,7 +2629,7 @@ export interface VseTariffImportPreview {
     source_url: string
     document_digest: string
     candidates: VseTariffCandidate[]
-    errors: Array<{ tariff: string; error: string }>
+    errors: Array<{ tariff: string; error: string; error_diagnostic?: ApiDiagnostic | null }>
 }
 
 /** One ticked preview row, with the user's answer to how it should be billed. */
@@ -2647,9 +2649,10 @@ export interface VseTariffImportResult {
         /** Whether this tariff was linked to a dynamic price source. */
         dynamic: boolean
         dynamic_source_warnings: string[]
+        dynamic_source_warning_diagnostics?: Array<ApiDiagnostic | null>
     }>
-    skipped: Array<{ name: string; reason: string }>
-    errors: Array<{ name: string; error: string }>
+    skipped: Array<{ name: string; reason: string; reason_diagnostic?: ApiDiagnostic | null }>
+    errors: Array<{ name: string; error: string; error_diagnostic?: ApiDiagnostic | null }>
 }
 
 export type TransferSectionName = 'zev' | 'participants' | 'metering_points' | 'tariffs' | 'charges' | 'readings' | 'supplementary_data' | 'invoices' | 'invoice_pdfs' | 'delivered_documents'
@@ -2660,6 +2663,7 @@ export interface ZevArchiveImportResult {
     sections: TransferSectionName[]
     counts: Record<string, number>
     warnings: string[]
+    warning_diagnostics?: Array<ApiDiagnostic | null>
 }
 
 /** One line on a publicly-viewable invoice (see `PublicInvoice`). */

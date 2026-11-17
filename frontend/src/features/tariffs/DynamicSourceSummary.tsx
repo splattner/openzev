@@ -1,9 +1,9 @@
-import { formatDynamicFetchError } from './errors'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { formatDateTime } from '../../lib/appSettings'
 import type { AppSettings, DynamicPriceHistory, DynamicTariffSource } from '../../types/api'
 import { Disclosure } from '../../components/Disclosure'
+import { DynamicFetchFailure } from './DynamicFetchFailure'
 import { missingPriceDates, missingRangeLabel } from './dynamicPriceGaps'
 
 /**
@@ -36,7 +36,7 @@ export function DynamicSourceSummary({ source, settings, canOperate, missing = [
             {source.last_success_at && (
                 <p className="muted m-0">{t('pages.dynamicSources.lastSuccess', { time: formatDateTime(source.last_success_at, settings) })}</p>
             )}
-            {source.last_fetch_status === 'failed' && <p className="text-error m-0">{formatDynamicFetchError(source, t)}</p>}
+            {source.last_fetch_status === 'failed' && <DynamicFetchFailure source={source} className="text-error" />}
             {missing.length > 0 && (
                 <div className="warning-text" role="status">
                     {missingPriceDates(missing).map((dates) => (

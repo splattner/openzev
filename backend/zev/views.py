@@ -17,6 +17,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
+from config.ui_notices import UiNotice, notice_data
 from accounts.permissions import IsAdmin
 from accounts.throttling import ApiKeyRateThrottle, TransferArchiveThrottle
 from accounts.models import FeatureFlag, User
@@ -80,6 +81,16 @@ from audit.mixins import AuditedCreateDestroyMixin, AuditedUpdateMixin
 from audit.services import record_audit_event
 
 logger = logging.getLogger(__name__)
+
+ARCHIVE_REQUIRED = UiNotice("A ZIP archive is required.", "archive_required")
+
+
+def _archive_payload(exc_or_notice):
+    return {"detail": str(exc_or_notice), "diagnostic": notice_data(exc_or_notice)}
+
+
+def _archive_error(exc_or_notice):
+    return Response(_archive_payload(exc_or_notice), status=status.HTTP_400_BAD_REQUEST)
 
 
 class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
@@ -451,11 +462,11 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         """Read an archive's manifest without importing anything."""
         upload = request.FILES.get("file")
         if upload is None:
-            return Response({"detail": "A ZIP archive is required."}, status=status.HTTP_400_BAD_REQUEST)
+            return _archive_error(ARCHIVE_REQUIRED)
         try:
             manifest = inspect_archive(upload)
         except (ArchiveError, ValueError) as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return _archive_error(exc)
         return Response(manifest)
 
     @action(
@@ -473,7 +484,7 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         """
         upload = request.FILES.get("file")
         if upload is None:
-            return Response({"detail": "A ZIP archive is required."}, status=status.HTTP_400_BAD_REQUEST)
+            return _archive_error(ARCHIVE_REQUIRED)
 
         sections = self._parse_sections(request.data.getlist("sections"))
         name_override = (request.data.get("name") or "").strip()
@@ -508,7 +519,7 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
                 },
             )
         except (ArchiveError, ValueError) as exc:
-            return _failed(f"ZEV import failed: {exc}", {"detail": str(exc)})
+            return _failed(f"ZEV import failed: {exc}", _archive_payload(exc))
 
         self._record_audit_best_effort(
             request,

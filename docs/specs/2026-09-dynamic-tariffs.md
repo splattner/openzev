@@ -547,6 +547,44 @@ a published static tariff rate.
 
 ### 10.1 VSE importer
 
+Import UI messages are translated by the existing frontend `react-i18next`
+resources. The backend keeps English diagnostics and attaches optional
+`{code, params}` metadata only to normal outcomes, billing warnings and actionable
+failures. No Django catalogs, request-language decorator or language headers are
+needed. Published names, candidate keys, prices and document digests are unchanged.
+
+`config/ui_notices.py::UiNotice` is a string carrying that metadata; the original
+string remains the legacy API/CLI text. Response serializers add nullable
+`detail_diagnostic`, `error_diagnostic` or `reason_diagnostic` objects, and
+parallel `warning_diagnostics` arrays. Arrays preserve order and use `null` for
+unclassified details. Created tariff results use
+`dynamic_source_warning_diagnostics` alongside `dynamic_source_warnings`.
+Archive errors attach a nullable top-level `diagnostic`; entry errors attach a
+`diagnostics` map parallel to their `errors` fields.
+
+The frontend validates and formats known notices with semantic parameters.
+Shared-source warnings carry up to three normalized fetch diagnostics and reuse
+the existing source-error renderer. Unknown/malformed metadata uses a translated
+contextual headline. The original safe English detail is mounted only after the
+user opens the shared `Disclosure` labelled “Technical details”; generic document
+or parser failures (`keepsTechnicalDetails`), and a reused-source failure whose
+stored diagnostics yield no usable cause, also retain that disclosure. Dynamic
+source types in `tariff_type`, `components` and `extra_components` are shown
+through `pages.dynamicSources.types.*`. Known notices include omitted
+charges, first-band fallback, version boundaries and double-billing warnings.
+A series conflict on the billing mode the user chose (`tariff_mode_conflict`)
+names the mode to choose; other field conflicts (`tariff_conflict`) can only be
+resolved by renaming. An unreadable storage refund (`storage_unreadable`) is
+distinct from a published-but-not-imported one (`storage_omitted`). Serializers
+expose the metadata through the read-only `NoticeField` (and `notice_list` for
+the parallel arrays). Request failures (`importRequestFailure`) translate a
+known top-level `diagnostic`; otherwise coded `validation_errors` are rendered
+by `formatTariffErrorData`, keeping every entry and its field label. The modals
+store the raw request error and translate it at render time. Archive
+inspection falls back to `zevTransfer.unreadableArchive`, import to
+`zevTransfer.importFailed`.
+Logs, low-level parser messages and model validation prose are not translated.
+
 `backend/tariffs/importers/vse_json.py`. A `tariffForm: dynamic` entry no
 longer returns a single blocked candidate; `_dynamic_candidate()` builds an
 *importable* one carrying `dynamic_url` and `dynamic_tariff_type`. Dynamic
@@ -840,8 +878,10 @@ administration use `formatDynamicFetchError` with the existing tariff code and
 parameter validation whenever the fetch status is failed, including when the
 legacy string is empty. Both readers skip malformed entries, unknown codes and
 unusable parameters, retaining up to three distinct usable causes. A translated
-generic fetch failure appears only when no usable cause remains; stored English
-messages are never rendered in those surfaces. Older records receive an empty
+generic fetch failure appears only when no usable cause remains. Tooltips show
+only that translated text; the source summary and source administration
+(`DynamicFetchFailure`) also keep a non-empty `last_fetch_error` behind a lazy
+“Technical details” `Disclosure`, so uncoded parser causes stay diagnosable. Older records receive an empty
 list from migration 0021, without guessing codes from English text; their generic
 message becomes specific after the next failed fetch. Safe legacy text remains
 available to API consumers and command-line diagnostics.
@@ -927,7 +967,7 @@ Tests: `zev/test_seed_dynamic_tariff.py` and `zev/tests.py::SeedDemoEndToEndTest
 
 | Module | Coverage |
 |---|---|
-| `screenshots/dynamic-fetch-errors.spec.ts` | Translated source summaries, list issue tooltips and source administration in all four languages; legacy fallback, desktop/400px screenshots and console checks |
+| `screenshots/dynamic-fetch-errors.spec.ts` | Translated source summary, list issue tooltip and source administration (German); legacy fallback with the “Technical details” disclosure, a language switch without refetching, desktop/400px screenshots and console checks |
 | `tests/dynamic-sources.test.ts` | Source/energy-type helpers; discovery; paginated list; manual create; bounded history query; fetch queueing; typed clear request; typed source delete (the aggregate expansion is served by the backend — see `test_dynamic_components.py`) |
 | `tests/dynamic-source-form-modal.test.ts` | Two-step rendering, version-only choices, absence of provider choices, and discovered component/product selection |
 | `tests/vse-tariff-import.test.ts` (extended) | A dynamic candidate is selectable, offers no billing-mode choice, can be the pre-selected recommendation |

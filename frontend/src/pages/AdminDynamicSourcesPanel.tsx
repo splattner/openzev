@@ -20,7 +20,8 @@ import {
   queueDynamicSourceFetch,
   recheckDynamicTariffSource,
 } from '../lib/api/tariffs'
-import { formatDynamicFetchError, formatTariffError } from '../features/tariffs/errors'
+import { formatTariffError } from '../features/tariffs/errors'
+import { DynamicFetchFailure } from '../features/tariffs/DynamicFetchFailure'
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
 import { queryKeys } from '../lib/api/queryKeys'
 import { useToast } from '../lib/toast'
@@ -174,7 +175,7 @@ export function AdminDynamicSourcesPanel() {
               ? t(`pages.dynamicSources.status.${row.original.last_fetch_status}` as Parameters<typeof t>[0])
               : t('pages.dynamicSources.status.disabled')}
           </span>
-          {row.original.last_fetch_status === 'failed' && <div className="text-danger">{formatDynamicFetchError(row.original, t)}</div>}
+          {row.original.last_fetch_status === 'failed' && <DynamicFetchFailure source={row.original} className="text-danger" />}
           {row.original.recovery_from && (
             <div className="muted">{t('pages.dynamicSources.recoveryFrom', { date: formatDateTime(row.original.recovery_from, settings) })}</div>
           )}

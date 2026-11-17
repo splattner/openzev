@@ -2,9 +2,7 @@ import { expect, test } from '@playwright/test'
 import { mockApi } from './page-anatomy-fixtures'
 import type { DynamicTariffSource, TariffSeries, TariffVersion } from '../src/types/api'
 import { de } from '../src/i18n/locales/de'
-import { en } from '../src/i18n/locales/en'
 import { fr } from '../src/i18n/locales/fr'
-import { it } from '../src/i18n/locales/it'
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
@@ -31,33 +29,18 @@ const series: TariffSeries = {
   version_count: 1, active_version_id: version.id, gaps: [], versions: [version],
 }
 
+// The code × language matrix is unit-tested; here: real rendering, legacy fallback,
+// the technical-details disclosure and a language switch without a refetch.
 const cases = [
-  ...([
-    ['de', de, false], ['en', en, false], ['fr', fr, false], ['it', it, false], ['de', de, true],
-  ] as const).map(([language, locale, legacy]) => ({
-    language, legacy, diagnostic: source.last_fetch_diagnostics![0],
-    expected: legacy ? locale.pages.dynamicSources.fetchFailed
-      : locale.pages.tariffs.apiErrors.hostUnresolved.replace('{{host}}', host),
-  })),
-  {
-    language: 'de', legacy: false,
-    diagnostic: { code: 'product_mismatch', params: { expected: 'demo-grid', actual: 'other-grid' } },
-    expected: de.pages.tariffs.apiErrors.productMismatch.replace('{{expected}}', 'demo-grid').replace('{{actual}}', 'other-grid'),
-  },
-  {
-    language: 'fr', legacy: false,
-    diagnostic: { code: 'timestamp_invalid', params: { field: 'prices[0].start_timestamp', received: 'bad-time' } },
-    expected: fr.pages.tariffs.apiErrors.timestampInvalid.replace('{{field}}', 'prices[0].start_timestamp').replace('{{received}}', 'bad-time'),
-  },
-  {
-    language: 'it', legacy: false,
-    diagnostic: { code: 'price_interval_invalid', params: { start: '2026-01-01T00:15:00Z', end: '2026-01-01T00:00:00Z' } },
-    expected: it.pages.tariffs.apiErrors.priceIntervalInvalid.replace('{{start}}', '2026-01-01T00:15:00Z').replace('{{end}}', '2026-01-01T00:00:00Z'),
-  },
+  { legacy: false, expected: de.pages.tariffs.apiErrors.hostUnresolved.replace('{{host}}', host) },
+  { legacy: true, expected: de.pages.dynamicSources.fetchFailed },
 ]
 
-for (const { language, legacy, diagnostic, expected } of cases) {
-  test(`stored fetch errors in ${language}, legacy=${legacy}, code=${diagnostic.code}`, async ({ page }, testInfo) => {
+const language = 'de'
+const diagnostic = source.last_fetch_diagnostics![0]
+
+for (const { legacy, expected } of cases) {
+  test(`stored fetch errors, legacy=${legacy}`, async ({ page }, testInfo) => {
     const errors = await mockApi(page)
     await page.route('**/api/v1/notifications/unread-count/', route => route.fulfill({ json: { count: 0 } }))
     await page.route('**/api/v1/metering/live/enabled/', route => route.fulfill({ json: { enabled: false } }))
@@ -80,11 +63,8 @@ for (const { language, legacy, diagnostic, expected } of cases) {
       if (width === 400) await expect(page.locator('#app-sidebar')).not.toBeInViewport()
       await expect(summary.getByText(expected, { exact: true })).toBeVisible()
       await expect(page.locator('body')).not.toContainText(raw)
-      await expect(page.locator('body')).not.toContainText('RAW ENGLISH')
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-      if (language === 'de' || diagnostic.code === 'timestamp_invalid') {
-        await page.screenshot({ path: testInfo.outputPath(`tariff-fetch-error-${width}.png`), fullPage: true })
-      }
+      await page.screenshot({ path: testInfo.outputPath(`tariff-fetch-error-${width}.png`), fullPage: true })
     }
     await page.goto('/admin/dynamic-sources')
     for (const width of [1440, 400]) {
@@ -92,13 +72,13 @@ for (const { language, legacy, diagnostic, expected } of cases) {
       if (width === 400) await expect(page.locator('#app-sidebar')).not.toBeInViewport()
       await expect(page.getByText(expected, { exact: true })).toBeVisible()
       await expect(page.locator('body')).not.toContainText(raw)
-      await expect(page.locator('body')).not.toContainText('RAW ENGLISH')
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-      if (language === 'de') {
-        await page.screenshot({ path: testInfo.outputPath(`admin-fetch-error-${width}.png`), fullPage: true })
-      }
+      await page.screenshot({ path: testInfo.outputPath(`admin-fetch-error-${width}.png`), fullPage: true })
     }
-    if (language === 'de' && !legacy && diagnostic.code === 'host_unresolved') {
+    if (legacy) {
+      await page.locator('summary', { hasText: de.importDiagnostics.technicalDetails }).first().click()
+      await expect(page.getByText(raw, { exact: true }).first()).toBeVisible()
+    } else {
       await page.setViewportSize({ width: 1440, height: 900 })
       const fetchRequests: string[] = []
       page.on('request', request => {

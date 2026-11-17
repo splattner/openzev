@@ -215,6 +215,13 @@ function codedErrors(value: unknown): TariffValidationError[] | null {
   return Array.isArray(value) && value.every(isCodedError) ? value : null
 }
 
+export function formatTariffDiagnostic(value: unknown, t: Translate, settings?: AppSettings): string {
+  if (value === null || typeof value !== 'object') return ''
+  const { code, params } = value as Partial<TariffValidationError>
+  if (typeof code !== 'string' || params === null || typeof params !== 'object' || Array.isArray(params)) return ''
+  return formatCodedError({ code, params, message: '', field: null, path: [] }, t, settings)
+}
+
 /** Up to three distinct translated fetch causes; empty when none is usable. */
 export function dynamicFetchMessages(diagnostics: unknown, t: Translate): string[] {
   const messages: string[] = []

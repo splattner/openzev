@@ -1143,6 +1143,9 @@ class DynamicTariffTransferTests(TestCase):
         result = import_archive(io.BytesIO(raw), owner=self.importer)
         self.assertTrue(any("different settings" in warning for warning in result["warnings"]))
         self.assertTrue(any("disabled" in warning for warning in result["warnings"]))
+        self.assertEqual([entry["code"] for entry in result["warning_diagnostics"]], [
+            "source_settings_kept", "source_disabled",
+        ])
         source.refresh_from_db()
         self.assertFalse(source.enabled)
 

@@ -377,9 +377,8 @@ communities: two ZEVs on the same operator product fetch once, together.
 
 Fetch failure explanations use your selected interface language in tariff details,
 status tooltips and source administration. Older saved failures may show a general
-message until the next fetch records a specific cause. The synthetic demo source
-uses an intentionally unreachable `.invalid` address; keep it disabled and use
-its seeded prices rather than fetching that address.
+message until the next fetch records a specific cause; the original message
+stays available under **Technical details**.
 
 ### Recovering a refused price series
 
@@ -1128,3 +1127,8 @@ Charges are part of a [ZEV export archive](17-zev-transfer.md) and of backups.
 - **Understand allocation:** [How Energy Allocation Works](08-billing-allocation-explained.md)
 - **Bill a one-off cost:** [One-off Charges](#one-off-charges)
 - **Generate invoices:** [Invoice Management](09-invoice-management.md)
+
+## Import diagnostics
+
+Normal import notices follow the selected interface language. Uncommon technical
+details are available by opening **Technical details** and may remain in English.

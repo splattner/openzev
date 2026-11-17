@@ -82,7 +82,7 @@ describe('DynamicSourceSummary', () => {
     it('keeps the failed-fetch error visible next to the missing-price notice', () => {
         const html = render({ last_fetch_status: 'failed', last_fetch_error: 'upstream 503' }, true, missing)
         expect(html).toContain('pages.dynamicSources.fetchFailed')
-        expect(html).not.toContain('upstream 503')
+        expect(html).toContain('importDiagnostics.technicalDetails')
         expect(html).toContain('badge badge-danger')
         expect(html).toContain('pages.dynamicSources.history.missingEffect')
     })
@@ -92,6 +92,6 @@ describe('DynamicSourceSummary', () => {
             code: 'host_unresolved', params: { host: 'example.test' },
         }] })
         expect(html).toContain('pages.tariffs.apiErrors.hostUnresolved')
-        expect(html).not.toContain('Raw English')
+        expect(html).not.toContain('importDiagnostics.technicalDetails')
     })
 })

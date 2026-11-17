@@ -22,6 +22,8 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.core.exceptions import ValidationError as DjangoValidationError
 
+from config.ui_notices import UiNotice, notice_data
+from tariffs.dynamic.diagnostics import normalize_fetch_diagnostics
 from tariffs.dynamic.discovery import SourceCapabilities, probe_source_configuration
 from tariffs.dynamic.adapters import DynamicApiVersion
 from tariffs.dynamic.components import aggregated_tariff_types
@@ -151,7 +153,7 @@ def _plan_one(
     if not versions:
         return PlannedCandidate(
             candidate, CandidateStatus.NEW,
-            "Creates a new tariff.",
+            UiNotice("Creates a new tariff.", "tariff_new"),
             effective_valid_to=candidate.valid_to,
             series_name=series_name,
         )
@@ -161,8 +163,12 @@ def _plan_one(
     if any(version.valid_from == candidate.valid_from for version in versions):
         return PlannedCandidate(
             candidate, CandidateStatus.DUPLICATE,
-            f"A version of this tariff already starts on {candidate.valid_from.isoformat()}; "
-            "it has been imported before and is left untouched.",
+            UiNotice(
+                f"A version of this tariff already starts on {candidate.valid_from.isoformat()}; "
+                "it has been imported before and is left untouched.",
+                "tariff_duplicate",
+                date=candidate.valid_from.isoformat(),
+            ),
             series_name=series_name,
         )
 
@@ -197,17 +203,30 @@ def _plan_one(
         if series_field == "billing_mode" and billing_mode_was_chosen:
             return PlannedCandidate(
                 candidate, CandidateStatus.CONFLICT,
-                f'A tariff named "{candidate.name}" already exists in this ZEV billed as '
-                f"{theirs!r}. Versions of one tariff must agree on that, so it cannot be "
-                f"imported as {mine!r}. Choose {theirs!r}, or rename one of them.",
+                UiNotice(
+                    f'A tariff named "{candidate.name}" already exists in this ZEV billed as '
+                    f"{theirs!r}. Versions of one tariff must agree on that, so it cannot be "
+                    f"imported as {mine!r}. Choose {theirs!r}, or rename one of them.",
+                    "tariff_mode_conflict",
+                    name=candidate.name,
+                    existing=str(theirs),
+                    requested=str(mine),
+                ),
                 series_name=series_name,
             )
 
         return PlannedCandidate(
             candidate, CandidateStatus.CONFLICT,
-            f'A tariff named "{candidate.name}" already exists in this ZEV with '
-            f"{series_field}={theirs!r}, but the document maps it to {mine!r}. "
-            "Rename one of them before importing.",
+            UiNotice(
+                f'A tariff named "{candidate.name}" already exists in this ZEV with '
+                f"{series_field}={theirs!r}, but the document maps it to {mine!r}. "
+                "Rename one of them before importing.",
+                "tariff_conflict",
+                name=candidate.name,
+                field=series_field,
+                existing=str(theirs),
+                requested=str(mine),
+            ),
             series_name=series_name,
         )
 
@@ -233,7 +252,14 @@ def _plan_one(
         detail += f" The end date is capped at {valid_to.isoformat()} by a later version."
 
     return PlannedCandidate(
-        candidate, CandidateStatus.NEW_VERSION, detail,
+        candidate, CandidateStatus.NEW_VERSION, UiNotice(
+            detail,
+            "tariff_new_version",
+            name=series_name,
+            mode=matched_billing_mode or "",
+            previous_end=window.predecessor_valid_to.isoformat() if window.predecessor_valid_to else "",
+            end=valid_to.isoformat() if valid_to and valid_to != candidate.valid_to else "",
+        ),
         closes_predecessor_on=window.predecessor_valid_to,
         effective_valid_to=valid_to,
         series_name=series_name,
@@ -264,21 +290,48 @@ class _DynamicSourcePlan:
 
 def _reused_source_warnings(source: DynamicTariffSource) -> list[str]:
     if not source.enabled:
-        return [
-            "The reused dynamic price source is disabled and will not refresh on schedule."
-        ]
+        return [UiNotice(
+            "The reused dynamic price source is disabled and will not refresh on schedule.",
+            "source_disabled",
+            name=source.label,
+        )]
     if source.last_fetch_status == FetchStatus.FAILED:
         detail = f": {source.last_fetch_error}" if source.last_fetch_error else "."
-        return [f"The reused dynamic price source is currently failing{detail}"]
+        return [UiNotice(
+            f"The reused dynamic price source is currently failing{detail}",
+            "source_fetch_failed",
+            name=source.label,
+            diagnostics=normalize_fetch_diagnostics(source.last_fetch_diagnostics),
+        )]
     if source.last_success_at is None:
-        return ["The reused dynamic price source has not completed a successful fetch yet."]
+        return [UiNotice(
+            "The reused dynamic price source has not completed a successful fetch yet.",
+            "source_not_fetched",
+            name=source.label,
+        )]
     return []
+
+
+def _error_notice(exc):
+    if notice_data(exc):
+        return exc.args[0]
+    cause = exc if getattr(exc, "code", None) else exc.__cause__
+    diagnostics = normalize_fetch_diagnostics([{
+        "code": getattr(cause, "code", None), "params": getattr(cause, "params", {}),
+    }])
+    if diagnostics:
+        entry = diagnostics[0]
+        return UiNotice(str(exc), entry["code"], **entry["params"])
+    return str(exc)
 
 
 def _prepare_dynamic_source(candidate: Candidate, tariff_name: str | None) -> _DynamicSourcePlan:
     """Probe the explicit product choice before matching a versioned source identity."""
     if tariff_name is None:
-        raise ValueError("Choose a dynamic product, or explicitly confirm the endpoint default with an empty product name.")
+        raise ValueError(UiNotice(
+            "Choose a dynamic product, or explicitly confirm the endpoint default with an empty product name.",
+            "product_selection_required",
+        ))
     try:
         capabilities = probe_source_configuration(
             candidate.dynamic_url,
@@ -302,9 +355,15 @@ def _prepare_dynamic_source(candidate: Candidate, tariff_name: str | None) -> _D
         # intersection; the probe pinned the version, so upgrade to exact.
         version_label = DynamicApiVersion(capabilities.api_version).label
         warnings.append(
-            f"The dynamic {candidate.dynamic_tariff_type} component already "
-            f"includes {', '.join(exact)} on this endpoint ({version_label}). "
-            "Do not bill those components again as separate tariffs."
+            UiNotice(
+                f"The dynamic {candidate.dynamic_tariff_type} component already "
+                f"includes {', '.join(exact)} on this endpoint ({version_label}). "
+                "Do not bill those components again as separate tariffs.",
+                "components_included_exact",
+                tariff_type=candidate.dynamic_tariff_type,
+                components=", ".join(exact),
+                version=version_label,
+            )
         )
 
     return _DynamicSourcePlan(natural_key, capabilities, warnings)
@@ -330,7 +389,7 @@ def _write_dynamic_source(
         initialise_source_from_probe(source, capabilities)
         warnings = list(plan.warnings)
         if len(label) > 200:
-            warnings.append("The source label was too long and has been shortened.")
+            warnings.append(UiNotice("The source label was too long and has been shortened.", "name_shortened"))
         return source, True, warnings
     return source, False, [*plan.warnings, *_reused_source_warnings(source)]
 
@@ -427,14 +486,14 @@ def apply_import(*, zev, document: ParsedDocument, selections: list[Selection], 
         if selection.key not in by_key:
             report.errors.append({
                 "name": selection.key,
-                "error": "This tariff is no longer in the document. Run the preview again.",
+                "error": UiNotice("This tariff is no longer in the document. Run the preview again.", "import_changed"),
             })
             continue
 
         try:
             candidate = _with_chosen_billing_mode(by_key[selection.key], selection.billing_mode)
         except ValueError as exc:
-            report.errors.append({"name": by_key[selection.key].name, "error": str(exc)})
+            report.errors.append({"name": by_key[selection.key].name, "error": _error_notice(exc)})
             continue
 
         # Re-read the series per candidate rather than planning against a list
@@ -459,7 +518,7 @@ def apply_import(*, zev, document: ParsedDocument, selections: list[Selection], 
             try:
                 dynamic_plan = _prepare_dynamic_source(candidate, selection.dynamic_tariff_name)
             except ValueError as exc:
-                report.errors.append({"name": candidate.name, "error": str(exc)})
+                report.errors.append({"name": candidate.name, "error": _error_notice(exc)})
                 continue
 
         try:
@@ -485,13 +544,13 @@ def apply_import(*, zev, document: ParsedDocument, selections: list[Selection], 
             # constraint detail, so never show them to the operator.
             report.errors.append({
                 "name": candidate.name,
-                "error": "This tariff could not be stored (a database constraint was violated). Run the preview again.",
+                "error": UiNotice("This tariff could not be stored (a database constraint was violated). Run the preview again.", "tariff_save_failed"),
             })
             continue
         except (PriceSeriesConflict, DynamicTariffResponseError) as exc:
             # Probe points that cannot be stored (duplicate starts,
             # overlaps). The transaction rolled tariff and source back.
-            report.errors.append({"name": candidate.name, "error": str(exc)})
+            report.errors.append({"name": candidate.name, "error": _error_notice(exc)})
             continue
 
         if dynamic_source_created:

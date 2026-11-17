@@ -93,14 +93,22 @@ successful archive import with readings creates an import log entry, asserted by
 
 ## 5. API contracts
 
-All under `ZevViewSet` (`/api/v1/zevs/...`):
+All under `ZevViewSet` (`/api/v1/zev/zevs/...`):
 
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
-| `GET /api/v1/zevs/transfer-sections/` | GET | any authenticated | `{"sections": [{"name": str, "requires": [str]}]}` — the section list and dependency graph, ordered as `SECTIONS`. Served so the rule lives in one place. |
-| `GET /api/v1/zevs/{pk}/export/?sections=zev,participants,...` | GET | ZEV owner / admin | Builds the archive into a `SpooledTemporaryFile(max_size=8 MiB)`, returns it as `FileResponse` (`application/zip`, `as_attachment`, filename from `archive_filename(zev, today)` in `export.py`: `openzev-export-<community>-<date>.zip`). `sections` query param is a comma-separated list; absent = all sections. Errors (`ValueError` from `build_archive`) → 400 `{"detail": str}` with a FAILED audit event. |
-| `POST /api/v1/zevs/inspect-archive/` | POST multipart | admin | Reads the manifest only (`inspect_archive`); `ArchiveError`/`ValueError` → 400. Creates nothing. |
-| `POST /api/v1/zevs/import-archive/` | POST multipart | admin | Fields: `file` (required, else 400 `{"detail": "A ZIP archive is required."}`), `sections` (repeated form field, comma-separated values, or absent = all), `name` (optional override). On failure: 400 with `{"detail", "errors", "total_errors"}` (ImportFailed) or `{"detail"}` (ArchiveError/ValueError) plus a FAILED audit event. On success: 201 with `{"zev_id", "zev_name", "sections", "counts", "warnings"}` and a SUCCESS audit event. |
+| `GET /api/v1/zev/zevs/transfer-sections/` | GET | any authenticated | `{"sections": [{"name": str, "requires": [str]}]}` — the section list and dependency graph, ordered as `SECTIONS`. Served so the rule lives in one place. |
+| `GET /api/v1/zev/zevs/{pk}/export/?sections=zev,participants,...` | GET | ZEV owner / admin | Builds the archive into a `SpooledTemporaryFile(max_size=8 MiB)`, returns it as `FileResponse` (`application/zip`, `as_attachment`, filename from `archive_filename(zev, today)` in `export.py`: `openzev-export-<community>-<date>.zip`). `sections` query param is a comma-separated list; absent = all sections. Errors (`ValueError` from `build_archive`) → 400 `{"detail": str}` with a FAILED audit event. |
+| `POST /api/v1/zev/zevs/inspect-archive/` | POST multipart | admin | Reads the manifest only (`inspect_archive`); `ArchiveError`/`ValueError` → 400. Creates nothing. |
+| `POST /api/v1/zev/zevs/import-archive/` | POST multipart | admin | Fields: `file` (required, else 400 `{"detail": "A ZIP archive is required."}`), `sections` (repeated form field, comma-separated values, or absent = all), `name` (optional override). On failure: 400 with `{"detail", "errors", "total_errors"}` (ImportFailed) or `{"detail"}` (ArchiveError/ValueError) plus a FAILED audit event. On success: 201 with `{"zev_id", "zev_name", "sections", "counts", "warnings"}` and a SUCCESS audit event. |
+
+Normal archive warnings and actionable failures use frontend translations.
+Responses retain English strings and add optional `{code, params}` metadata:
+`diagnostic` on file-level failures, a `diagnostics` map of parallel nullable
+arrays on entry errors, and `warning_diagnostics` on success. Corrupt ZIP members
+and unreadable UTF-8/CSV files have distinct codes (`archive_corrupt` and
+`archive_csv_invalid`). Unclassified detail is shown only after opening
+“Technical details”. See the [import UI contract](2026-09-dynamic-tariffs.md#101-vse-importer).
 
 All audit events via `_record_transfer_audit(request, **kwargs)`: a try/except
 wrapper that logs `logger.exception` and never lets an audit failure fail the

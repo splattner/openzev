@@ -259,3 +259,9 @@ import them as separate steps.
 - [Participant Management](03-participant-management.md) — linking accounts after an import
 - [Metering Imports](05-metering-import.md) — loading readings on their own
 - [Platform Administration](14-admin-console.md) — where the import lives (sidebar group **Platform**)
+
+
+## Import diagnostics
+
+Normal import notices follow the selected interface language. Uncommon technical
+details are available by opening **Technical details** and may remain in English.

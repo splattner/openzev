@@ -1,5 +1,5 @@
 import type { TransferSection, TransferSectionName } from '../../features/zev/transferSections'
-import type { ZevArchiveImportResult } from '../../types/api'
+import type { ApiDiagnostic, ZevArchiveImportResult } from '../../types/api'
 import { api } from './client'
 
 export type ArchiveManifest = {
@@ -16,6 +16,7 @@ export type ImportEntryError = {
   position: number | null
   label: string
   errors: Record<string, string[]>
+  diagnostics?: Record<string, Array<ApiDiagnostic | null>>
 }
 
 export async function fetchTransferSections(): Promise<TransferSection[]> {
