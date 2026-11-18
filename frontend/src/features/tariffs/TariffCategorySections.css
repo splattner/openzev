@@ -150,8 +150,14 @@ td.tariff-table-valid {
   cursor: pointer;
 }
 
-.tariff-next-change:hover {
+.tariff-next-change > span {
   text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+.tariff-next-change:hover {
+  color: var(--interactive-hover);
 }
 
 .tariff-table .tariff-table-open {

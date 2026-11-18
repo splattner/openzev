@@ -370,7 +370,9 @@
   border-top: 1px solid var(--border-subtle);
   color: var(--text-muted);
   font-size: 0.75rem;
-  text-decoration: none;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
 }
 
 .user-menu-about:hover {

@@ -26,11 +26,12 @@
 .setup-guidance-list a {
   color: var(--interactive);
   font-weight: 600;
-  text-decoration: none;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
 }
 
 .setup-guidance-list a:hover {
   color: var(--interactive-hover);
-  text-decoration: underline;
 }
 

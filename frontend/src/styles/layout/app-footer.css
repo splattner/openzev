@@ -13,6 +13,9 @@
   align-items: center;
   gap: 0.5rem;
   color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
 }
 
 .app-footer-link svg {

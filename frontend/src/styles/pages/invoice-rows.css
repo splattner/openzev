@@ -71,13 +71,14 @@
   color: var(--interactive);
   font-size: inherit;
   font-weight: 600;
-  text-decoration: none;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
 }
 
 .invoice-row-meta a:hover,
 .invoice-progress-covered a:hover {
   color: var(--interactive-hover);
-  text-decoration: underline;
 }
 
 .invoice-progress {

@@ -69,13 +69,14 @@
   white-space: normal;
   overflow-wrap: anywhere;
   text-align: left;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
   cursor: pointer;
 }
 
 .field-reference-token:hover {
   color: var(--interactive-hover);
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 
 .field-reference-token:focus-visible {

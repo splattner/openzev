@@ -157,16 +157,18 @@ select.select-compact {
   margin-bottom: 0.875rem;
 }
 
-/* Plain links in the workspace read as links: forest, underlined on hover. */
+/* Plain links in the workspace: forest, underlined at rest. */
+
 .content-main a:not([class]) {
   color: var(--interactive);
   font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
   text-underline-offset: 0.18em;
 }
 
 .content-main a:not([class]):hover {
   color: var(--interactive-hover);
-  text-decoration: underline;
 }
 
 /* A link inside a sentence or beside a status, which colour and weight alone would not set apart from the

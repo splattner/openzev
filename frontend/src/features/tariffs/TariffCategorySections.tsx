@@ -187,9 +187,9 @@ export function TariffCategorySections({
                                                 }}
                                             >
                                                 <FontAwesomeIcon icon={faClock} fixedWidth aria-hidden="true" />
-                                                {change.kind === 'prices'
+                                                <span>{change.kind === 'prices'
                                                     ? t(changeSummary ? 'pages.tariffs.overview.nextPricesChange' : 'pages.tariffs.overview.nextPrices', { date: changeDate, prices: change.prices, unit: change.unit, change: changeSummary })
-                                                    : t(change.kind === 'schedule' ? 'pages.tariffs.overview.nextSchedule' : 'pages.tariffs.overview.nextVersion', { date: changeDate })}
+                                                    : t(change.kind === 'schedule' ? 'pages.tariffs.overview.nextSchedule' : 'pages.tariffs.overview.nextVersion', { date: changeDate })}</span>
                                             </button>
                                         )}
                                     </td>

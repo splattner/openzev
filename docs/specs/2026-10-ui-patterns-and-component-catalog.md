@@ -534,8 +534,11 @@ usage guidance. Shared badge and notice treatments are defined in SPEC-2026-08 �
 `.badge-quiet` changes emphasis while the warning/danger class keeps its meaning.
 
 **Shipped (phase 6).** `components/IssueText` is the shared form of the
-reference treatment: coloured text with a warning icon, a link (`to`), a button
-(`onClick`) or plain text when the user may not act. The sweep applied §10.1 to
+reference treatment: coloured text with a warning icon and no capsule. It is
+a link (`to`), a button (`onClick`) or plain text when the user may not act.
+Interactive forms underline the label at rest and keep their visible keyboard
+focus ring; static labels stay undecorated. Warning and error colours remain
+stable on hover and focus. The sweep applied §10.1 to
 the Overview period cards (no status pills; warning colours follow the
 [invoice lifecycle severity rules](2026-03-invoice-lifecycle-and-communication.md#94-manager-overview-and-billing-email-delivery);
 routine and resolved steps stay neutral; warning links stay underlined;
