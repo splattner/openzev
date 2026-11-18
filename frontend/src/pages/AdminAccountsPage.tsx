@@ -369,142 +369,144 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
             </section>
 
             <div className="table-card">
-                <table>
-                    <thead>
-                        <tr>
-                            <SortableHeader {...sorting.header('account')}>{t('pages.accounts.col.account')}</SortableHeader>
-                            <SortableHeader {...sorting.header('communities')}>{t('pages.accounts.col.communities')}</SortableHeader>
-                            <SortableHeader {...sorting.header('security')}>{t('pages.accounts.col.security')}</SortableHeader>
-                            <th>{t('pages.accounts.col.actions')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {sorting.rows.map((account) => {
-                            const isSelf = account.id === currentUser?.id
-                            const menuItems = [
-                                ...(canImpersonateAccount(account)
-                                    ? [{
-                                        key: 'impersonate',
-                                        label: t('pages.accounts.impersonate'),
-                                        icon: <FontAwesomeIcon icon={faUser} fixedWidth />,
-                                        disabled: impersonationMutation.isPending || dialogLoading,
-                                        onClick: () => confirmImpersonate(account),
-                                    }]
-                                    : []),
-                                {
-                                    key: 'reset-mfa',
-                                    label: t('pages.accounts.resetMfa'),
-                                    icon: <FontAwesomeIcon icon={faShieldHalved} fixedWidth />,
-                                    disabled: resetMfaMutation.isPending || dialogLoading,
-                                    onClick: () => confirmResetMfa(account),
-                                },
-                                {
-                                    key: 'view-activity',
-                                    label: t('pages.accounts.viewActivity'),
-                                    icon: <FontAwesomeIcon icon={faClockRotateLeft} fixedWidth />,
-                                    onClick: () => viewActivity(account),
-                                },
-                                // Not for the admin's own row: it would sign them out too, and the
-                                // account page has "Sign out other devices" for that.
-                                ...(isSelf
-                                    ? []
-                                    : [{
-                                        key: 'sign-out',
-                                        label: t('pages.accounts.signOutEverywhere'),
-                                        icon: <FontAwesomeIcon icon={faRightFromBracket} fixedWidth />,
-                                        disabled: revokeSessionsMutation.isPending || dialogLoading,
-                                        onClick: () => confirmSignOut(account),
-                                    }]),
-                                // Deactivating yourself would sign you out mid-edit (the
-                                // server refuses it too); the account page's own logout covers that case.
-                                ...(isSelf
-                                    ? []
-                                    : [{
-                                        key: 'toggle-active',
-                                        label: t(account.is_active ? 'pages.accounts.deactivate' : 'pages.accounts.activate'),
-                                        icon: <FontAwesomeIcon icon={account.is_active ? faBan : faPlay} fixedWidth />,
-                                        disabled: activationMutation.isPending || dialogLoading,
-                                        onClick: () => confirmSetActive(account, !account.is_active),
-                                    }]),
-                                {
-                                    key: 'delete',
-                                    label: t('common.delete'),
-                                    icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
-                                    // A member account has to be detached from its
-                                    // communities first; the server refuses otherwise.
-                                    disabled: !canDeleteAccount(account) || deleteUserMutation.isPending || dialogLoading,
-                                    danger: true,
-                                    onClick: () => confirmDelete(account),
-                                },
-                            ]
+                <div className="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <SortableHeader {...sorting.header('account')}>{t('pages.accounts.col.account')}</SortableHeader>
+                                <SortableHeader {...sorting.header('communities')}>{t('pages.accounts.col.communities')}</SortableHeader>
+                                <SortableHeader {...sorting.header('security')}>{t('pages.accounts.col.security')}</SortableHeader>
+                                <th>{t('pages.accounts.col.actions')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {sorting.rows.map((account) => {
+                                const isSelf = account.id === currentUser?.id
+                                const menuItems = [
+                                    ...(canImpersonateAccount(account)
+                                        ? [{
+                                            key: 'impersonate',
+                                            label: t('pages.accounts.impersonate'),
+                                            icon: <FontAwesomeIcon icon={faUser} fixedWidth />,
+                                            disabled: impersonationMutation.isPending || dialogLoading,
+                                            onClick: () => confirmImpersonate(account),
+                                        }]
+                                        : []),
+                                    {
+                                        key: 'reset-mfa',
+                                        label: t('pages.accounts.resetMfa'),
+                                        icon: <FontAwesomeIcon icon={faShieldHalved} fixedWidth />,
+                                        disabled: resetMfaMutation.isPending || dialogLoading,
+                                        onClick: () => confirmResetMfa(account),
+                                    },
+                                    {
+                                        key: 'view-activity',
+                                        label: t('pages.accounts.viewActivity'),
+                                        icon: <FontAwesomeIcon icon={faClockRotateLeft} fixedWidth />,
+                                        onClick: () => viewActivity(account),
+                                    },
+                                    // Not for the admin's own row: it would sign them out too, and the
+                                    // account page has "Sign out other devices" for that.
+                                    ...(isSelf
+                                        ? []
+                                        : [{
+                                            key: 'sign-out',
+                                            label: t('pages.accounts.signOutEverywhere'),
+                                            icon: <FontAwesomeIcon icon={faRightFromBracket} fixedWidth />,
+                                            disabled: revokeSessionsMutation.isPending || dialogLoading,
+                                            onClick: () => confirmSignOut(account),
+                                        }]),
+                                    // Deactivating yourself would sign you out mid-edit (the
+                                    // server refuses it too); the account page's own logout covers that case.
+                                    ...(isSelf
+                                        ? []
+                                        : [{
+                                            key: 'toggle-active',
+                                            label: t(account.is_active ? 'pages.accounts.deactivate' : 'pages.accounts.activate'),
+                                            icon: <FontAwesomeIcon icon={account.is_active ? faBan : faPlay} fixedWidth />,
+                                            disabled: activationMutation.isPending || dialogLoading,
+                                            onClick: () => confirmSetActive(account, !account.is_active),
+                                        }]),
+                                    {
+                                        key: 'delete',
+                                        label: t('common.delete'),
+                                        icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
+                                        // A member account has to be detached from its
+                                        // communities first; the server refuses otherwise.
+                                        disabled: !canDeleteAccount(account) || deleteUserMutation.isPending || dialogLoading,
+                                        danger: true,
+                                        onClick: () => confirmDelete(account),
+                                    },
+                                ]
 
-                            return (
-                                <tr key={account.id} className={account.is_active ? 'account-row' : 'account-row is-inactive'}>
-                                    <td>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
-                                            <strong className="account-name">{accountDisplayName(account)}</strong>
-                                            <span className="badge badge-tag">{roleLabel(account.role)}</span>
-                                            {!account.is_active && <span className="badge badge-neutral">{t('pages.accounts.inactive')}</span>}
-                                        </div>
-                                        <div className="muted">{account.username} · {account.email || '-'}</div>
-                                    </td>
-                                    <td>
-                                        <AccountMemberships memberships={account.memberships} />
-                                    </td>
-                                    <td>
-                                        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                                            {account.mfa_methods.length === 0 && (
-                                                <span className="badge badge-neutral">{t('pages.accounts.mfa.none')}</span>
-                                            )}
-                                            {account.mfa_methods.map((method) => (
-                                                <span key={method} className="badge badge-success">{t(`pages.accounts.mfa.${method}`)}</span>
-                                            ))}
-                                            <AccountMfaComplianceBadge compliance={account.mfa_compliance} />
-                                        </div>
-                                        <div className="muted">
-                                            {account.last_login
-                                                ? t('pages.accounts.lastSignIn', { date: formatDateTime(account.last_login, settings) })
-                                                : t('pages.accounts.neverSignedIn')}
-                                        </div>
-                                    </td>
-                                    <td className="actions-cell">
-                                        <div className="actions-cell-content">
-                                            <button
-                                                className="button button-primary button-compact"
-                                                type="button"
-                                                onClick={() => openEditUserModal(account)}
-                                            >
-                                                <FontAwesomeIcon icon={faPen} fixedWidth />
-                                                {t('common.edit')}
-                                            </button>
-                                            <ActionMenu
-                                                label={t('pages.accounts.moreActions')}
-                                                icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
-                                                items={isSelf ? menuItems.filter((item) => item.key !== 'delete') : menuItems}
-                                            />
-                                        </div>
+                                return (
+                                    <tr key={account.id} className={account.is_active ? 'account-row' : 'account-row is-inactive'}>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                                                <strong className="account-name">{accountDisplayName(account)}</strong>
+                                                <span className="badge badge-tag">{roleLabel(account.role)}</span>
+                                                {!account.is_active && <span className="badge badge-neutral">{t('pages.accounts.inactive')}</span>}
+                                            </div>
+                                            <div className="muted">{account.username} · {account.email || '-'}</div>
+                                        </td>
+                                        <td>
+                                            <AccountMemberships memberships={account.memberships} />
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                                {account.mfa_methods.length === 0 && (
+                                                    <span className="badge badge-neutral">{t('pages.accounts.mfa.none')}</span>
+                                                )}
+                                                {account.mfa_methods.map((method) => (
+                                                    <span key={method} className="badge badge-success">{t(`pages.accounts.mfa.${method}`)}</span>
+                                                ))}
+                                                <AccountMfaComplianceBadge compliance={account.mfa_compliance} />
+                                            </div>
+                                            <div className="muted">
+                                                {account.last_login
+                                                    ? t('pages.accounts.lastSignIn', { date: formatDateTime(account.last_login, settings) })
+                                                    : t('pages.accounts.neverSignedIn')}
+                                            </div>
+                                        </td>
+                                        <td className="actions-cell">
+                                            <div className="actions-cell-content">
+                                                <button
+                                                    className="button button-primary button-compact"
+                                                    type="button"
+                                                    onClick={() => openEditUserModal(account)}
+                                                >
+                                                    <FontAwesomeIcon icon={faPen} fixedWidth />
+                                                    {t('common.edit')}
+                                                </button>
+                                                <ActionMenu
+                                                    label={t('pages.accounts.moreActions')}
+                                                    icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
+                                                    items={isSelf ? menuItems.filter((item) => item.key !== 'delete') : menuItems}
+                                                />
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )
+                            })}
+
+                            {visibleAccounts.length === 0 && (
+                                <tr>
+                                    <td colSpan={4}>
+                                        {t(filtersActive ? 'pages.accounts.noMatches' : 'pages.accounts.noAccounts')}
+                                        {filtersActive && (
+                                            <>
+                                                {' '}
+                                                <button className="button button-secondary button-compact" type="button" onClick={() => setFilters(DEFAULT_ACCOUNT_FILTERS)}>
+                                                    {t('pages.accounts.filters.clear')}
+                                                </button>
+                                            </>
+                                        )}
                                     </td>
                                 </tr>
-                            )
-                        })}
-
-                        {visibleAccounts.length === 0 && (
-                            <tr>
-                                <td colSpan={4}>
-                                    {t(filtersActive ? 'pages.accounts.noMatches' : 'pages.accounts.noAccounts')}
-                                    {filtersActive && (
-                                        <>
-                                            {' '}
-                                            <button className="button button-secondary button-compact" type="button" onClick={() => setFilters(DEFAULT_ACCOUNT_FILTERS)}>
-                                                {t('pages.accounts.filters.clear')}
-                                            </button>
-                                        </>
-                                    )}
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <FormModal isOpen={showCreateUserModal} title={t('pages.accounts.createModal.title')} onClose={() => setShowCreateUserModal(false)}>

@@ -1,23 +1,12 @@
-import { expect, test, type Page } from '@playwright/test'
-import { goToPreviousPeriod, navigateTo, pinDemoZev } from './helpers'
-
-function collectErrors(page: Page) {
-  const errors: string[] = []
-  page.on('pageerror', error => errors.push(error.message))
-  page.on('console', message => {
-    // Optional source discovery answers 404 while its feature flag is off.
-    const disabledDiscovery = message.location().url.includes('/metering/supplementary/sources/eligible/') && message.text().includes('404')
-    if (message.type() === 'error' && !disabledDiscovery) errors.push(message.text())
-  })
-  return errors
-}
+import { expect, test } from '@playwright/test'
+import { collectBrowserErrors, goToPreviousPeriod, navigateTo, pinDemoZev } from './helpers'
 
 for (const width of [1440, 400]) {
   test.describe(`record table sorting at ${width}px`, () => {
     test.use({ viewport: { width, height: 1000 } })
 
     test('metering-point headings update the URL and sort the first building', async ({ page }, testInfo) => {
-      const errors = collectErrors(page)
+      const errors = collectBrowserErrors(page)
       await pinDemoZev(page)
       await navigateTo(page, '/metering/points')
       const table = page.locator('.metering-point-list').first()
@@ -55,7 +44,7 @@ for (const width of [1440, 400]) {
       ['tariffs', '/tariffs', '.tariff-table'],
     ]) {
       test(`${name} exposes working sort controls`, async ({ page }, testInfo) => {
-        const errors = collectErrors(page)
+        const errors = collectBrowserErrors(page)
         await pinDemoZev(page)
         await navigateTo(page, route)
         if (name === 'dashboard') await goToPreviousPeriod(page)
@@ -72,6 +61,14 @@ for (const width of [1440, 400]) {
         expect(new Set(original).size).toBeGreaterThan(1)
         const collator = new Intl.Collator('de-CH', { numeric: true })
         const header = table.locator('th').first()
+        if (width === 400 && (name === 'invoices' || name === 'tariffs')) {
+          await expect(table.locator('thead button')).toHaveCount(0)
+          expect(await values()).toEqual(original)
+          expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+          expect(errors).toEqual([])
+          await page.screenshot({ path: testInfo.outputPath(`${name}.png`), fullPage: true })
+          return
+        }
         await expect(header.locator('button')).toBeVisible()
         if (name === 'tariffs') {
           await expect(table.locator('th.numeric button')).toBeVisible()

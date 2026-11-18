@@ -372,42 +372,44 @@ export function AdminSystemSettingsPage() {
                     {!featureFlagsQuery.isLoading && flags.length === 0 && <p className="muted">{t('features.empty')}</p>}
 
                     {flags.length > 0 && (
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>{t('features.name')}</th>
-                                    <th>{t('features.descriptionCol')}</th>
-                                    <th className="feature-toggle-col">{t('features.enabled')}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {flags.map((flag) => (
-                                    <tr key={flag.id}>
-                                        <td><code>{flag.name}</code></td>
-                                        <td>
-                                            {flag.description || <span className="muted">—</span>}
-                                            {flag.controlled_by_env ? (
-                                                <small className="muted" style={{ display: 'block' }}>
-                                                    {t('features.controlledByEnv', { variable: `FEATURE_${flag.name.toUpperCase()}` })}
-                                                </small>
-                                            ) : flag.follows_default ? (
-                                                <small className="muted" style={{ display: 'block' }}>{t('features.followsDefault')}</small>
-                                            ) : null}
-                                        </td>
-                                        <td>
-                                            {/* The app's one switch (Mantine), as in every other settings form. */}
-                                            <Switch
-                                                checked={flag.enabled}
-                                                disabled={featureToggleMutation.isPending || flag.controlled_by_env}
-                                                onChange={() => featureToggleMutation.mutate({ id: flag.id, enabled: !flag.enabled })}
-                                                label={flag.enabled ? t('features.on') : t('features.off')}
-                                                aria-label={`${flag.name}: ${flag.enabled ? t('features.on') : t('features.off')}`}
-                                            />
-                                        </td>
+                        <div className="table-scroll">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>{t('features.name')}</th>
+                                        <th>{t('features.descriptionCol')}</th>
+                                        <th className="feature-toggle-col">{t('features.enabled')}</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {flags.map((flag) => (
+                                        <tr key={flag.id}>
+                                            <td><code>{flag.name}</code></td>
+                                            <td>
+                                                {flag.description || <span className="muted">—</span>}
+                                                {flag.controlled_by_env ? (
+                                                    <small className="muted" style={{ display: 'block' }}>
+                                                        {t('features.controlledByEnv', { variable: `FEATURE_${flag.name.toUpperCase()}` })}
+                                                    </small>
+                                                ) : flag.follows_default ? (
+                                                    <small className="muted" style={{ display: 'block' }}>{t('features.followsDefault')}</small>
+                                                ) : null}
+                                            </td>
+                                            <td>
+                                                {/* The app's one switch (Mantine), as in every other settings form. */}
+                                                <Switch
+                                                    checked={flag.enabled}
+                                                    disabled={featureToggleMutation.isPending || flag.controlled_by_env}
+                                                    onChange={() => featureToggleMutation.mutate({ id: flag.id, enabled: !flag.enabled })}
+                                                    label={flag.enabled ? t('features.on') : t('features.off')}
+                                                    aria-label={`${flag.name}: ${flag.enabled ? t('features.on') : t('features.off')}`}
+                                                />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
                 </section>
                 </AppTabs.Panel>

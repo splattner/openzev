@@ -4,7 +4,7 @@
   display: none;
 }
 
-@container (max-width: 46rem) {
+@container (max-width: 56rem) {
   /* The header that names the currency is out of sight here. */
   .invoice-row-currency {
     display: inline;

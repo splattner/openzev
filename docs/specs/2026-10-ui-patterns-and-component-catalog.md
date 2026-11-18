@@ -63,7 +63,7 @@ the code shows it.
 | Three disclosure mechanisms | Native `<details>` (`BillingPeriodCard`, `BillingPeriodsPage`), hand-rolled `aria-expanded` buttons (`ZevEmailTemplateFields`, `RawMeteringTable`, `MeteringGapsDrawer`, `MeteringPointRow`, `TariffCategorySections`). |
 | Information without a use | Counts and decoration that explain nothing (tariff, fee and version totals; a coloured "In Bearbeitung" on the overview). The participants "Kein Messpunkt" fix link is the model to follow. |
 | Repeated library configuration | `Tabs` with the same `app-tabs` class mapping is configured in nine files; `Drawer` three times. (Both resolved: `AppTabs` in phase 2; the drawers in phase 3, with `no-restricted-imports` for `Drawer` and raw `Tabs`.) |
-| Existing responsive tables are reusable | Participants and invoices share `.table-card.invoice-rows`, whose rules are container queries (`@container (max-width: 46rem)` and `28rem`, `frontend/src/styles/pages/invoice-rows.css`). A list narrowed by a pane can reuse them. |
+| Existing responsive tables are reusable | Participants and invoices share `.table-card.invoice-rows`, whose rules are container queries (`@container (max-width: 56rem)` and `28rem`, `frontend/src/styles/pages/invoice-rows.css`). A list narrowed by a pane can reuse them. |
 
 These are inputs to the rules below. A difference is a defect when it makes a
 task harder to understand or to repeat; the rollout (§11) removes them in a

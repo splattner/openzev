@@ -104,7 +104,7 @@ defined by shared frontend primitives and CSS contracts.
 | `frontend/src/components/EmailLogsModal.tsx` | `EmailLogsModal` | Uses `FormModal` for delivery history with retry actions and semantic status badges. |
 | `frontend/src/components/PeriodSelector.tsx` | `PeriodSelector` | Billing-interval navigation and optional custom ranges. Callers own period URL state and the aligned navigation floor. `compact` (whole periods) renders labelled chevron buttons around a one-line trigger naming the period via `billingPeriodName` (`lib/billingPeriod.ts`), with the exact dates in its tooltip and menu; the year's other names sit invisibly in the same cell so the trigger keeps a stable width. A whole-period selector (`allowCustomRange={false}`) steps from any range to the nearest whole periods (`adjacentBillingPeriod`); in `compact` mode a range that is not a whole period keeps its dates under a warning badge (`common.periodSelector.notBillingPeriod`), elsewhere under the **Custom** info badge. |
 | `frontend/src/components/YearPicker.tsx` | `YearPicker` | Native year control with `years`, `value`, `onChange`, optional `disabled`, required translated `label`, optional `id`, `visibleLabel` (default true), and `className`. It generates an associated id when omitted; hidden labels use `aria-label`. Range/default/rollover policy stays with the caller. |
-| `frontend/src/components/tableSorting.tsx` | `SortableHeader`, `useTableSorting` | Shared accessible headings and raw-value TanStack sorting for record tables with custom row/card markup; contract and coverage in §7.2. |
+| `frontend/src/components/tableSorting.tsx` | `SortableHeader`, `ResponsiveTableHead`, `useTableSorting` | Shared accessible headings and raw-value TanStack sorting for record tables with custom row/card markup; contract and coverage in §7.2. |
 | `frontend/src/components/InvoicePresentation.tsx` | `InvoiceLink`, `InvoiceStatusBadge`, `InvoiceAmount`, `InvoicePdfCell`, `InvoiceActionButton`, `InvoiceRowActions` | Typed invoice cells/actions shared by period rows, own invoices, and the admin DataTable. `InvoiceStatusBadge` supports `variant="plain"` for the detail header; its default badge presentation remains for tables. `InvoiceActionButton`/`InvoiceRowActions` take `variant` (`primary` default, `secondary` outlined where a page-level primary action leads). `InvoiceAmount` takes `currency` (default true); `false` drops "CHF" for a column whose header names it. Callers own row models, eligibility and permission checks; no shared pagination layer. |
 | `frontend/src/components/PageHeader.tsx` | `PageHeader` | Page title (`h1`, `tabIndex={-1}`: the focus target after navigation, not a tab stop), a plain-text `title`, optional `eyebrow`, `scopeNote` (access label after the eyebrow, e.g. a viewer's read-only access; not in the tab title), `description` and `actions`. Sets `document.title` through `useDocumentTitle` (`frontend/src/lib/useDocumentTitle.ts`): `app.documentTitleScoped` ("Billing · Muster ZEV – OpenZEV") when the eyebrow is text, else `app.documentTitle`. Keep it outside data/scope state branches. Embedded pages use the host page title. |
 | `frontend/src/components/Notice.tsx` | `Notice` | Errors use `alert`, warnings use `status`; optional role override and retry with busy feedback. |
@@ -472,10 +472,29 @@ time; `DataTable` also supports Shift-click multi-sort. Lookup-backed accessors
 refresh when their names or other dependencies change.
 
 Sort the complete loaded result before client-side pagination and within
-existing groups. Apply the two-row threshold to each rendered table. On narrow
-layouts, sortable headings stay above the record cards. Sorting preserves
-selection, group membership, source-row labels, row actions and downloads;
+existing groups. Apply the two-row threshold to each rendered table. Sorting
+preserves selection, group membership, source-row labels, actions and downloads;
 it does not change permissions or API queries.
+
+Participant, period invoice and tariff lists switch to cards at a container
+width of 56rem or less. This includes desktop layouts narrowed by a sidebar or
+pane; the earlier breakpoint prevents long participant identities overflowing.
+The approved product decision is to hide the heading band and omit sorting
+controls on participant and billing cards. Tariff cards keep only the category
+heading, as plain text. Other record tables retain their sort controls.
+
+`ResponsiveTableHead` retains column semantics and the selected sort order.
+Table layout restores the controls. If a focused sort button disappears,
+focus moves to the table (`tabIndex={-1}`); focus elsewhere stays put.
+The card-mode decision comes from CSS, independently of the heading's display
+layout. Without `ResizeObserver`, initial mode and viewport resizes are handled;
+container-only changes require a supported browser with `ResizeObserver`.
+
+This approved omission of narrow-layout sorting is an exception to the UI
+reference's WCAG 2.2 AA target: equivalent narrow sorting is not provided.
+Retained labels and focus do not establish reflow conformance. Do not claim
+full AA conformance for this interaction; restoring equivalent sorting would
+require revisiting the approved product decision.
 
 Page-specific keys are documented with their features: [tariff overview](2026-10-tariff-split-view.md),
 [metering points](2026-03-metering-point-management.md),

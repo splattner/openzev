@@ -1,4 +1,4 @@
-import { SortableHeader, useTableSorting } from '../../components/tableSorting'
+import { ResponsiveTableHead, SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
     faArrowRight,
@@ -222,8 +222,8 @@ export function ParticipantCardsSection({
             <div className="table-card invoice-rows participant-rows">
                 {/* Explicit roles keep table semantics when narrow containers turn
                     the table into cards with display: block. */}
-                <table role="table">
-                    <thead role="rowgroup">
+                <table role="table" tabIndex={-1}>
+                    <ResponsiveTableHead role="rowgroup">
                         <tr role="row">
                             <SortableHeader {...sorting.header('participant')} role="columnheader" scope="col">{t('pages.participants.col.participant')}</SortableHeader>
                             <SortableHeader {...sorting.header('address')} role="columnheader" scope="col">{t('pages.participants.col.address')}</SortableHeader>
@@ -234,7 +234,7 @@ export function ParticipantCardsSection({
                                 <span className="visually-hidden">{t('pages.participants.col.actions')}</span>
                             </th>
                         </tr>
-                    </thead>
+                    </ResponsiveTableHead>
                     <tbody role="rowgroup">
                         {sorting.rows.map(({ participant, issues, roles, validityState, displayName, address }) => {
                             const isCurrent = validityState === 'current'

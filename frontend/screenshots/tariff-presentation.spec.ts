@@ -41,7 +41,7 @@ test('the next version is read from the current row and opens through the URL an
     await page.keyboard.press(key)
     await expect(page).toHaveURL(/version=next/)
     await expect(page.locator('.tariff-version-card.is-shown')).toContainText('0.315')
-    await expect(page.locator('.tariff-version-card.is-shown .badge').first()).toHaveText('Upcoming')
+    await expect(page.locator('.tariff-version-card.is-shown .tariff-version-card-state').first()).toHaveText('Upcoming')
     await expect(row.locator('tr.is-selected')).toHaveCount(1)
     // Every version in force or scheduled is in the pane, each with the change against the one before it.
     await expect(page.locator('.tariff-version-card')).toHaveCount(3)
@@ -124,7 +124,7 @@ for (const language of ['en', 'de', 'fr']) {
 }
 
 for (const language of ['en', 'de', 'fr']) {
-  test(`category headers keep sorting controls visible across card breakpoints in ${language}`, async ({ page }, testInfo) => {
+  test(`category headers omit sorting controls in card layout in ${language}`, async ({ page }, testInfo) => {
     const local: TariffSeries = { ...grid, name: 'Local', energy_type: 'local', version_count: 1, active_version_id: 'local',
       versions: [{ ...current, id: 'local', name: 'Local', energy_type: 'local' }] }
     await tariffs(page, [grid, local], language)
@@ -138,8 +138,7 @@ for (const language of ['en', 'de', 'fr']) {
     const header = list.locator('thead')
     const controls = header.getByRole('button')
     const rem = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize))
-    await expect(controls).toHaveCount(4)
-    for (const width of [25 * rem, 46 * rem - 1, 46 * rem, 46 * rem + 1, 50 * rem, 56 * rem - 1, 56 * rem, 56 * rem + 1]) {
+    for (const width of [25 * rem, 50 * rem, 56 * rem - 1, 56 * rem, 56 * rem + 1]) {
       await list.evaluate((element, size) => {
         element.style.boxSizing = 'content-box'
         element.style.width = `${size}px`
@@ -147,22 +146,18 @@ for (const language of ['en', 'de', 'fr']) {
       await expect(list).toHaveCSS('width', `${width}px`)
       await expect(list.locator('td.numeric').first()).toBeVisible({ visible: width > 56 * rem })
       await expect(list.locator('td.tariff-table-bands').first()).toBeVisible({ visible: width <= 56 * rem })
-      const bounds = (await header.boundingBox())!
-      const first = (await controls.first().boundingBox())!
-      for (const control of await controls.all()) {
-        await expect(control).toBeVisible()
-        const box = (await control.boundingBox())!
-        expect(box.x).toBeGreaterThanOrEqual(bounds.x - 1)
-        expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width + 1)
-        expect(box.y).toBeGreaterThanOrEqual(bounds.y - 1)
-        expect(box.y + box.height).toBeLessThanOrEqual(bounds.y + bounds.height + 1)
-        if (width >= 46 * rem - 1) expect(Math.abs(box.y - first.y), `Header at ${width}px`).toBeLessThanOrEqual(1)
+      await expect(header).toHaveAttribute('data-card-layout', width <= 56 * rem ? 'true' : 'false')
+      // Cards expose the combined band label, hidden in desktop layout.
+      await expect(list.getByRole('columnheader')).toHaveCount(width <= 56 * rem ? 7 : 6)
+      await expect(controls).toHaveCount(width <= 56 * rem ? 0 : 4)
+      await expect(header.locator('th').first()).toBeVisible()
+      if (width <= 56 * rem) {
+        await expect(header.locator('th').nth(2)).toHaveCSS('clip-path', 'inset(50%)')
       }
     }
     await controls.first().click()
     await controls.first().click()
     await expect(list.locator('.tariff-select').first()).toHaveText('Local')
-    await list.evaluate(element => element.removeAttribute('style'))
     await page.emulateMedia({ forcedColors: 'active' })
     expect(await page.evaluate(() => matchMedia('(forced-colors: active)').matches)).toBe(true)
     await controls.first().focus()
@@ -172,11 +167,18 @@ for (const language of ['en', 'de', 'fr']) {
       await page.keyboard.press('Tab')
     }
     await page.screenshot({ path: testInfo.outputPath(`tariff-headers-forced-colors-${language}.png`), fullPage: true })
+    await controls.last().focus()
+    await list.evaluate(element => element.removeAttribute('style'))
+    await expect(controls).toHaveCount(0)
+    await expect(list.locator('table')).toBeFocused()
+    await expect(header.locator('th').first()).not.toHaveCSS('cursor', 'pointer')
+    await expect(header.locator('th').first()).not.toContainText(/[▲▼]/)
   })
 }
 
 test('shared sticky headers and the light raw-metering grid survive fractional zoom', async ({ page }, testInfo) => {
   await mockApi(page, { populated: true })
+  await page.route('**/api/v1/metering/held-readings/**', route => route.fulfill({ json: { count: 0, results: [] } }))
   await page.route('**/api/v1/metering/readings/raw-data/**', route => {
     const detail = new URL(route.request().url()).searchParams.has('date')
     return route.fulfill({ json: detail

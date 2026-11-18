@@ -77,15 +77,18 @@
   border-top-right-radius: calc(var(--radius-lg) - 1px);
 }
 
-:is(.card, .table-card) > :where(table, .table-scroll, .data-table):last-child {
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table):last-child,
+:is(.card, .table-card) > .sheet-table-body:last-child > :where(table, .table-scroll, .data-table):last-child {
   margin-bottom: calc(-1 * var(--sheet-pad-block));
 }
 
-:is(.card, .table-card) > :where(table, .table-scroll, .data-table):last-child tbody tr:last-child > td:first-child {
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table):last-child tbody tr:last-child > td:first-child,
+:is(.card, .table-card) > .sheet-table-body:last-child > :where(table, .table-scroll, .data-table):last-child tbody tr:last-child > td:first-child {
   border-bottom-left-radius: calc(var(--radius-lg) - 1px);
 }
 
-:is(.card, .table-card) > :where(table, .table-scroll, .data-table):last-child tbody tr:last-child > td:last-child {
+:is(.card, .table-card) > :where(table, .table-scroll, .data-table):last-child tbody tr:last-child > td:last-child,
+:is(.card, .table-card) > .sheet-table-body:last-child > :where(table, .table-scroll, .data-table):last-child tbody tr:last-child > td:last-child {
   border-bottom-right-radius: calc(var(--radius-lg) - 1px);
 }
 

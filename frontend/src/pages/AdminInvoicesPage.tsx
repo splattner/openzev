@@ -153,7 +153,7 @@ export function AdminInvoicesContent() {
                     <p className="muted">{t('adminInvoices.empty')}</p>
                 )}
                 {invoices.length > 0 && (
-                    <div className="page-stack" style={{ width: '100%' }}>
+                    <div className="page-stack sheet-table-body" style={{ width: '100%' }}>
                         <div className="actions-row" style={{ flexWrap: 'wrap' }}>
                             <input
                                 type="search"

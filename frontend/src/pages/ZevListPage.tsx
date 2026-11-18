@@ -922,112 +922,114 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                 />
             ) : (
                 <div className="table-card">
-                <table>
-                    <thead>
-                        <tr>
-                            <SortableHeader {...sorting.header('name')}>{t('pages.zevs.col.name')}</SortableHeader>
-                            <SortableHeader {...sorting.header('issuer')}>{t('pages.zevs.col.issuer')}</SortableHeader>
-                            <SortableHeader {...sorting.header('startDate')}>{t('pages.zevs.col.startDate')}</SortableHeader>
-                            <SortableHeader {...sorting.header('gridOperator')}>{t('pages.zevs.col.gridOperator')}</SortableHeader>
-                            <SortableHeader {...sorting.header('billingInterval')}>{t('pages.zevs.col.billingInterval')}</SortableHeader>
-                            <th>{t('pages.zevs.col.actions')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {sorting.rows.map((zev) => (
-                            <tr key={zev.id}>
-                                <td>
-                                    <div className="actions-row">
-                                        <span>{zev.name}</span>
-                                        <span className="badge badge-tag">
-                                            {zev.zev_type.toUpperCase()}
-                                        </span>
-                                        {!isValidIban(zev.bank_iban ?? '') && (
-                                            <IssueText tone="warning" title={t('pages.zevs.ibanWarningHint')}>
-                                                {t('pages.zevs.ibanWarning')}
-                                            </IssueText>
-                                        )}
-                                        {zev.disabled_at && (
-                                            <span
-                                                className="badge badge-danger badge-quiet"
-                                                title={t('pages.zevs.disabledSince', { date: formatShortDate(zev.disabled_at, settings) })}
-                                            >
-                                                {t('pages.zevs.disabledBadge')}
-                                            </span>
-                                        )}
-                                    </div>
-                                </td>
-                                <td>{zev.issuer?.display_name ?? '–'}</td>
-                                <td>{formatShortDate(zev.start_date, settings)}</td>
-                                <td>{zev.grid_operator || '-'}</td>
-                                <td>{t(`pages.zevs.billingIntervals.${zev.billing_interval}` as Parameters<typeof t>[0], { defaultValue: zev.billing_interval })}</td>
-                                <td className="actions-cell">
-                                    <div className="actions-cell-content">
-                                        <button
-                                            className="button button-secondary button-compact"
-                                            type="button"
-                                            onClick={() => {
-                                                setSelectedZevId(zev.id)
-                                                navigate('/')
-                                            }}
-                                        >
-                                            <FontAwesomeIcon icon={faArrowRight} fixedWidth />
-                                            {t('pages.zevs.manage')}
-                                        </button>
-                                        <button className="button button-primary button-compact" type="button" onClick={() => startEdit(zev)}>
-                                            <FontAwesomeIcon icon={faPen} fixedWidth />
-                                            {t('common.edit')}
-                                        </button>
-                                        {zev.disabled_at && (
-                                            <button
-                                                className="button button-secondary button-compact"
-                                                type="button"
-                                                disabled={enableMutation.isPending || dialogLoading}
-                                                onClick={() => confirm({
-                                                    title: t('pages.zevs.enableTitle'),
-                                                    message: t('pages.zevs.enableMessage', { name: zev.name }),
-                                                    confirmText: t('pages.zevs.enableConfirm'),
-                                                    onConfirm: () => consumeReportedError(enableMutation.mutateAsync(zev.id)),
-                                                })}
-                                            >
-                                                <FontAwesomeIcon icon={faPlay} fixedWidth />
-                                                {t('pages.zevs.enable')}
-                                            </button>
-                                        )}
-                                        {zev.disabled_at && (
-                                            <button
-                                                className="button button-danger button-compact"
-                                                type="button"
-                                                disabled={purgeMutation.isPending}
-                                                onClick={() => openPurgeDialog(zev)}
-                                            >
-                                                <FontAwesomeIcon icon={faSkullCrossbones} fixedWidth />
-                                                {t('pages.zevs.purge')}
-                                            </button>
-                                        )}
-                                        {!zev.disabled_at && (
-                                            <button
-                                                className="button button-secondary button-compact"
-                                                type="button"
-                                                disabled={disableMutation.isPending || dialogLoading}
-                                                onClick={() => confirm({
-                                                    title: t('pages.zevs.disableTitle'),
-                                                    message: t('pages.zevs.disableMessage', { name: zev.name }),
-                                                    confirmText: t('pages.zevs.disableConfirm'),
-                                                    isDangerous: true,
-                                                    onConfirm: () => consumeReportedError(disableMutation.mutateAsync(zev.id)),
-                                                })}
-                                            >
-                                                <FontAwesomeIcon icon={faBan} fixedWidth />
-                                                {t('pages.zevs.disable')}
-                                            </button>
-                                        )}
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                    <div className="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <SortableHeader {...sorting.header('name')}>{t('pages.zevs.col.name')}</SortableHeader>
+                                    <SortableHeader {...sorting.header('issuer')}>{t('pages.zevs.col.issuer')}</SortableHeader>
+                                    <SortableHeader {...sorting.header('startDate')}>{t('pages.zevs.col.startDate')}</SortableHeader>
+                                    <SortableHeader {...sorting.header('gridOperator')}>{t('pages.zevs.col.gridOperator')}</SortableHeader>
+                                    <SortableHeader {...sorting.header('billingInterval')}>{t('pages.zevs.col.billingInterval')}</SortableHeader>
+                                    <th>{t('pages.zevs.col.actions')}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {sorting.rows.map((zev) => (
+                                    <tr key={zev.id}>
+                                        <td>
+                                            <div className="actions-row">
+                                                <span>{zev.name}</span>
+                                                <span className="badge badge-tag">
+                                                    {zev.zev_type.toUpperCase()}
+                                                </span>
+                                                {!isValidIban(zev.bank_iban ?? '') && (
+                                                    <IssueText tone="warning" title={t('pages.zevs.ibanWarningHint')}>
+                                                        {t('pages.zevs.ibanWarning')}
+                                                    </IssueText>
+                                                )}
+                                                {zev.disabled_at && (
+                                                    <span
+                                                        className="badge badge-danger badge-quiet"
+                                                        title={t('pages.zevs.disabledSince', { date: formatShortDate(zev.disabled_at, settings) })}
+                                                    >
+                                                        {t('pages.zevs.disabledBadge')}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td>{zev.issuer?.display_name ?? '–'}</td>
+                                        <td>{formatShortDate(zev.start_date, settings)}</td>
+                                        <td>{zev.grid_operator || '-'}</td>
+                                        <td>{t(`pages.zevs.billingIntervals.${zev.billing_interval}` as Parameters<typeof t>[0], { defaultValue: zev.billing_interval })}</td>
+                                        <td className="actions-cell">
+                                            <div className="actions-cell-content">
+                                                <button
+                                                    className="button button-secondary button-compact"
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedZevId(zev.id)
+                                                        navigate('/')
+                                                    }}
+                                                >
+                                                    <FontAwesomeIcon icon={faArrowRight} fixedWidth />
+                                                    {t('pages.zevs.manage')}
+                                                </button>
+                                                <button className="button button-primary button-compact" type="button" onClick={() => startEdit(zev)}>
+                                                    <FontAwesomeIcon icon={faPen} fixedWidth />
+                                                    {t('common.edit')}
+                                                </button>
+                                                {zev.disabled_at && (
+                                                    <button
+                                                        className="button button-secondary button-compact"
+                                                        type="button"
+                                                        disabled={enableMutation.isPending || dialogLoading}
+                                                        onClick={() => confirm({
+                                                            title: t('pages.zevs.enableTitle'),
+                                                            message: t('pages.zevs.enableMessage', { name: zev.name }),
+                                                            confirmText: t('pages.zevs.enableConfirm'),
+                                                            onConfirm: () => consumeReportedError(enableMutation.mutateAsync(zev.id)),
+                                                        })}
+                                                    >
+                                                        <FontAwesomeIcon icon={faPlay} fixedWidth />
+                                                        {t('pages.zevs.enable')}
+                                                    </button>
+                                                )}
+                                                {zev.disabled_at && (
+                                                    <button
+                                                        className="button button-danger button-compact"
+                                                        type="button"
+                                                        disabled={purgeMutation.isPending}
+                                                        onClick={() => openPurgeDialog(zev)}
+                                                    >
+                                                        <FontAwesomeIcon icon={faSkullCrossbones} fixedWidth />
+                                                        {t('pages.zevs.purge')}
+                                                    </button>
+                                                )}
+                                                {!zev.disabled_at && (
+                                                    <button
+                                                        className="button button-secondary button-compact"
+                                                        type="button"
+                                                        disabled={disableMutation.isPending || dialogLoading}
+                                                        onClick={() => confirm({
+                                                            title: t('pages.zevs.disableTitle'),
+                                                            message: t('pages.zevs.disableMessage', { name: zev.name }),
+                                                            confirmText: t('pages.zevs.disableConfirm'),
+                                                            isDangerous: true,
+                                                            onConfirm: () => consumeReportedError(disableMutation.mutateAsync(zev.id)),
+                                                        })}
+                                                    >
+                                                        <FontAwesomeIcon icon={faBan} fixedWidth />
+                                                        {t('pages.zevs.disable')}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
         </div>

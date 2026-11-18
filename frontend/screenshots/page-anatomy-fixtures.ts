@@ -143,6 +143,7 @@ export async function mockApi(page: Page, state: ApiState = {}) {
       totp_enabled: false, passkeys: [], recovery_codes_remaining: 0, required: false, grace_until: null,
     } })
     if (path.endsWith('/auth/me/')) return route.fulfill({ json: user() })
+    if (path.endsWith('/invoices/charges/')) return route.fulfill({ json: [] })
     if (path.endsWith('/auth/app-settings/')) return route.fulfill({ json: {
       date_format_short: 'dd.MM.yyyy', date_format_long: 'd MMMM yyyy', date_time_format: 'dd.MM.yyyy HH:mm',
       mfa_required: false, mfa_grace_period_days: 14,

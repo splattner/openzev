@@ -1,5 +1,109 @@
 import { test, expect, type Page } from '@playwright/test'
-import { API_BASE, getAdminToken, impersonateDemoParticipant, navigateTo } from './helpers'
+import { API_BASE, collectBrowserErrors, getAdminToken, impersonateDemoParticipant, navigateTo, pinDemoZev } from './helpers'
+
+for (const [name, path, selector] of [
+  ['participants', '/participants', '.participant-rows'],
+  ['billing', '/billing/invoices', '.invoice-rows'],
+  ['documents', '/documents', '.table-card:has(.doc-wide)'],
+  ['admin invoices', '/admin/invoices', '.card:has(.data-table)'],
+]) {
+  test(`${name} table meets its sheet edges across breakpoints`, async ({ page }, testInfo) => {
+    const errors = collectBrowserErrors(page)
+    await pinDemoZev(page)
+    await navigateTo(page, path)
+    const sheet = page.locator(selector).first()
+    await expect(sheet.locator('tbody tr').first()).toBeAttached()
+    for (const width of [1440, 1180, 1080, 940, 400]) {
+      await page.setViewportSize({ width, height: 900 })
+      if (width <= 400) {
+        await expect.poll(() => page.locator('#app-sidebar').evaluate(element => element.getBoundingClientRect().right)).toBeLessThanOrEqual(0)
+      }
+      if (name !== 'admin invoices') {
+        await expect.poll(() => sheet.evaluate(element => {
+          const head = element.querySelector('thead')!
+          if (getComputedStyle(head).clipPath === 'inset(50%)') return !head.querySelector('button')
+          const gap = head.getBoundingClientRect().top - element.getBoundingClientRect().top - element.clientTop
+          const boxes = Array.from(head.querySelectorAll('th.sortable-header'), cell => cell.getBoundingClientRect())
+            .filter(box => box.width && box.height)
+          const singleLine = !head.classList.contains('responsive-table-head') || boxes.every(box => Math.abs(box.top - boxes[0].top) < 1)
+          const noOverlap = boxes.every((a, index) => boxes.slice(index + 1).every(b =>
+            Math.min(a.right, b.right) - Math.max(a.left, b.left) <= 0.5 ||
+            Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) <= 0.5))
+          return Math.abs(gap) < 0.5 && singleLine && noOverlap
+        }), { message: `header wraps, overlaps or leaves a gap at ${width}px` }).toBe(true)
+      }
+      if (name === 'admin invoices' || (name === 'documents' && width > 640)) {
+        expect(await sheet.evaluate(element => {
+          const table = element.querySelector('.data-table, .table-scroll')!
+          return element.getBoundingClientRect().bottom - table.getBoundingClientRect().bottom - element.clientTop
+        }), `bottom gap at ${width}px`).toBeCloseTo(0, 0)
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+      await page.screenshot({ path: testInfo.outputPath(`table-${width}.png`), fullPage: true })
+    }
+    expect(errors).toEqual([])
+  })
+}
+
+for (const language of ['en', 'de', 'fr', 'it']) {
+  test(`participant cards retain sorting and focus across the container boundary in ${language}`, async ({ page }, testInfo) => {
+    await page.addInitScript(lang => localStorage.setItem('openzev.language', lang), language)
+    await pinDemoZev(page)
+    await page.setViewportSize({ width: 1600, height: 900 })
+    await navigateTo(page, '/participants')
+    const sheet = page.locator('.participant-rows')
+    const table = sheet.getByRole('table')
+    const head = table.locator('thead')
+    const header = head.locator('th').first()
+    const names = () => sheet.locator('.invoice-row-name strong').allTextContents()
+    const original = await names()
+    const collator = new Intl.Collator(language, { numeric: true })
+    const ascending = [...original].sort(collator.compare)
+    const descending = [...original].sort((a, b) => collator.compare(b, a))
+    const boundary = 56 * await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize))
+    const resize = async (width: number) => {
+      await sheet.evaluate((element, size) => {
+        element.style.boxSizing = 'content-box'
+        element.style.width = `${size}px`
+      }, width)
+      await expect(head).toHaveAttribute('data-card-layout', width <= boundary ? 'true' : 'false')
+      await expect(table.getByRole('columnheader')).toHaveCount(6)
+    }
+
+    await resize(boundary + 1)
+    await header.locator('button').click()
+    await header.locator('button').click()
+    await expect(header).toHaveAttribute('aria-sort', 'descending')
+    await expect.poll(names).toEqual(descending)
+    await header.locator('button').focus()
+    for (const width of [boundary, boundary - 1]) {
+      await resize(width)
+      await expect(head).toHaveCSS('clip-path', 'inset(50%)')
+      await expect(head.locator('button')).toHaveCount(0)
+      await expect(table).toBeFocused()
+      await expect.poll(names).toEqual(descending)
+    }
+    await page.screenshot({ path: testInfo.outputPath(`participants-${language}-cards.png`), fullPage: true })
+
+    await resize(boundary + 1)
+    await expect(header).toHaveAttribute('aria-sort', 'descending')
+    await expect.poll(names).toEqual(descending)
+    await header.locator('button').click()
+    await expect.poll(names).toEqual(original)
+    await header.locator('button').click()
+    await expect.poll(names).toEqual(ascending)
+    await page.screenshot({ path: testInfo.outputPath(`participants-${language}-table.png`), fullPage: true })
+
+    const search = page.locator('main input').first()
+    await search.focus()
+    await resize(boundary)
+    await expect(search).toBeFocused()
+    await expect.poll(names).toEqual(ascending)
+    await resize(boundary + 1)
+    await expect(search).toBeFocused()
+    await expect(header).toHaveAttribute('aria-sort', 'ascending')
+  })
+}
 
 const PROBE_PREFIX = 'Layout Probe '
 const PROBE_COUNT = 10

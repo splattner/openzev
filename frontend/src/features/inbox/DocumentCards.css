@@ -71,6 +71,14 @@
   display: block;
 }
 
+.doc-wide .billing-workflow-table {
+  min-width: 0;
+}
+
+.doc-participant-cell {
+  overflow-wrap: anywhere;
+}
+
 /* Two buttons share a line while there is room and stack when there is not, so the table
    never grows wider than its sheet and clips the second one. */
 
@@ -88,6 +96,15 @@
 
 .doc-filter-narrow {
   display: none;
+}
+
+/* The hidden phone cards follow the desktop table, so it is not :last-child. */
+@media (min-width: 641px) {
+  .table-card > .doc-wide {
+    margin-bottom: calc(-1 * var(--sheet-pad-block));
+    border-bottom-left-radius: calc(var(--radius-lg) - 1px);
+    border-bottom-right-radius: calc(var(--radius-lg) - 1px);
+  }
 }
 
 @media (max-width: 640px) {

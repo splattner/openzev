@@ -507,7 +507,7 @@ link the invoice breakdown to `/admin/invoices` and email statistics to
     - Saves via `updateAppSettings` mutation. On success, updates the query cache directly: `queryClient.setQueryData(['app-settings'], data)`.
 - **Features tab:**
     - Uses `fetchFeatureFlags` with query key `['feature-flags']`.
-    - Displays the registered feature flags in a table with toggle switches.
+    - Displays the registered feature flags in a table with toggle switches inside the shared `.table-scroll` wrapper.
     - A flag whose row has `follows_default` (a flag with a computed default, such as `supplementary_energy_data_enabled`, until an admin chooses) shows its current effective value and a hint that it follows the instance's default; toggling it stores a choice (`follows_default` becomes `false`). Every flag reads as its effective value, so a flag whose `controlled_by_env` is true (a `FEATURE_<NAME>` variable is set) shows the variable's name and a disabled switch. A toggle also invalidates the system health and energy data queries. See [ADR 0033](../adr/0033-energy-data-flag-follows-the-integration-key.md).
     - Toggling uses `updateFeatureFlag` and invalidates `['feature-flags']` after success.
     - The Accounts hub's second tab is **Tokens & keys** (`/admin/accounts/tokens`; `/admin/accounts/api-keys` and `/admin/api-keys` redirect): API keys, analytics tokens and energy data tokens of every account with owner, type, scope and status, filters for owner, type and status, and revoke through each kind's endpoint (SPEC-2026-tokens-and-keys §7.4).
@@ -560,8 +560,8 @@ link the invoice breakdown to `/admin/invoices` and email statistics to
   independent of field height.
 - **Summary cards:** three `StatCard` components above the form — configured rate count, today's active rate (percentage, or the translated "none" label), and count of scheduled rates with `valid_from` in the future.
 - **Create/Edit form:** 3 fields (rate %, valid_from date input with app-settings format, valid_to date input optional). Default rate: `8.1`. The frontend converts percentage to fraction before sending (`(percentage / 100).toFixed(4)`). Dates use the shared `CivilDateInput` (`frontend/src/components/CivilDateInput.tsx`, a Mantine `DatePickerInput` typing civil dates in the app's configured format); calendar localization comes from the app-level Mantine `DatesProvider` supplied by `DateLocaleProvider` (`frontend/src/components/DateLocaleProvider.tsx`, mounted in `main.tsx`), which maps the active UI language to a dayjs locale for month names, weekday order, and picker text. Submitting an empty valid_from is rejected client-side with a toast (`adminVatSettings.messages.missingValidFrom`).
-- **Rate table:** inside `.table-card`, a `data-table` (same shared table styling
-  as the Features and OAuth tabs) displays rate as percentage (`(rate × 100).toFixed(2)%`), valid_from (formatted), valid_to (formatted or "Open"), with Edit/Delete buttons.
+- **Rate table:** inside `.table-card > .table-scroll`, a `data-table` (same shared table styling
+  as the Features and OAuth tabs) displays rate as percentage (`(rate × 100).toFixed(2)%`), valid_from (formatted), valid_to (formatted or "Open"), with Edit/Delete buttons. The wrapper contains overflow and keeps the header flush with the sheet.
 - **Delete:** Uses `ConfirmDialog` component for destructive confirmation.
 - **Validation feedback:** API errors (overlap, invalid range) displayed via toast.
 

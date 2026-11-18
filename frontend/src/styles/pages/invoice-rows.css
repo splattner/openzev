@@ -107,46 +107,40 @@
 /* Too narrow for four columns: each row becomes a card — who and how much,
    then progress beside the actions (below them on phones). */
 
-@container (max-width: 46rem) {
+@container (max-width: 56rem) {
   .invoice-rows table,
   .invoice-rows tbody,
   .invoice-rows td {
     display: block;
   }
 
-  /* Out of sight, not out of the accessibility tree. */
+  .invoice-rows table {
+    position: relative;
+  }
+
+  /* Keep column labels accessible; card rows carry their own visible labels. */
   .invoice-rows thead {
+    --table-card-layout: 1;
+
     position: absolute;
-    width: 1px;
+    width: 100%;
     height: 1px;
     overflow: hidden;
     clip-path: inset(50%);
-    white-space: nowrap;
   }
 
-  .invoice-rows thead:has(.sortable-header) {
-    position: static;
-    display: block;
-    width: auto;
-    height: auto;
-    overflow: visible;
-    clip-path: none;
-    white-space: normal;
-  }
-
-  .invoice-rows thead:has(.sortable-header) tr {
+  .invoice-rows thead tr {
     display: flex;
-    flex-wrap: wrap;
-    background: var(--brand-deep);
   }
 
-  .invoice-rows thead:has(.sortable-header) th {
-    display: none;
-  }
-
-  .invoice-rows thead th.sortable-header {
+  .invoice-rows thead th {
+    position: relative;
     display: block;
     width: auto;
+  }
+
+  .invoice-rows > table:first-child {
+    margin-top: 0;
   }
 
   .invoice-rows tbody tr {
@@ -173,11 +167,6 @@
      brings its own: the first card's inset above, mirrored below. */
   .table-card.invoice-rows > table:last-child tbody tr:last-child {
     padding-bottom: calc(var(--sheet-pad-block) + 0.2rem);
-  }
-
-  /* Stacked rows keep the sheet's top inset; dividers run edge to edge. */
-  .table-card.invoice-rows > table:first-child {
-    margin-top: 0;
   }
 
   .table-card.invoice-rows tbody tr {

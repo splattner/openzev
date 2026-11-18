@@ -680,9 +680,14 @@ An arrow shows the selected sort direction.
 Action columns cannot be sorted.
 
 Sort controls appear only with at least two filtered rows. Filtering down to
-one row preserves the selected order for when more rows return. On phones,
-sortable headings remain above the record cards. Calculation layouts such as
+one row preserves the selected order for when more rows return. In narrower
+windows, participant and billing rows become cards and hide their heading bar
+and sorting controls. Tariff cards keep only their category heading.
+The current order is kept; widen the window to sort again. Calculation layouts such as
 invoice line items and the hour/minute readings grid keep their fixed order.
+
+Wide admin tables scroll horizontally inside their panel, with the scrollbar
+at its bottom edge.
 
 ## API Access
 
