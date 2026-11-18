@@ -776,17 +776,18 @@ positive coverage and maintenance-link permissions.
   `DynamicPriceHistoryPanel` is shown inline in the tariff detail pane
   (`compact`). It exposes a seven-day default/31-day maximum date window (opened
   for a tariff: the last 30 days within its validity), summary statistics, a step
-  chart, explicit coverage gaps, and a paginated interval table. In the pane the
-  chart is visible without opening anything, with elapsed gaps shaded
-  (`ReferenceArea`) and an `aria-label` giving the window, the price range and the
-  missing dates; the statistics and the interval table sit in a lazy disclosure
-  “Fetched interval prices”, and the gap list is left to the source summary. The
-  pane's table pages 12 rows at a time (`DataTable`'s `pageSize` prop, default 100)
-  with the shared range label and previous/next buttons; paging keeps the date
-  range, and a new range returns to the first page. The modal keeps the default
-  page size (`tests/dynamic-price-history-paging.test.ts`).
-  The statistics are four flat `StatCard`s in a `.kpi-row.kpi-row--fit` (as many
-  columns as fit, 9.5rem minimum), so the pane shows them two by two.
+  chart, explicit coverage gaps, and a paginated interval table. The inline
+  chart passes up to six Swiss-midnight tick candidates to the axis and grid.
+  `ReferenceArea` shades elapsed gaps, and the chart's accessible label gives
+  the date window, price range and missing dates. The pane passes the existing
+  `source` and tariff version (`tariff`) objects from query data so the memoized
+  panel can skip rerendering when the delete confirmation opens.
+  The source summary lists gaps. The lazy “Fetched interval prices” disclosure
+  contains four flat `StatCard`s in a `.kpi-row.kpi-row--fit` grid with a 9.5rem
+  minimum column width, plus the interval table. The pane sets `DataTable`'s
+  `pageSize` to 12, and the modal uses the default of 100. The table uses the
+  shared range label and previous/next buttons. Paging keeps the date range, and
+  a new range returns to the first page (`tests/dynamic-price-history-paging.test.ts`).
   The interval table has one "Validity" column (`intervalLabel`, sorted by its
   start): `01.10.2026 00:00 – 00:15`, with the end's date repeated only when it
   falls on another day than the start. Price uses a numeric CHF accessor, so

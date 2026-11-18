@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   applyMinimumPrice,
+  compactHistoryTicks,
   defaultHistoryDateRange,
   intervalLabel,
   statsFromPoints,
@@ -192,5 +193,33 @@ describe('intervalLabel', () => {
   it('follows the configured date format', () => {
     expect(intervalLabel('2026-10-01T00:00:00+02:00', '2026-10-01T00:15:00+02:00', { ...settings, date_time_format: 'yyyy-MM-dd HH:mm' }))
       .toBe('2026-10-01 00:00 – 00:15')
+  })
+})
+
+describe('compactHistoryTicks', () => {
+  it.each([
+    [30, '2026-10-25T23:00:00Z'],
+    [31, '2026-10-30T23:00:00Z'],
+  ] as const)('limits a %i-day window to six tick candidates', (days, lastTick) => {
+    const ticks = compactHistoryTicks('2026-10-01', `2026-10-${days}`)
+    expect(ticks).toHaveLength(6)
+    expect(ticks?.[0]).toBe(Date.parse('2026-09-30T22:00:00Z'))
+    expect(ticks?.[5]).toBe(Date.parse(lastTick))
+  })
+
+  it('uses one tick for a single day', () => {
+    expect(compactHistoryTicks('2026-10-01', '2026-10-01')).toEqual([Date.parse('2026-09-30T22:00:00Z')])
+  })
+
+  it.each([
+    ['', '2026-10-01'],
+    ['2026-10-04', '2026-10-01'],
+  ])('leaves ticks unspecified for an invalid window (%s to %s)', (from, to) => {
+    expect(compactHistoryTicks(from, to)).toBeUndefined()
+  })
+
+  it('uses Swiss midnights on either side of a daylight-saving transition', () => {
+    expect(compactHistoryTicks('2026-03-29', '2026-03-30')?.map(tick => new Date(tick).toISOString()))
+      .toEqual(['2026-03-28T23:00:00.000Z', '2026-03-29T22:00:00.000Z'])
   })
 })

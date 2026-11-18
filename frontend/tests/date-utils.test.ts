@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { formatDateByPattern, formatDateTime } from '../src/lib/appSettings'
 import {
   BUSINESS_TIME_ZONE,
   businessDayStartMs,
@@ -90,5 +91,26 @@ describe('daysInPeriod', () => {
     expect(daysInPeriod('', '2026-01-31')).toBe(0)
     expect(daysInPeriod('2026-01-01', '')).toBe(0)
     expect(daysInPeriod('not-a-date', '2026-01-31')).toBe(0)
+  })
+})
+
+describe('display date formatting', () => {
+  it('skips month-name formatters for numeric patterns', () => {
+    const dateTimeFormat = vi.spyOn(Intl, 'DateTimeFormat')
+    try {
+      expect(formatDateByPattern('2026-07-15', 'dd.MM.yyyy')).toBe('15.07.2026')
+      expect(formatDateTime('2026-07-31T22:15:00Z')).toBe('01.08.2026 00:15')
+      expect(dateTimeFormat.mock.calls.some(([, options]) => (
+        options?.month === 'long' || options?.month === 'short' || options?.month === 'narrow'
+      ))).toBe(false)
+    } finally {
+      dateTimeFormat.mockRestore()
+    }
+  })
+
+  it('uses the month in Europe/Zurich when the timestamp crosses midnight at month end', () => {
+    const instant = '2026-07-31T22:15:00Z'
+    const month = new Intl.DateTimeFormat(undefined, { month: 'long', timeZone: BUSINESS_TIME_ZONE }).format(new Date(instant))
+    expect(formatDateByPattern(instant, 'd MMMM yyyy')).toBe(`1 ${month} 2026`)
   })
 })
