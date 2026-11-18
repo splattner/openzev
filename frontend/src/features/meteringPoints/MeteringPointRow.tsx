@@ -1,4 +1,5 @@
-import { Tooltip } from '@mantine/core'
+import { ActionTooltip } from '../../components/ActionTooltip'
+import { IconActionButton } from '../../components/IconActionButton'
 import { useMemo, type MouseEvent } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
@@ -154,6 +155,7 @@ export function MeteringPointRow({
     onOpenEditAssignment(current[0])
   }
 
+  const chartLabel = t('pages.meteringPoints.chartFor', { meterId: point.meter_id })
   const assignmentSection = current.length ? t('pages.meteringPoints.columns.holder') : undefined
   const pointSection = current.length ? t('pages.meteringPoints.columns.meter') : undefined
   const pointMenuItems: ActionMenuItem[] = []
@@ -335,14 +337,15 @@ export function MeteringPointRow({
           )}
         </td>
         <td id={actionsId} role="cell" className="metering-point-actions">
-          <Link
-            className="button button-secondary button-compact button-icon"
-            to={`/metering/chart?metering_point=${point.id}`}
-            aria-label={t('pages.meteringPoints.chartFor', { meterId: point.meter_id })}
-            title={t('pages.meteringPoints.chartFor', { meterId: point.meter_id })}
-          >
-            <FontAwesomeIcon icon={faChartLine} fixedWidth />
-          </Link>
+          <ActionTooltip label={chartLabel}>
+            <Link
+              className="button button-secondary button-compact button-icon"
+              to={`/metering/chart?metering_point=${point.id}`}
+              aria-label={chartLabel}
+            >
+              <FontAwesomeIcon icon={faChartLine} fixedWidth />
+            </Link>
+          </ActionTooltip>
           {canWrite && (
             <ActionMenu
               label={t('pages.meteringPoints.moreActionsFor', { meterId: point.meter_id })}
@@ -351,16 +354,15 @@ export function MeteringPointRow({
               items={pointMenuItems}
             />
           )}
-          <button
-            type="button"
-            className="button button-secondary button-compact button-icon metering-point-expand disclosure-toggle"
+          <IconActionButton
+            className="metering-point-expand disclosure-toggle"
             aria-expanded={expanded}
             aria-controls={expanded ? detailId : undefined}
-            aria-label={t(expanded ? 'pages.meteringPoints.detail.hide' : 'pages.meteringPoints.detail.show', { meterId: point.meter_id })}
+            label={t(expanded ? 'pages.meteringPoints.detail.hide' : 'pages.meteringPoints.detail.show', { meterId: point.meter_id })}
             onClick={onToggle}
           >
             <FontAwesomeIcon icon={faChevronDown} className="disclosure-toggle-icon" fixedWidth />
-          </button>
+          </IconActionButton>
         </td>
       </tr>
 
@@ -406,27 +408,19 @@ export function MeteringPointRow({
                           </div>
                           {canWrite && assignmentsAvailable && (
                             <div className="metering-assignment-actions">
-                              <Tooltip label={`${t('common.edit')}: ${nameOf(assignment)}`} events={{ hover: true, focus: true, touch: false }}>
-                                <button
-                                  className="button button-secondary button-compact button-icon"
-                                  type="button"
-                                  onClick={() => onOpenEditAssignment(assignment)}
-                                  aria-label={`${t('common.edit')}: ${nameOf(assignment)}`}
-                                >
-                                  <FontAwesomeIcon icon={faPen} fixedWidth />
-                                </button>
-                              </Tooltip>
-                              <Tooltip label={t('pages.meteringPoints.removeAssignmentFor', { name: nameOf(assignment) })} events={{ hover: true, focus: true, touch: false }}>
-                                <button
-                                  className="button button-danger button-compact button-icon"
-                                  type="button"
-                                  aria-label={t('pages.meteringPoints.removeAssignmentFor', { name: nameOf(assignment) })}
-                                  disabled={deleteAssignmentPending || dialogLoading}
-                                  onClick={() => confirmRemoveAssignment(assignment)}
-                                >
-                                  <FontAwesomeIcon icon={faTrash} fixedWidth />
-                                </button>
-                              </Tooltip>
+                              <IconActionButton
+                                  label={t('common.editNamed', { name: nameOf(assignment) })}
+                              onClick={() => onOpenEditAssignment(assignment)}
+                              >
+                              <FontAwesomeIcon icon={faPen} fixedWidth />
+                              </IconActionButton>
+                              <IconActionButton
+                                  label={t('pages.meteringPoints.removeAssignmentFor', { name: nameOf(assignment) })} danger
+                              disabled={deleteAssignmentPending || dialogLoading}
+                              onClick={() => confirmRemoveAssignment(assignment)}
+                              >
+                              <FontAwesomeIcon icon={faTrash} fixedWidth />
+                              </IconActionButton>
                             </div>
                           )}
                         </li>

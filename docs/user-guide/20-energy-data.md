@@ -512,8 +512,9 @@ Settings → Functions**).
 | **Delete data** | no | yes, all readings | yes |
 | **Remove source** | yes | yes, all readings | no |
 
-In the source's details these three are the last section of the **⋯** menu, in red, away from
-the everyday actions, and each asks for confirmation. A ZEV manager can switch a participant's source off or on,
+Each action asks for confirmation. In the source details, these actions appear
+in the final section of **⋯** when several actions are available. If **Remove
+source** is the only action, it has its own button. A ZEV manager can switch a participant's source off or on,
 delete its data or remove it (on the **Energy data** tab below), but cannot disconnect it, test it or touch its key. Deleting a participant or a metering point deletes their
 sources and readings with them.
 

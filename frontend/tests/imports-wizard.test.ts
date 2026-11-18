@@ -733,7 +733,7 @@ describe('ImportsPage wizard gating', () => {
         importLogsData[0].deletion_protection_code = 'overwrite_import_protected'
         renderPage()
         const row = Array.from(container.querySelectorAll('tbody tr')).find((entry) => entry.textContent?.includes('alpha.csv'))!
-        const actions = row.querySelector('[aria-label="pages.imports.actions.rowActions"]')
+        const actions = row.querySelector('.button-destructive')
         expect(actions).toBeNull()
         const protocol = row.querySelector<HTMLButtonElement>('[aria-label="pages.imports.actions.openProtocol"]')!
         act(() => protocol.click())
@@ -825,9 +825,10 @@ describe('ImportsPage wizard gating', () => {
         expect(container.textContent).toContain('pages.imports.wizard.title')
     })
 
-    it('renders a row action menu per log', () => {
+    it('renders a named trash icon per eligible log', () => {
         twoLogs()
-        expect(buttons('pages.imports.actions.rowActions')).toHaveLength(2)
+        expect(buttons('pages.imports.actions.deleteImport: alpha.csv')[0].textContent).toBe('')
+        expect(buttons('pages.imports.actions.deleteImport: beta.xml')[0].textContent).toBe('')
         expect(buttons('pages.imports.actions.openProtocol')).toHaveLength(2)
     })
 
@@ -910,11 +911,7 @@ function setInputValue(input: HTMLInputElement, value: string) {
 
 async function startDeletion(mode: string) {
     if (mode === 'single') {
-        await act(async () => buttons('pages.imports.actions.rowActions')[0].click())
-        await waitForCondition(() => !!document.querySelector('[role=menuitem]'), 'import action menu')
-        const item = Array.from(document.querySelectorAll<HTMLButtonElement>('[role=menuitem]'))
-            .find(button => button.textContent?.includes('pages.imports.actions.deleteImport'))!
-        act(() => item.click())
+        await act(async () => container.querySelector<HTMLButtonElement>('tbody .button-destructive')!.click())
         act(() => buttons('pages.imports.delete.confirmAction')[0].click())
     } else {
         act(() => buttons('pages.imports.actions.deleteImports')[0].click())

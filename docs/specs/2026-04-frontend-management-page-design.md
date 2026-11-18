@@ -95,7 +95,7 @@ defined by shared frontend primitives and CSS contracts.
 
 | File | Export | Contract |
 |---|---|---|
-| `frontend/src/components/ActionMenu.tsx` | `ActionMenu` | Overflow action trigger for lower-priority row/card actions. Uses labelled menu items, optional icons, section headers, and danger styling. Default button class: `button button-secondary button-compact`. Choosing an item moves focus to the trigger before the item runs, so a dialog it opens returns focus to the trigger when it closes. The dropdown is capped to the room on screen (Mantine's `size` middleware) and scrolls, so a long menu stays reachable on a short viewport. Passing an icon retains visible text by default; `iconOnly` explicitly opts in to a square accessible icon-only trigger with a tooltip on hover and keyboard focus. Ellipsis overflow triggers use this mode; named task menus such as the tariff overview PDF retain text. |
+| `frontend/src/components/ActionMenu.tsx` | `ActionMenu` | Use an ellipsis for multiple secondary actions. In icon-only overflow, a single entry becomes a button. Show its label unless it has a named icon. Labelled task menus stay menus. Keep long menus scrollable and restore focus after dialogs. |
 | `frontend/src/components/ConfirmDialog.tsx` | `useConfirmDialog`, `ConfirmDialog` | Required wrapper for destructive or high-impact actions. Supports `title`, `message`, `isDangerous`, `confirmDisabled`, optional children, and async confirm handlers. `confirmText` and `cancelText` default to `common.confirm` / `common.cancel`. Uses the [dialog behavior](#dialog-behavior) below. |
 | `frontend/src/components/FormModal.tsx` | `FormModal`, `useFormModalGuard` | Generic modal shell for CRUD forms and small workflow dialogs. Props: `isOpen`, `title`, `children`, `onClose`, optional `size` (`xs` 480px, `sm` 600px (default), `md` 760px, `lg` 960px, `xl` 1080px, as `.form-modal-<size>` max widths under the 90% responsive bound), `dirty` (explicit unsaved-input override), and `returnFocusRef` (`RefObject<HTMLElement \| null>`). Uses the shared [dialog behavior](#dialog-behavior). **Dirty guard:** X, Escape, scrim click, `FormModalFooter`/`FormModalCancelButton` Cancel and in-app navigation (a router blocker, only under a data router) ask **Discard changes?** (`ConfirmDialog`, `common.unsavedChanges.*`) when the form holds unsaved input, and close at once otherwise; `beforeunload` raises the browser's own prompt. Unsaved input is read from the dialog's own controls by `useUnsavedInput` (`input`, `select`, `textarea`, including Mantine's hidden inputs): the controls are snapshotted at the first key or pointer press inside the dialog and compared when asked, so prefilled and late-loaded forms are clean until touched and an undone change is clean again. A dialog without controls never asks. `dirty` overrides the reading: `false` for a finished step (`ZevListPage` wizard step 5, `ZevImportModal` result), `true` for a draft outside the controls. A save's own `onClose` bypasses the guard, which wraps only user dismissals. A Cancel written by hand inside a dialog uses `FormModalCancelButton` (or `useFormModalGuard()` from a component rendered inside the dialog); outside a `FormModal` both run the action unguarded. The shared logic is `useDraftConfirm`/`useRouterDraftBlock`/`useDraftGuard` in `components/useDraftGuard.ts`, also used by the tariff pane. |
 | `frontend/src/components/FormModalFooter.tsx` | `FormModalFooter`, `FormModalCancelButton` | Cancel (`button-secondary`, `type="button"`) then the primary submit (`formId` when the footer sits outside its form); `compact`, icons and labels optional. Cancel goes through the surrounding `FormModal`'s dirty guard; in the tariff pane the page's own guard wraps `onCancel`. |
@@ -260,7 +260,7 @@ language and should be reused instead of ad hoc page-local CSS when possible:
 | `.filter-bar`, `.filter-bar-fields`, `.filter-bar-note` | Period selector and view filters on one line, set on the page without a sheet; the fields wrap below the period as one group, never split around it |
 | `.stat-card--interactive` | `StatCard` with `onPress`: real button semantics, `[aria-pressed='true']` shows the selected state with `var(--interactive)`; focus styling comes from the global `:focus-visible` ring |
 | `.stat-card--accent`, `.stat-card--success`, `.stat-card--warning`, `.stat-card--danger`, `.stat-card--flat` | Dark accent (≤1 per view); semantic tones color the value (`h3` or span); `flat` removes card chrome for nested tiles |
-| `.button`, `.button-secondary`, `.button-outline`, `.button-danger`, `.button-compact` | Shared button system (flat `var(--interactive)` fill; see SPEC-2026-08-ui-redesign-pdf-style; hover `var(--interactive-hover)`). Inside rows the main action is a forest outline (`button-outline`); destructive row actions are quiet until hovered (`.button-secondary.button-destructive`, and every compact `.button-danger`); confirm dialogs keep the solid red — SPEC-2026-08 §7.4 |
+| `.button`, `.button-secondary`, `.button-outline`, `.button-danger`, `.button-compact` | Shared button system (flat `var(--interactive)` fill; see SPEC-2026-08-ui-redesign-pdf-style; hover `var(--interactive-hover)`). Inside rows the main action is a forest outline (`button-outline`); destructive row actions use danger-colored text on a neutral background. Confirm dialogs use a solid danger button — SPEC-2026-08 §7.4 |
 | `.badge`, `.badge-neutral`, `.badge-info`, `.badge-success`, `.badge-brand`, `.badge-warning`, `.badge-danger`, `.badge-quiet`, `.badge-tag` | Status labels use semantic badge classes; `.badge-quiet` reduces emphasis and `.badge-tag` marks attributes. Staff invoices use `InvoiceStatusBadge`; participant invoices use `InvoicePaymentState`. See SPEC-2026-08 §15 for treatments and usage. |
 | `IssueText` (`components/IssueText.tsx`, `.issue-text--error`/`--warning`) | A concrete problem as short red or amber text with a warning icon and no capsule (interaction treatment: ui-patterns §10.1). With `to` it is a link, with `onClick` a button, with neither plain text: a read-only user gets the same words without a click affordance. Use it instead of `.badge-danger`/`.badge-warning` for something the user can act on; a `.badge` stays for a state (failed job, running work, classification). |
 | `.error-banner`, `.warning-banner`, `.info-banner`, `.success-banner` | Notice surfaces used by `Notice`; toasts and log blocks follow the shared treatments in SPEC-2026-08 §15. Import and invoice containers use `.plain-feedback` without changing roles or recovery actions. |
@@ -356,17 +356,12 @@ scroll the table instead of squeezing its dates into tall rows.
   decorative icons to headings or ordinary prose. Sidebar navigation is outside
   this restriction.
 - Use `fixedWidth` on action icons to align labels vertically.
-- The compact Edit controls for backup destinations, buildings, assignments, VAT rates,
-  tariff versions, accounts, OAuth providers and ZEVs, and Delete for backup
-  destinations, assignment removal and VAT/OAuth rows, use `.button-icon` with record-specific
-  accessible names. They and the wizard's numbered meter-removal buttons use
-  Mantine `Tooltip` with hover and focus enabled. Email history retains a
-  labelled footer Close; task-specific actions such as Test, Manage and Add
-  metering point retain visible text. Ellipsis overflow controls are icon-only,
-  while the menu items retain their labels.
+- Familiar Edit and Delete controls use a pencil or trash icon. The tooltip and
+  accessible name match and identify the record when needed. Task-specific actions
+  such as Test, Manage and Add metering point keep visible text.
 - Do not embed symbols such as `+` in translated button labels when the button already renders an icon.
 - Enabled Delete/Remove controls use the shared danger color in both rows and
-  menus, including tariff bands, wizard removal, backup files and payments.
+  menus.
   Disabled controls retain their disabled treatment.
 - Destructive actions use the trash icon; edit uses pen; create/add uses plus; import/export use upload/download; cancel/close uses x-mark; approval/save uses check when a stronger visual cue is useful.
 
@@ -584,7 +579,7 @@ Each record or page should distinguish actions by priority:
 | Primary | Visible button in toolbar or card header | Create, assign, generate, open high-frequency workflow |
 | Secondary | Visible compact button near primary | Edit, export, open chart, open protocol |
 | Overflow | `ActionMenu` | Lower-frequency or contextual actions |
-| Destructive | Visible only if high-frequency and obvious, otherwise overflow + confirm | Delete, clear data, remove assignment |
+| Destructive | Direct button or overflow, with confirmation for persisted records | Delete, clear data, remove assignment |
 
 Rules:
 
@@ -593,7 +588,8 @@ Rules:
   with an overflow menu last. Icon-only Edit uses the neutral secondary style.
   Table action groups stay on one line; narrow tables scroll horizontally.
 - Avoid rendering many equal-weight buttons in every row.
-- Destructive actions must use `ConfirmDialog`.
+- Use `ConfirmDialog` for destructive actions on persisted records. Removing an
+  unsaved draft row, such as a meter in the ZEV wizard, takes effect immediately.
 - If a record only has one frequent action and one destructive action, both may remain visible as compact buttons.
 - If a page accumulates more than two non-destructive row actions, move lower-priority actions into `ActionMenu`.
 

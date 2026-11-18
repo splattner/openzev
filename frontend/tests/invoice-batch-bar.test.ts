@@ -125,6 +125,7 @@ describe('invoice batch actions', () => {
             menuItems: [
                 { key: 'generate-all', label: 'duplicate of the primary', onClick: vi.fn() },
                 { key: 'send-all', label: 'Send 3 invoices', onClick: vi.fn() },
+                { key: 'generate-all-pdfs', label: 'Regenerate all PDFs', onClick: vi.fn() },
             ],
         })
         const group = container.querySelector('[role="group"]')!
@@ -142,6 +143,19 @@ describe('invoice batch actions', () => {
         await waitForCondition(() => document.body.textContent?.includes('Send 3 invoices') === true, 'the overflow menu')
         expect(document.body.textContent).toContain('Send 3 invoices')
         expect(document.body.textContent).not.toContain('duplicate of the primary')
+    })
+
+    it('shows the only remaining batch action beside the recommended action', () => {
+        const { container } = mountActions({
+            menuItems: [
+                { key: 'generate-all', label: 'duplicate of the primary', onClick: vi.fn() },
+                { key: 'generate-all-pdfs', label: 'Regenerate all PDFs', onClick: vi.fn() },
+            ],
+        })
+        expect(container.querySelector('button[aria-haspopup="menu"]')).toBeNull()
+        expect([...container.querySelectorAll('button')].map((button) => button.textContent)).toEqual([
+            'Generate 2 invoices', 'pages.invoices.batch.downloadAll (4)', 'Regenerate all PDFs',
+        ])
     })
 
     it('hides the download all button when the period holds no document', () => {

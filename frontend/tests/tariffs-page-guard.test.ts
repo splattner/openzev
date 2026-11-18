@@ -100,7 +100,7 @@ afterEach(() => { act(() => root.unmount()); client.clear(); container.remove() 
 const submit = () => click(q('button[type="submit"]'))
 const asked = (message: string) => document.body.textContent?.includes(message) ?? false
 const importButton = () => [...container.querySelectorAll('button')].find((button) => button.textContent === 'pages.tariffs.import.action')
-const moreActions = () => container.querySelector('[aria-label="pages.tariffs.versions.moreActions"]')
+const deleteVersionButton = () => container.querySelector('.tariff-version-card-actions .button-destructive')
 
 /** A save that stays in flight until the test lets it land. */
 function holdSave() {
@@ -211,7 +211,7 @@ it.each(['a changed draft', 'a save in flight'])('offers no delete while a form 
     if (state === 'a save in flight') holdSave()
     await openEditForm()
     if (state === 'a save in flight') await submit()
-    expect(moreActions()).toBeNull()
+    expect(deleteVersionButton()).toBeNull()
     expect(container.querySelector('.button-danger')).toBeNull()
 })
 
@@ -222,10 +222,7 @@ it('deletes only the tariff asked about once a pending save has been let go, and
     await click(q('[data-row-key="z:Levy:levy"] .tariff-select'))
     await click(dialogButton('common.unsavedChanges.discard') ?? null)
     await click(q('[data-row-key="z:Grid:grid"] .tariff-select'))
-    await click(moreActions())
-    const deleteItem = () => [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((item) => item.textContent === 'pages.tariffs.versions.deleteVersion')
-    await waitForCondition(() => deleteItem() !== undefined, 'the delete menu item')
-    await click(deleteItem() ?? null)
+    await click(deleteVersionButton())
     await click(dialogButton('pages.tariffs.deleteConfirm') ?? null)
     expect(api.remove).toHaveBeenCalledExactlyOnceWith('grid')
     shown = [levy]

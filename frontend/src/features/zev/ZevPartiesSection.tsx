@@ -375,6 +375,7 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
                                 menuItems.push({
                                     key: 'delete',
                                     label: t('common.delete'),
+                                    iconButtonLabel: t('common.deleteNamed', { name: party.display_name }),
                                     icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
                                     danger: true,
                                     disabled: removeParty.isPending,
@@ -451,7 +452,7 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
     )
 }
 
-/** The row's "…" menu; nothing when no item applies (a viewer, or nothing left to do). */
+/** Secondary row actions, when any apply. */
 function RowMenu({ items }: { items: ActionMenuItem[] }) {
     const { t } = useTranslation()
     if (items.length === 0) return null
@@ -762,7 +763,6 @@ function Landowners({ rows, parties, canManage, busy, buildings, onAssign, onSet
                         const open = canManage && row.valid_to === null
                         const menuItems: ActionMenuItem[] = [...access.menuItems]
                         if (open) {
-                            // Rare, and it changes who later documents name: in the menu, confirmed.
                             menuItems.unshift({
                                 key: 'end',
                                 label: t('pages.zevSettings.parties.end'),

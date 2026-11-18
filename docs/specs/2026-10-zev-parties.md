@@ -564,9 +564,9 @@ Sections of the roles card and the contacts in Other people:
 
 Row pattern (#1224, as the participants and metering points): no box per row, the sheet is the
 container. A role holder is a `RoleRow` (name and dates, status, actions); a contact is a table
-row. At most two visible actions per row — the edit pencil (icon only, with an accessible name)
-and the one access action — and a "…" menu (`RowMenu` → `ActionMenu`, label "More actions") for
-the rest (access changes, "End" for a landowner, "Delete" for an unused contact, danger-styled).
+row. Edit uses an icon with an accessible name. A single secondary action appears as a
+button, such as the labelled "End" for a landowner or the named, danger-styled trash icon for an unused contact.
+Multiple secondary actions use an ellipsis menu (label "More actions").
 
 Party picker: every party of the ZEV by `display_name`, with "New contact…" opening the party
 form; the created contact is selected in the picker. Viewers see everything read-only. Follows
@@ -578,7 +578,7 @@ derives today's holder, upcoming rows ("From" badge) and the history client-side
 the role, else "Change issuer" / "Change representative", opening an inline `AssignForm` (a
 heading named like the button, picker + date, default today; a missing party is reported under the
 picker) with a hint that the previous holder ends the day before; no issuer → `IssueText` (warning) whose click opens the same form (plain text for a viewer).
-Landowners (for a ZEV and a vZEV alike; the hint says a community spanning several plots has several; a landowner row shows the building it owns and offers "Set building" / "Change building" (a compact building select with Save and Cancel, saved only on Save), and the add form an optional building select, SPEC-2026-10-buildings-and-sites §7.5): current and future rows; "End" (in the row menu) opens an inline last-day form (default today) whose neutral "End" button asks for confirmation (`ConfirmDialog` naming the date and that earlier documents stay unchanged);
+Landowners (for a ZEV and a vZEV alike; the hint says a community spanning several plots has several; a landowner row shows the building it owns and offers "Set building" / "Change building" (a compact building select with Save and Cancel, saved only on Save), and the add form an optional building select, SPEC-2026-10-buildings-and-sites §7.5): current and future rows; "End" opens an inline last-day form (default today) whose neutral "End" button asks for confirmation (`ConfirmDialog` naming the date and that earlier documents stay unchanged);
 "Add landowner" the same `AssignForm` (submit "Add"). Other contacts: parties without participations, with
 their role tags; edit in `PartyFormModal` (`features/zev/PartyFormModal.tsx`: kind,
 organisation name, title, first/last name — "contact" labels for an organisation —, name

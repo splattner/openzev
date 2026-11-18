@@ -677,12 +677,9 @@ python -m pytest -q
   and buildings through the labelled button. Read-only roles have no editing controls.
   Generic assignment actions require exactly one current assignment; inconsistent
   overlapping assignments remain individually manageable in the details.
-  Detail-row Edit and Remove are icon-only pencil/trash controls named with
-  the participant, with tooltips on hover and keyboard focus. Edit is first.
-  Building headers likewise put the named edit pencil before Add metering point
-  and the icon-only overflow menu.
-  Chart, overflow and expand use the standard square secondary buttons; Add
-  assignment uses a labelled secondary button in the expanded details.
+  Expanded assignment rows show Edit and Remove icons. The building header
+  offers **Delete building** when the building is empty. Metering actions follow
+  the [shared icon contract](2026-04-frontend-management-page-design.md#43-icon-contract).
 - Buildings group the list; see [building operations](2026-10-buildings-and-sites.md).
 - See [UI interaction and accessibility](2026-08-ui-redesign-pdf-style.md#154-pages) for list
   presentation and verification.

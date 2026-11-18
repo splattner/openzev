@@ -455,8 +455,8 @@ SPEC-2026-04 §7.3 stays the reference: primary, secondary, overflow, destructiv
 
 - One clear primary action per header, toolbar or task context.
 - Frequent row actions use the compact outlined treatment (`button-outline
-  button-compact`); lower-frequency ones go to `ActionMenu`; destructive row
-  actions are quiet until hover and always confirm.
+  button-compact`). For secondary actions and destructive controls, follow
+  [the management-page action rules](2026-04-frontend-management-page-design.md#73-action-hierarchy).
 - The `button` base class plus one variant is required on every visible action
   (`button-primary`, `-secondary`, `-outline`, `-ghost`, `-danger`; `-compact`
   in rows). The two stray forms (`button danger`, `button button-primary
@@ -497,9 +497,9 @@ what its owner can do to it (an energy source is the example), has this shape:
   works. Substantial technical details (ids, token prefixes, endpoints) are
   secondary material in one closed `Disclosure`; short facts that fit stay
   visible (§10.3 rule 3).
-- **Actions:** at most one visible button, the one that keeps it working right now
-  (sync, or reconnect when it no longer works), and an `ActionMenu` ("⋯") with
-  everything else in sections (connection, data, end). Ending it (disconnect,
+- **Actions:** a visible button for the action that keeps the connection working
+  (sync or reconnect) when available. Other actions use a labelled button when
+  there is one, or an ellipsis menu with connection, data and end sections. Ending it (disconnect,
   delete data, remove) is the last section, the destructive items marked `danger`;
   every one of them confirms through `ConfirmDialog`. A foldable is for reading,
   never a place for buttons. A choice that depends on the state is absent from the

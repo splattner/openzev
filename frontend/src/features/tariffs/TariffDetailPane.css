@@ -362,8 +362,6 @@
   border-top: 1px solid var(--border-default);
 }
 
-/* A version card's Edit button and its ⋮ menu. */
-
 .tariff-version-card-actions {
   display: flex;
   gap: 0.375rem;

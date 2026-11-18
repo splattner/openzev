@@ -1,3 +1,4 @@
+import { IconActionButton } from '../../components/IconActionButton'
 import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faMoneyBillWave, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
@@ -134,11 +135,9 @@ export function InvoicePaymentsCard({
                                     {canManage ? (
                                         <td className="numeric">
                                             {invoice.status !== 'cancelled' && !hasCredits ? (
-                                                <button
-                                                    type="button"
-                                                    className="button button-danger button-compact button-icon"
-                                                    aria-label={t('pages.invoiceDetail.payments.remove')}
-                                                    title={t('pages.invoiceDetail.payments.remove')}
+                                                <IconActionButton
+                                                    danger
+                                                    label={t('pages.invoiceDetail.payments.remove')}
                                                     onClick={() => confirm({
                                                         title: t('pages.invoiceDetail.payments.removeTitle'),
                                                         message: t('pages.invoiceDetail.payments.removeMessage', {
@@ -151,7 +150,7 @@ export function InvoicePaymentsCard({
                                                     })}
                                                 >
                                                     <FontAwesomeIcon icon={faTrash} fixedWidth />
-                                                </button>
+                                                </IconActionButton>
                                             ) : null}
                                         </td>
                                     ) : null}

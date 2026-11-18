@@ -628,8 +628,9 @@ community's, so there the page shows only the meters the user holds with generat
   return to the cards, focus returns to the control, a typed and unsaved key is guarded); see SPEC-2026-live-energy-data §7.2. Status, last sync,
   covered range, reconciliation state, and actions **Test**, **Sync now**, **Replace key** (Solar
   Manager), **New push token**, **Revoke token**, **Import CSV** (push), **Disconnect** (keeps data),
-  **Delete data**, **Remove source** (one visible action, **Sync now** or **Reconnect**, and the rest in a "⋯" menu with
-  the last section, in red, for ending it); the push endpoints, the Solar Manager id and the token facts in a closed
+  **Delete data**, **Remove source**. **Sync now** or **Reconnect** is promoted when applicable. A single
+  remaining action appears as a labelled button. Multiple remaining actions use an ellipsis menu with
+  a final section for ending the connection; the push endpoints, the Solar Manager id and the token facts in a closed
   "Technical details" disclosure. Confirmations are the only thing opened over it, and a rotated token stays on screen across refetches.
 - **Connect flow** (`SupplementarySourceModal`): what (history, live; skipped when only one is open),
   how (Solar Manager for history only, a new push source, or the meter's existing push source, which

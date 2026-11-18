@@ -10,7 +10,7 @@ import { BackupSettingsSection } from '../src/features/backups/BackupSettingsSec
 import type { BackupDestination, BackupJob, BackupSchedule, BackupStatus } from '../src/types/api'
 
 // `t` returns the key, so assertions read as "this message is shown".
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string, values?: { name?: string }) => key.endsWith('Named') && values?.name ? `${key}: ${values.name}` : key }) }))
 
 const pushToast = vi.fn()
 vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast }) }))
@@ -141,7 +141,7 @@ const labelled = (container: Element, key: string) =>
     Array.from(container.querySelectorAll('label')).find((l) => l.textContent?.includes(key))
 
 it.each([
-    ['destination', 'testBackupDestination', 'common.edit: nightly-disk', 'pages.backups.destinations.test'],
+    ['destination', 'testBackupDestination', 'common.editNamed: nightly-disk', 'pages.backups.destinations.test'],
     ['job', 'verifyBackupJob', 'pages.backups.jobs.details', 'pages.backups.jobs.check'],
 ] as const)('keeps %s action focus while another action is pending', async (_kind, operation, focusLabel, triggerLabel) => {
     setup({ jobs: [completed()] })
@@ -223,7 +223,7 @@ for (const kind of ['destination', 'file']) {
             const operation = kind === 'destination' ? api.deleteBackupDestination : api.deleteBackupArtifact
             operation.mockReturnValueOnce(new Promise((_, fail) => { reject = fail }))
             const container = await render()
-            const trigger = button(container, kind === 'destination' ? 'common.delete: nightly-disk' : 'pages.backups.jobs.deleteFile')!
+            const trigger = button(container, kind === 'destination' ? 'common.deleteNamed: nightly-disk' : 'pages.backups.jobs.deleteFile')!
             expect(trigger.classList.contains('button-danger')).toBe(true)
             await click(trigger)
             await click(button(container.querySelector('[role="dialog"]')!, kind === 'destination' ? 'common.delete' : 'pages.backups.jobs.deleteFile'))
@@ -354,13 +354,13 @@ describe('destinations', () => {
         setup({ destinations: [disk, other] })
         api.updateBackupDestination.mockResolvedValue(other)
         const container = await render()
-        const edit = button(container, 'common.edit: weekly-disk')!
+        const edit = button(container, 'common.editNamed: weekly-disk')!
         expect(edit.textContent).toBe('')
         expect(Array.from(edit.closest('tr')!.querySelectorAll('button')).map((button) =>
             button.getAttribute('aria-label') ?? button.textContent,
-        )).toEqual(['common.edit: weekly-disk', 'pages.backups.destinations.test', 'common.delete: weekly-disk'])
+        )).toEqual(['common.editNamed: weekly-disk', 'pages.backups.destinations.test', 'common.deleteNamed: weekly-disk'])
         act(() => edit.focus())
-        await waitForCondition(() => document.querySelector('[role="tooltip"]')?.textContent === 'common.edit: weekly-disk', 'edit tooltip on focus')
+        await waitForCondition(() => document.querySelector('[role="tooltip"]')?.textContent === 'common.editNamed: weekly-disk', 'edit tooltip on focus')
         await click(edit)
         expect(labelled(container, 'pages.backups.form.name')!.querySelector('input')!.value).toBe('weekly-disk')
         await act(async () => { container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
@@ -371,7 +371,7 @@ describe('destinations', () => {
         setup({ destinations: [disk, { ...disk, id: 'other', name: 'weekly-disk' }] })
         api.deleteBackupDestination.mockResolvedValue(undefined)
         const container = await render()
-        const remove = button(container, 'common.delete: weekly-disk')!
+        const remove = button(container, 'common.deleteNamed: weekly-disk')!
         expect(remove.textContent).toBe('')
         await click(remove)
         await click(button(container.querySelector('[role="dialog"]')!, 'common.delete'))

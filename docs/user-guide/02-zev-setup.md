@@ -177,8 +177,9 @@ always name whoever held a role on their own date:
   so until one is set.
 - **Add landowner** adds a party from a date, optionally with the building it
   owns; **Set building** / **Change building** on a landowner's row links or
-  re-links it (choose the building, then **Save**), and **End** (in the row's **⋯**
-  menu) asks for the landowner's last day and a confirmation. A party that owns two
+  re-links it (choose the building, then **Save**), and **End** asks for the
+  landowner's last day and a confirmation. **End** appears as a button or under
+  **⋯** when the row also has access actions. A party that owns two
   buildings has two landowner rows. Ending a role before it started removes
   it.
 - Whoever a ZEV is created for — through self-registration or the admin
@@ -219,7 +220,7 @@ property management company that represents the community — and everyone else
 who has access: a participant given read-only access, or a login added by email
 (a bookkeeper). **Add contact** creates a contact (a person, or an organisation
 with a contact person); the pencil on a contact's row edits it, and a contact that holds no role
-and has no access can be deleted from the row's **⋯** menu. In a role's party picker, **New contact…** creates one on the spot.
+and has no access can be removed with the **Delete** trash icon on its row. In a role's party picker, **New contact…** creates one on the spot.
 
 **Give access** in the header adds someone who is not listed yet: pick a
 **party of the community** or enter an **email address**, choose **Manage** or

@@ -6,7 +6,16 @@ import { MantineProvider } from '@mantine/core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('react-i18next', () => ({
-    useTranslation: () => ({ t: (key: string, options?: Record<string, unknown>) => (key.endsWith('removeAssignMessage') || key.endsWith('issueFor') ? `${key}:${JSON.stringify(options)}` : options?.name ? `${key}:${options.name}` : options?.count === undefined ? key : `${key}:${options.count}`), i18n: { language: 'en' } }),
+    useTranslation: () => ({
+        t: (key: string, options?: Record<string, unknown>) => {
+            if (key.endsWith('removeAssignMessage') || key.endsWith('issueFor')) {
+                return `${key}:${JSON.stringify(options)}`
+            }
+            const value = options?.name ?? options?.count
+            return value === undefined ? key : `${key}:${value}`
+        },
+        i18n: { language: 'en' },
+    }),
 }))
 vi.mock('../src/lib/appSettings', () => ({
     formatShortDate: (value: string) => value,

@@ -1570,7 +1570,7 @@ visibility, restored access, and strict selection with a second membership.
   The participant cell shows current participant identity, invoice-number link, dates inside
   the period and meter locations when a party has several participations.
   Repeated parties are determined before filtering. The invoice number is the
-  identity cell's only link; stored PDFs open from the row menu. Cancelled
+  identity cell's only link. **Open PDF** appears among the row actions. Cancelled
   invoices retain their link but have no billed amount. When the row's invoice
   `replaces` earlier ones, a "Replaces INV-x (Cancelled)" line links the newest
   of them, with "+n more" for the rest.
@@ -1601,11 +1601,10 @@ visibility, restored access, and strict selection with a second membership.
 - The compact period selector and batch actions share the command bar.
   Period names have a stable width, with exact dates in the tooltip/menu;
   longer translated controls wrap below the selector. The first allowed
-  workflow action (generate, approve, send) is promoted; the remaining actions
-  and PDF regeneration are in overflow. Download is visible when documents
-  exist. Controls with no targets are omitted; in-flight operations disable
-  their controls. Row actions are outlined; billing overflow triggers are
-  explicitly icon-only with translated accessible names.
+  workflow action (generate, approve, send) is promoted. Download is visible
+  when documents exist. Rows and the batch toolbar show a labelled button
+  for a single remaining action or a named ellipsis for multiple actions.
+  Controls with no targets are omitted. In-flight operations disable their controls.
 - Filters are **All**, **Drafts**, **Approved**, **Sent** and **Issues** with
   counts. A positive Issues count retains its emphasis while selected (SPEC-2026-08 §15). Sent means the exact sent status, excluding paid. Pressing All or
   the active segment clears filtering. A zero-count segment, or one counting

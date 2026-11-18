@@ -193,18 +193,17 @@ describe('ZevPeopleSection', () => {
         await openMenu(books, 'pages.zevSettings.access.resend')
     })
 
-    it('keeps delete in the row menu, only for a contact nobody depends on', async () => {
+    it('shows Delete for a contact nobody depends on', async () => {
         vi.mocked(fetchParties).mockResolvedValue([party('c3', 'Hans', { email: 'hans@example.com' })])
         vi.mocked(fetchPartyRoles).mockResolvedValue([])
         vi.mocked(fetchZevAccess).mockResolvedValue([])
         const container = await render()
         const hans = rowOf(container, 'Hans')
-        // Edit is an icon, not a labelled button; delete is quiet in the menu.
         expect(button(hans, 'common.edit') ?? hans.querySelector('button[aria-label="common.edit"]')).toBeTruthy()
         expect(hans.querySelector('button[aria-label="common.edit"]')!.textContent).toBe('')
-        expect(button(hans, 'common.delete')).toBeUndefined()
-        const item = await openMenu(hans, 'common.delete')
-        expect(item.className).toContain('action-menu-item-danger')
+        const remove = hans.querySelector('button[aria-label="common.deleteNamed:Hans"]')!
+        expect(remove.textContent).toBe('')
+        expect(remove.classList.contains('button-destructive')).toBe(true)
     })
 
     it('gives a viewer no access controls', async () => {

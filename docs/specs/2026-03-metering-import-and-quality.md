@@ -1735,7 +1735,9 @@ Outcome, finding and change-kind labels use plain text without decorative
 icons or badges; informational findings omit a repeated severity prefix.
 Structured diagnostic parameters remain visible with their finding.
 The history table omits sort controls for fewer than two filtered rows; protected
-imports omit their ineffective actions menu. The protocol action uses an eye
+imports omit **Delete import**. Deletable rows show a trash icon named for the
+file or import timestamp.
+The protocol action uses an eye
 icon with an accessible label and hover/focus tooltip.
 Import screens and dialogs render error/warning/information notices as plain
 feedback, without coloured banner backgrounds; retry actions remain usable.

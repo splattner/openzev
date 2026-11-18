@@ -223,7 +223,7 @@ email with a link to **My documents** and no attachment, and the result says how
 many emails were queued and how many participants were skipped because they have
 no email address. The text of that email is edited by admins under **Platform →
 Templates → Email templates**.
-- **Withdraw** — takes an uploaded notice back from participants (for example sent
+- **Withdraw**, beside **Download**, takes an uploaded notice back from participants (for example sent
   to the wrong person). The record and the file are kept and the row stays here,
   marked as withdrawn. Invoices, statements and the other issued documents are
   corrected by issuing again, never withdrawn.
@@ -334,10 +334,11 @@ If no participants with active assignments exist for the period, the page shows 
 ## Row and Batch Actions
 
 Each row shows its next step as an outlined button — **Generate invoice**,
-**Approve**, **Send Email** or **Mark Paid**, depending on the status — and puts
-the rest under **More**:
+**Approve**, **Send Email** or **Mark Paid**, depending on the status. If one
+other action is available it appears as a button. If several are available they
+appear under **More**.
 
-| Status | Button | Under **More** |
+| Status | Next step | Other actions |
 | --- | --- | --- |
 | *(none)* / Cancelled | **Generate invoice** / **Generate again** | Delete invoice (cancelled), Open PDF, Generate/Regenerate PDF |
 | Draft | **Approve** | Regenerate invoice, Delete invoice, Open PDF, Generate/Regenerate PDF |
@@ -364,9 +365,9 @@ including when the filter is selected. Changing period or community clears the f
 The **batch actions** in the command bar always act on the whole period,
 including rows hidden by a filter. The recommended next step is the page's one
 filled button and names how many invoices it touches (for example *Approve 4
-invoices*); **Download all PDFs** sits beside it, and **More batch actions**
-holds **Generate all**, **Approve all**, **Send all** and **Regenerate all
-PDFs**. Operations with no eligible invoices are omitted from the menu. While a
+invoices*). **Download all PDFs** sits beside it. The remaining operations
+(**Generate all**, **Approve all**, **Send all** or **Regenerate all PDFs**)
+appear as a labelled button if only one applies, or under **More batch actions**. While a
 batch request runs, its controls are disabled. Generation remains disabled
 for queued targets until their invoices arrive. **Send all** counts only
 approved invoices with an email address, and stays disabled while any email
@@ -538,8 +539,7 @@ PDF generation is a separate step from invoice creation.
 - **Regenerate** — replaces an existing PDF (e.g. after the HTML template was updated).
 - **Open PDF** — opens the generated PDF in a new browser tab.
 
-**More → Open PDF** opens the document. Generation and regeneration are also
-under **More** for any invoice that exists. **Download all
+These actions are available on the invoice row when applicable. **Download all
 PDFs** in the command bar downloads the period's documents together.
 
 If document details keep changing during rendering, generation can stop with
