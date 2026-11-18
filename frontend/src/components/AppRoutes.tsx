@@ -36,8 +36,7 @@ const MagicSignInPage = lazy(async () => ({ default: (await import('../pages/Mag
 const ParticipantOnboardingPage = lazy(async () => ({ default: (await import('../pages/ParticipantOnboardingPage')).ParticipantOnboardingPage }))
 const PublicInvoicePage = lazy(async () => ({ default: (await import('../pages/PublicInvoicePage')).PublicInvoicePage }))
 const ParticipantsPage = lazy(async () => ({ default: (await import('../pages/ParticipantsPage')).ParticipantsPage }))
-const TariffsPage = lazy(async () => ({ default: (await import('../pages/TariffsPage')).TariffsPage }))
-const TariffProgressionPage = lazy(async () => ({ default: (await import('../pages/TariffProgressionPage')).TariffProgressionPage }))
+const TariffsHubPage = lazy(async () => ({ default: (await import('../pages/TariffsHubPage')).TariffsHubPage }))
 const ConfirmEmailChangePage = lazy(async () => ({ default: (await import('../pages/ConfirmEmailChangePage')).ConfirmEmailChangePage }))
 const ForgotPasswordPage = lazy(async () => ({ default: (await import('../pages/ForgotPasswordPage')).ForgotPasswordPage }))
 const ResetPasswordPage = lazy(async () => ({ default: (await import('../pages/ResetPasswordPage')).ResetPasswordPage }))
@@ -219,7 +218,7 @@ export function AppRoutes() {
             path="tariffs"
             element={
               <ProtectedRoute allowedRoles={ZEV_SCOPE}>
-                <TariffsPage />
+                <TariffsHubPage tab="components" />
               </ProtectedRoute>
             }
           />
@@ -227,7 +226,7 @@ export function AppRoutes() {
             path="tariffs/progression"
             element={
               <ProtectedRoute allowedRoles={ZEV_SCOPE}>
-                <TariffProgressionPage />
+                <TariffsHubPage tab="progression" />
               </ProtectedRoute>
             }
           />

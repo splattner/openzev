@@ -13,6 +13,8 @@ const EMBEDDED_PAGES = [
     'AdminSystemHealthPanel.tsx',
     'BillingEmailsPage.tsx',
     'BillingPeriodsPage.tsx',
+    'TariffsPage.tsx',
+    'TariffProgressionPage.tsx',
 ]
 
 /** Single empty-state card for accounts without access; no page header of its own. */

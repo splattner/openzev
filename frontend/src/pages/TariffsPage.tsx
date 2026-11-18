@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { TariffOverview } from '../features/tariffs/TariffOverview'
 import { TariffDetailPane } from '../features/tariffs/TariffDetailPane'
@@ -27,12 +27,11 @@ import { useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useMinWidth } from '../lib/useMinWidth'
 import { useManagedZev } from '../lib/managedZev'
-import { useCommunityAccess, useScopeNote } from '../lib/communityAccess'
+import { useCommunityAccess } from '../lib/communityAccess'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
 import type { Tariff, TariffSeries, TariffVersion } from '../types/api'
-import { PageHeader } from '../components/PageHeader'
 import { Notice } from '../components/Notice'
 import { ScopeGuard } from '../components/ScopeGuard'
 
@@ -58,7 +57,6 @@ export function TariffsPage() {
     const { settings } = useAppSettings()
     const { selectedZevId, selectedZev } = useManagedZev()
     const { t } = useTranslation()
-    const scopeNote = useScopeNote()
     const { isZevScope, canWriteSelectedCommunity } = useCommunityAccess()
     const isManagedScope = isZevScope
     const readOnly = !canWriteSelectedCommunity
@@ -361,31 +359,17 @@ export function TariffsPage() {
         onError: (error) => pushToast(formatApiError(error, t('pages.tariffs.overviewPdf.error')), 'error'),
     })
 
-    const header = (
-        <PageHeader
-            eyebrow={selectedZev?.name}
-            communitySwitch
-            scopeNote={scopeNote}
-            title={t('pages.tariffs.title')}
-            description={t('pages.tariffs.description')}
-            actions={selectedZevId && seriesQuery.isSuccess ? (
-                <>
-                    {/* A read-only view of all tariffs together, not a place to edit
-                        (SPEC-2026-tariff-progression §8.1); no navigation item. */}
-                    <Link className="button button-secondary" to="/tariffs/progression">
-                        {t('pages.tariffs.progression.link')}
-                    </Link>
-                    <TariffActions
-                        onOpenCreateTariff={createTariff}
-                        onOpenImportModal={!readOnly ? () => setShowImportModal(true) : undefined}
-                        readOnly={readOnly}
-                        onDownloadOverview={(scope) => overviewMutation.mutate(scope)}
-                        overviewBusy={overviewMutation.isPending}
-                    />
-                </>
-            ) : undefined}
-        />
-    )
+    const actions = selectedZevId && seriesQuery.isSuccess ? (
+        <div className="actions-row actions-row-wrap actions-row-end">
+            <TariffActions
+                onOpenCreateTariff={createTariff}
+                onOpenImportModal={!readOnly ? () => setShowImportModal(true) : undefined}
+                readOnly={readOnly}
+                onDownloadOverview={(scope) => overviewMutation.mutate(scope)}
+                overviewBusy={overviewMutation.isPending}
+            />
+        </div>
+    ) : null
 
     // The form for the task in hand, and what to call it under the tariff's name.
     function renderEditor(): { label: string, content: ReactNode, version?: Pick<TariffVersion, 'valid_from' | 'valid_to'> } | null {
@@ -455,79 +439,79 @@ export function TariffsPage() {
 
     return (
         <div className="page-stack">
-            {header}
+            {actions}
             <ScopeGuard skeleton="table">
-            {seriesQuery.isLoading ? <PageSkeleton variant="table" /> : seriesQuery.isError ? (
-                <Notice tone="error" onRetry={() => void seriesQuery.refetch()} isRetrying={seriesQuery.isFetching}>{t('common.error')}</Notice>
-            ) : <>
-            {selectedZev?.vat_mode === 'inclusive' && (
-                <p className="muted m-0">{t('pages.tariffs.vatInclusiveNotice')}</p>
-            )}
+                {seriesQuery.isLoading ? <PageSkeleton variant="table" /> : seriesQuery.isError ? (
+                    <Notice tone="error" onRetry={() => void seriesQuery.refetch()} isRetrying={seriesQuery.isFetching}>{t('common.error')}</Notice>
+                ) : <>
+                    {selectedZev?.vat_mode === 'inclusive' && (
+                        <p className="muted m-0">{t('pages.tariffs.vatInclusiveNotice')}</p>
+                    )}
 
-            {selectedZevId && (
-                <VseTariffImportModal
-                    isOpen={showImportModal}
-                    onClose={() => setShowImportModal(false)}
-                    zevId={selectedZevId}
-                    initialUrl={selectedZev?.tariff_source_url ?? ''}
-                />
-            )}
-
-            <div
-                ref={splitRef}
-                className="detail-split"
-                data-layout={fitsTwoPanes ? 'wide' : 'narrow'}
-                data-pane={paneOpen ? 'open' : 'closed'}
-            >
-                <div className="detail-split-list" hidden={listHidden}>
-                    {tariffs.length === 0 ? (
-                        <TariffEmptyState onOpenCreateTariff={createTariff} readOnly={readOnly} />
-                    ) : (
-                        <TariffOverview
-                            groups={overview}
-                            settings={settings}
-                            selected={selected}
-                            onOpenDetail={showVersion}
+                    {selectedZevId && (
+                        <VseTariffImportModal
+                            isOpen={showImportModal}
+                            onClose={() => setShowImportModal(false)}
+                            zevId={selectedZevId}
+                            initialUrl={selectedZev?.tariff_source_url ?? ''}
                         />
                     )}
-                </div>
 
-                {editor === 'create' && editorPane ? (
-                    <DetailPane
-                        tone="brand"
-                        title={t('pages.tariffs.createTitle')}
-                        onClose={escapePane}
-                        titleRef={paneTitleRef}
+                    <div
+                        ref={splitRef}
+                        className="detail-split"
+                        data-layout={fitsTwoPanes ? 'wide' : 'narrow'}
+                        data-pane={paneOpen ? 'open' : 'closed'}
                     >
-                        <div className="detail-pane-body page-stack">{editorPane.content}</div>
-                    </DetailPane>
-                ) : openSeries && (
-                    <TariffDetailPane
-                        series={openSeries}
-                        allSeries={allSeries}
-                        settings={settings}
-                        shownVersionId={shownVersionId}
-                        onShowVersion={(versionId) => showVersion(openSeries, versionId)}
-                        onClose={escapePane}
-                        onEditTariff={(version, actionKey) => beginEditing(actionKey, () => startTariffEdit(version))}
-                        onOpenCreatePeriod={(versionId) => beginEditing('add-period', () => openCreatePeriod(versionId))}
-                        onEditPeriod={(period, actionKey) => beginEditing(actionKey, () => startPeriodEdit(period))}
-                        onDeleteVersion={confirmDeleteTariff}
-                        onDeletePeriod={confirmDeletePeriod}
-                        onNewVersion={(series, source) => beginEditing('new-version', () => versions.openNewVersion(series, source))}
-                        onDuplicate={(series, source) => beginEditing('duplicate', () => versions.openDuplicate(series, source))}
-                        onRenameSeries={(series, source) => beginEditing('rename', () => versions.openRename(series, source))}
-                        readOnly={readOnly}
-                        titleRef={paneTitleRef}
-                        editor={editorPane ?? undefined}
-                    />
-                )}
-            </div>
+                        <div className="detail-split-list" hidden={listHidden}>
+                            {tariffs.length === 0 ? (
+                                <TariffEmptyState onOpenCreateTariff={createTariff} readOnly={readOnly} />
+                            ) : (
+                                <TariffOverview
+                                    groups={overview}
+                                    settings={settings}
+                                    selected={selected}
+                                    onOpenDetail={showVersion}
+                                />
+                            )}
+                        </div>
 
-            {dialog && (
-                <ConfirmDialog {...dialog} isLoading={dialogLoading} onConfirm={handleConfirm} onCancel={handleCancel} />
-            )}
-            </>}
+                        {editor === 'create' && editorPane ? (
+                            <DetailPane
+                                tone="brand"
+                                title={t('pages.tariffs.createTitle')}
+                                onClose={escapePane}
+                                titleRef={paneTitleRef}
+                            >
+                                <div className="detail-pane-body page-stack">{editorPane.content}</div>
+                            </DetailPane>
+                        ) : openSeries && (
+                            <TariffDetailPane
+                                series={openSeries}
+                                allSeries={allSeries}
+                                settings={settings}
+                                shownVersionId={shownVersionId}
+                                onShowVersion={(versionId) => showVersion(openSeries, versionId)}
+                                onClose={escapePane}
+                                onEditTariff={(version, actionKey) => beginEditing(actionKey, () => startTariffEdit(version))}
+                                onOpenCreatePeriod={(versionId) => beginEditing('add-period', () => openCreatePeriod(versionId))}
+                                onEditPeriod={(period, actionKey) => beginEditing(actionKey, () => startPeriodEdit(period))}
+                                onDeleteVersion={confirmDeleteTariff}
+                                onDeletePeriod={confirmDeletePeriod}
+                                onNewVersion={(series, source) => beginEditing('new-version', () => versions.openNewVersion(series, source))}
+                                onDuplicate={(series, source) => beginEditing('duplicate', () => versions.openDuplicate(series, source))}
+                                onRenameSeries={(series, source) => beginEditing('rename', () => versions.openRename(series, source))}
+                                readOnly={readOnly}
+                                titleRef={paneTitleRef}
+                                editor={editorPane ?? undefined}
+                            />
+                        )}
+                    </div>
+
+                    {dialog && (
+                        <ConfirmDialog {...dialog} isLoading={dialogLoading} onConfirm={handleConfirm} onCancel={handleCancel} />
+                    )}
+                </>}
             </ScopeGuard>
         </div>
     )

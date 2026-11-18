@@ -1,4 +1,4 @@
-# Feature Spec: Combined tariff progression (Tarifverlauf)
+# Feature Spec: Combined tariff progression (Preisverlauf)
 
 - Spec ID: SPEC-2026-tariff-progression
 - Status: In Progress
@@ -48,8 +48,8 @@ boundaries is tested in §10.
 | Area | Details |
 |---|---|
 | Backend computation | New module `invoices/tariff_progression.py`; one read-only endpoint `GET /api/v1/tariffs/tariffs/progression/` |
-| Frontend | A routed page `/tariffs/progression` reached from the tariffs page header: controls, stepped chart, composition table, fixed-fee table |
-| Types, client, i18n | `TariffProgression*` types, `fetchTariffProgression`, `queryKeys.tariffs.progression`, `pages.tariffs.progression.*` in de/en/fr/it |
+| Frontend | A routed tab `/tariffs/progression` under Tariffs: controls, stepped chart, composition table, fixed-fee table |
+| Types, client, i18n | `TariffProgression*` types, `fetchTariffProgression`, `queryKeys.tariffs.progression`, `pages.tariffs.tabs.*` and `pages.tariffs.progression.*` in de/en/fr/it |
 | Docs | User guide chapter 07, baseline spec updates (§9) |
 
 ### Out of scope
@@ -98,7 +98,7 @@ These answer the open questions of #1117.
 | Net and gross | Computed in the backend with the ZEV's `vat_mode` and the `VatRate` in force on each day (§5.5). `not_registered`: one series, no gross. `registered`: gross = net + active rate. `inclusive`: the *billed* price grosses only the input-VAT-bearing tariffs, exactly as the engine does. | The three modes already differ in the engine; the view must not invent a fourth treatment. |
 | Percentage tariffs | Priced as `percentage × grid base` where the base is the sum of the grid tariffs' bands **at the same slot**. | The engine resolves the grid base per timestamp (`_price_energy`); the existing chart's representative-price shortcut is not repeated here. |
 | Dynamic tariffs | Included as the duration-weighted **mean of the fetched prices in each slot, per calendar month** (§5.4a); months with missing prices are reported (§5.9). | They have no bands, but a stored price per interval; a mean over a slot is what the engine's per-reading prices average to, and the monthly cadence keeps the chart readable. |
-| Where | A routed page `/tariffs/progression`, opened from the tariffs page header (§8). | Own controls and query; keeps the pane's draft/scope logic untouched. Decided, §12 point 1. |
+| Where | A routed **Price progression** tab `/tariffs/progression`, beside **Tariff components** (§8). | Own controls and query; the existing routes keep the pane's draft/scope logic separate. Decided, §12 point 1. |
 
 ## 4a. Data model
 
@@ -431,14 +431,23 @@ no cache. Fetched dynamic prices are read, not written (§5.4a).
 
 ### 8.1 Entry and route
 
-- Route `/tariffs/progression` (`components/AppRoutes.tsx`, lazy
-  `pages/TariffProgressionPage.tsx`), same `ProtectedRoute` roles as `/tariffs`.
-- The tariffs page header (`TariffsPage.tsx`) gets a secondary link **Price
-  progression** to it, shown to everyone who can open the page. The new page
-  header has a back link to `/tariffs`. Following rule 6 / D of the UI patterns
-  spec: the page has its own filters and query and no list or pane beside it; a
-  chart alone would not justify a page, the independence from the pane's draft
-  and scope logic does (decided, §12 point 1).
+- Routes `/tariffs` and `/tariffs/progression` share `pages/TariffsHubPage.tsx`
+  and the same `ProtectedRoute` access. The hub owns the Tariffs heading and
+  `AppTabs`: **Tariff components** (`Tarifbestandteile`) and **Price progression**
+  (`Preisverlauf`). Browser titles also name the active tab. Component actions
+  sit below the tabs; progression has no navigation action or back button.
+- Tab switches replace the current history entry, preserving query parameters,
+  hash and pane history state. Progression filter, date and line changes also
+  preserve that context (`usePageNavigation.updateParams`). Closing a pane
+  opened from the list returns to that list entry, including after visiting
+  progression and changing its controls.
+- The tab strip stays mounted while each panel lazily loads its own page body.
+  Focus stays on the activated tab without a history-state focus command.
+  Activating the selected tab does nothing. Arrow keys activate the other tab;
+  an unsaved draft asks whether to keep editing or discard it. After keeping
+  the draft, arrow navigation can return focus to the selected tab without
+  another prompt. Each body owns its queries and scope guard; progression does
+  not mount the components editor.
 - **No navigation item.** The page is a view of the tariffs, reached from their
   page. `SidebarLink` matches by path prefix (`Layout.tsx`), so **Tariffs** stays
   active on `/tariffs/progression` (`aria-current="true"`) without any change.
@@ -582,8 +591,8 @@ export interface TariffProgression {
 
 ### i18n
 
-All text under `pages.tariffs.progression.*` in `de`, `en`, `fr`, `it`
-(`frontend/src/i18n/locales`): title, controls, the three net/gross label pairs,
+All text under `pages.tariffs.tabs.*` and `pages.tariffs.progression.*` in `de`, `en`, `fr`, `it`
+(`frontend/src/i18n/locales`): tab labels, controls, the three net/gross label pairs,
 category names (reuse the existing tariff category keys), notice texts per
 `incomplete.reason`, fixed-fee scope and unit labels, empty and error states. No
 hard-coded text.
@@ -597,8 +606,8 @@ hard-coded text.
   (`07e` was taken). Done in the implementation PR.
 - `docs/specs/2026-03-tariffs-and-billing-engine.md`: the endpoint and its
   correspondence to `_price_energy` / §4.8.
-- `docs/specs/2026-10-tariff-split-view.md`: the page-header link (§4) and that
-  the progression is a separate page.
+- `docs/specs/2026-10-tariff-split-view.md`: the routed tabs (§4), retaining the
+  components list and pane independently of the progression view.
 - `docs/specs/2026-09-percentage-tariff-bands.md`: a note that the single-tariff
   chart still uses the representative-price derivation (§11, risk 2).
 - `AGENTS.md`: add this spec to the completed feature specs list when it ships.
@@ -749,6 +758,10 @@ The user-guide screenshot `07g` is the capture test in `screenshots/capture.spec
 on the actual page: a localized diagnostic without metadata, desktop and 400px
 screenshots, no horizontal overflow, and no unexpected console errors.
 
+`screenshots/tariff-tabs.spec.ts` covers the real-page filter-changing round
+trip with pane close and Back/Forward, URL/hash preservation, reload focus,
+keyboard draft confirmation, and keyboard navigation while a panel loads.
+
 ### Validation
 
 Backend: `ruff check .`, `python manage.py check`, `python -m pytest -q`.
@@ -784,9 +797,7 @@ screenshot of each.
 
 Decided:
 
-1. **Page, not tab.** A routed `/tariffs/progression` page. A tab on the tariffs
-   page would entangle the pane's draft guard, scope clearing and
-   `tariff`/`version` URL state.
+1. **Routed tabs** replace the former header link (navigation contract in §8.1).
 2. **Line identity across window changes.** A changed window (HT 07–20 becomes
    06–22) ends the old line and starts a new one (§5.3). The break is honest: the
    two lines describe different times of day. Matching lines by band type

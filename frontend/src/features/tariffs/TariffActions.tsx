@@ -15,7 +15,7 @@ type TariffActionsProps = {
   overviewBusy?: boolean
 }
 
-/** The tariff page's header actions: import, the overview PDF, and the one primary action. */
+/** The components tab's actions: import, the overview PDF, and the one primary action. */
 export function TariffActions({
   onOpenCreateTariff,
   readOnly = false,

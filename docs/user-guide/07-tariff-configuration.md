@@ -2,6 +2,9 @@
 
 This guide covers setting up tariffs and pricing in OpenZEV.
 
+The **Tariffs** page has two tabs: **Tariff components** to manage
+individual tariffs, and **Price progression** for their combined prices over time.
+
 Column headings sort tariffs within their categories. In card view, sorting
 controls appear beside the category name and wrap when needed. Price uses the lowest
 listed CHF rate for a multi-band tariff; unavailable prices stay last. Unit sorts
@@ -785,11 +788,9 @@ its price moved over time; open **History** to see the chart.
 
 ### Price Progression
 
-The price history above follows **one** tariff. To see what **one kWh costs in
-total** and how that moved over the years, click **Price progression** in the
-header of the Tariffs page. It adds up every per-kWh tariff that applies, the
-way an invoice would price a kWh, and is read-only for everyone who can open
-the tariffs.
+The price history above follows **one** tariff. For the combined price per kWh
+over time, select **Price progression**. This read-only tab sums the applicable
+per-kWh tariffs using the same pricing rules as invoices.
 
 ![The price progression page](screenshots/07g-tariff-progression.png)
 

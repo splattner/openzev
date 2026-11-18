@@ -1,12 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import axios from 'axios'
 import { useId } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { CivilDateInput } from '../components/CivilDateInput'
 import { EmptyState } from '../components/EmptyState'
 import { Notice } from '../components/Notice'
-import { PageHeader } from '../components/PageHeader'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { ScopeGuard } from '../components/ScopeGuard'
 import { TariffProgressionView } from '../features/tariffs/progression/TariffProgressionView'
@@ -14,9 +12,9 @@ import { formatTariffError } from '../features/tariffs/errors'
 import { clampDay, hasGross, lineOn, type PriceBasis } from '../features/tariffs/progression/progression'
 import { queryKeys } from '../lib/api/queryKeys'
 import { fetchTariffProgression } from '../lib/api/tariffs'
-import { useScopeNote } from '../lib/communityAccess'
 import { todayBusinessIso } from '../lib/dates'
 import { useManagedZev } from '../lib/managedZev'
+import { usePageNavigation } from '../lib/usePageNavigation'
 import type { TariffProgressionEnergyType, TariffProgressionVatMode } from '../types/api'
 
 const ENERGY_TYPES: TariffProgressionEnergyType[] = ['grid', 'local', 'feed_in']
@@ -30,9 +28,8 @@ const PARAMS = { energy: 'energy', from: 'from', to: 'to', basis: 'basis', date:
  */
 export function TariffProgressionPage() {
     const { t } = useTranslation()
-    const scopeNote = useScopeNote()
     const { selectedZevId, selectedZev } = useManagedZev()
-    const [params, setParams] = useSearchParams()
+    const { searchParams: params, updateParams } = usePageNavigation()
     const fieldId = useId()
 
     const energyParam = params.get(PARAMS.energy)
@@ -41,12 +38,12 @@ export function TariffProgressionPage() {
     const to = params.get(PARAMS.to) || undefined
 
     function update(patch: Partial<Record<keyof typeof PARAMS, string | null>>) {
-        const next = new URLSearchParams(params)
-        Object.entries(patch).forEach(([key, value]) => {
-            if (value) next.set(PARAMS[key as keyof typeof PARAMS], value)
-            else next.delete(PARAMS[key as keyof typeof PARAMS])
+        updateParams((next) => {
+            Object.entries(patch).forEach(([key, value]) => {
+                if (value) next.set(PARAMS[key as keyof typeof PARAMS], value)
+                else next.delete(PARAMS[key as keyof typeof PARAMS])
+            })
         })
-        setParams(next, { replace: true })
     }
 
     const query = useQuery({
@@ -66,14 +63,6 @@ export function TariffProgressionPage() {
 
     return (
         <div className="page-stack">
-            <PageHeader
-                eyebrow={selectedZev?.name}
-                communitySwitch
-                scopeNote={scopeNote}
-                title={t('pages.tariffs.progression.title')}
-                description={t('pages.tariffs.progression.description')}
-                actions={<Link className="button button-secondary" to="/tariffs">{t('pages.tariffs.progression.back')}</Link>}
-            />
             <ScopeGuard skeleton="table">
                 <div className="card tariff-progression-controls">
                     <label>
@@ -138,7 +127,6 @@ export function TariffProgressionPage() {
                     <EmptyState
                         titleKey="pages.tariffs.progression.empty.title"
                         descriptionKey="pages.tariffs.progression.empty.description"
-                        actions={[{ labelKey: 'pages.tariffs.progression.back', to: '/tariffs', variant: 'secondary' }]}
                     />
                 ) : progression ? (
                     <TariffProgressionView
