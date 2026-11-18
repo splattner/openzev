@@ -74,14 +74,18 @@ describe('the scope line chooses the community', () => {
         const items = await open()
         expect(items.map((item) => item.textContent)).toEqual(['ZEV Nord', 'ZEV Süd'])
         expect(items[0].getAttribute('aria-current')).toBe('true')
+        expect(items[0].disabled).toBe(true)
         expect(items[1].getAttribute('aria-current')).toBeNull()
+        expect(items[1].disabled).toBe(false)
     })
 
     it('switches to another community and ignores the current one', async () => {
         await render()
-        await choose('ZEV Nord')
+        const items = await open()
+        await act(async () => items[0].click())
         expect(state.context!.setSelectedZevId).not.toHaveBeenCalled()
-        await choose('ZEV Süd')
+        expect(trigger()?.getAttribute('aria-expanded')).toBe('true')
+        await act(async () => items[1].click())
         expect(state.context!.setSelectedZevId).toHaveBeenCalledExactlyOnceWith('2')
     })
 
@@ -151,10 +155,16 @@ describe('switching with unsaved settings', () => {
     })
 })
 
-it('lists but does not switch when the selection is fixed', async () => {
+it('disables every item when the selection is fixed', async () => {
     session([NORTH, SOUTH], false)
     await render()
     const items = await open()
-    expect(items[0].disabled || items[0].hasAttribute('data-disabled')).toBe(false)
-    expect(items[1].disabled || items[1].hasAttribute('data-disabled')).toBe(true)
+    expect(items[0].disabled).toBe(true)
+    expect(items[0].getAttribute('aria-current')).toBe('true')
+    expect(items[1].disabled).toBe(true)
+    await act(async () => {
+        items[0].click()
+        items[1].click()
+    })
+    expect(state.context!.setSelectedZevId).not.toHaveBeenCalled()
 })

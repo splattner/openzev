@@ -132,31 +132,68 @@ test('a long community list scrolls inside its menu and stays on screen', async 
   await prepareProbeZevs(page)
   await navigateTo(page, '/tariffs')
   const switcher = page.locator('main .community-switch')
-  for (const size of [
-    { width: 1440, height: 600 },
-    { width: 1280, height: 400 },
-    { width: 740, height: 390 },
-    { width: 390, height: 600 },
+  for (const { width, height, target } of [
+    { width: 1440, height: 600, target: '10' },
+    { width: 1280, height: 400, target: '09' },
+    { width: 740, height: 390, target: '10' },
+    { width: 390, height: 600, target: '09' },
   ]) {
-    await page.setViewportSize(size)
+    await page.setViewportSize({ width, height })
     await switcher.click()
     const menu = page.locator('.community-menu')
     await expect(menu).toBeVisible()
     const box = await menu.boundingBox()
     expect(box, 'community menu has no box').not.toBeNull()
     expect(box!.y, 'menu starts above the viewport').toBeGreaterThanOrEqual(0)
-    expect(box!.y + box!.height, 'menu ends below the viewport').toBeLessThanOrEqual(size.height)
-    expect(box!.x + box!.width, 'menu ends right of the viewport').toBeLessThanOrEqual(size.width)
+    expect(box!.y + box!.height, 'menu ends below the viewport').toBeLessThanOrEqual(height)
+    expect(box!.x + box!.width, 'menu ends right of the viewport').toBeLessThanOrEqual(width)
     expect(box!.height, 'community menu was crushed').toBeGreaterThanOrEqual(100)
-    if (size.height <= 400) {
+    if (height <= 400) {
       expect(await menu.evaluate((el) => el.scrollHeight > el.clientHeight), 'the list scrolls inside the menu').toBe(true)
     }
-    const target = page.getByRole('menuitem', { name: `${PROBE_PREFIX}10` })
-    await target.scrollIntoViewIfNeeded()
-    await target.click()
+    await expect(menu.locator('[aria-current="true"]')).toBeDisabled()
+    const targetName = `${PROBE_PREFIX}${target}`
+    const targetItem = menu.getByRole('menuitem', { name: targetName, exact: true })
+    await targetItem.scrollIntoViewIfNeeded()
+    await targetItem.click()
     await expect(menu).toBeHidden()
-    await expect(switcher).toContainText(`${PROBE_PREFIX}10`)
+    await expect(switcher).toContainText(targetName)
   }
+})
+
+test('community keyboard navigation skips the current item and returns focus', async ({ page }) => {
+  await prepareProbeZevs(page)
+  await navigateTo(page, '/tariffs')
+  const switcher = page.locator('main .community-switch')
+  const menu = page.getByRole('menu')
+  await expect(switcher).toHaveAccessibleName(new RegExp(`${PROBE_PREFIX}01`))
+  await switcher.focus()
+  await page.keyboard.press('Enter')
+  await expect(menu).toBeVisible()
+  await expect.poll(() => page.evaluate(() => Boolean(document.activeElement?.closest('[role="menu"]')))).toBe(true)
+  const current = menu.getByRole('menuitem', { name: `${PROBE_PREFIX}01`, exact: true })
+  await expect(current).toHaveAttribute('aria-current', 'true')
+  await expect(current).toBeDisabled()
+  await current.evaluate((item) => item.focus())
+  await expect(current).not.toBeFocused()
+  const next = menu.getByRole('menuitem', { name: `${PROBE_PREFIX}02`, exact: true })
+  await page.keyboard.press('ArrowDown')
+  await expect(next).toBeFocused()
+  await page.keyboard.press('ArrowDown')
+  await expect(menu.getByRole('menuitem', { name: `${PROBE_PREFIX}03`, exact: true })).toBeFocused()
+  await page.keyboard.press('ArrowUp')
+  await expect(next).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(menu).toBeHidden()
+  await expect(switcher).toContainText(`${PROBE_PREFIX}02`)
+  await expect(switcher).toHaveAccessibleName(new RegExp(`${PROBE_PREFIX}02`))
+  await switcher.focus()
+  await page.keyboard.press('Space')
+  await expect(menu).toBeVisible()
+  await expect.poll(() => page.evaluate(() => Boolean(document.activeElement?.closest('[role="menu"]')))).toBe(true)
+  await page.keyboard.press('Escape')
+  await expect(menu).toBeHidden()
+  await expect(switcher).toBeFocused()
 })
 
 // The account panel is the only way to log out or change the language, and it

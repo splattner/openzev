@@ -79,12 +79,8 @@ function CommunityMenu({ name, managedZev }: {
                                 key={entry.id}
                                 className={`community-menu-item${isCurrent ? ' is-current' : ''}`}
                                 aria-current={isCurrent ? 'true' : undefined}
-                                disabled={!isSelectable && !isCurrent}
-                                onClick={() => {
-                                    if (isSelectable) {
-                                        requestSwitch(entry.id)
-                                    }
-                                }}
+                                disabled={isCurrent || !isSelectable}
+                                onClick={() => requestSwitch(entry.id)}
                                 rightSection={isCurrent ? <CheckIcon /> : null}
                             >
                                 <span className="community-menu-name">{entry.name}</span>
