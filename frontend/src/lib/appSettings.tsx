@@ -73,18 +73,21 @@ function formatDateParts({ date, dateOnly }: ParsedDateValue) {
     const fields = dateOnly
         ? { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate(), hours: 0, minutes: 0 }
         : zonedParts(date)
-    const monthZone = dateOnly ? undefined : BUSINESS_TIME_ZONE
     return {
         day: fields.day,
         dayPadded: pad(fields.day),
         hoursPadded: pad(fields.hours),
         minutesPadded: pad(fields.minutes),
-        month: fields.month,
         monthPadded: pad(fields.month),
-        monthLong: new Intl.DateTimeFormat(undefined, { month: 'long', timeZone: monthZone }).format(date),
-        monthShort: new Intl.DateTimeFormat(undefined, { month: 'short', timeZone: monthZone }).format(date),
         year: fields.year,
     }
+}
+
+function formatMonthName({ date, dateOnly }: ParsedDateValue) {
+    return new Intl.DateTimeFormat(undefined, {
+        month: 'long',
+        timeZone: dateOnly ? undefined : BUSINESS_TIME_ZONE,
+    }).format(date)
 }
 
 export function formatDateByPattern(value: string | null | undefined, pattern: ShortDateFormat | LongDateFormat): string {
@@ -105,11 +108,11 @@ export function formatDateByPattern(value: string | null | undefined, pattern: S
         case 'yyyy-MM-dd':
             return `${parts.year}-${parts.monthPadded}-${parts.dayPadded}`
         case 'd MMMM yyyy':
-            return `${parts.day} ${parts.monthLong} ${parts.year}`
+            return `${parts.day} ${formatMonthName(parsed)} ${parts.year}`
         case 'd. MMMM yyyy':
-            return `${parts.day}. ${parts.monthLong} ${parts.year}`
+            return `${parts.day}. ${formatMonthName(parsed)} ${parts.year}`
         case 'MMMM d, yyyy':
-            return `${parts.monthLong} ${parts.day}, ${parts.year}`
+            return `${formatMonthName(parsed)} ${parts.day}, ${parts.year}`
         default:
             return value
     }

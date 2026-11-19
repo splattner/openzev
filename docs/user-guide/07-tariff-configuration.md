@@ -276,10 +276,11 @@ successful fetch. **Source details** unfolds the endpoint, protocol, product,
 stored coverage and usage. Usage counts cover the whole platform.
 
 Below the source, the pane charts the fetched prices of the last 30 days of the
-tariff's validity without opening anything. If the source has **no price for
-time that has already passed**, a warning names the dates (for example
-*No prices for 03.10.2026 – 05.10.2026*), the chart shades those stretches red
-and breaks the line there, and **Exact missing intervals** lists the timestamps.
+tariff's validity. The chart shows up to six dates in Swiss time, depending on
+the available width. If the source has **no price for time that has already
+passed**, the source summary names the dates (for example *No prices for
+03.10.2026 – 05.10.2026*). The chart shades those stretches red and breaks the
+line there.
 Invoice generation stops for a period that needs a missing price, so fetch the
 prices again or wait for them to fill in. Dates in the future are not reported,
 as prices may not be published yet. Change the date range above the chart to look

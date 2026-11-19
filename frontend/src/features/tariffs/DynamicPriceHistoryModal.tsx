@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { CartesianGrid, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -11,7 +11,7 @@ import { fetchDynamicPriceHistory } from '../../lib/api/tariffs'
 import { formatDateTime, formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { AXIS_COLOR, CHART_GRIDLINE, CONS_COLORS, NEGATIVE_COLOR } from '../../lib/chartTokens'
 import { CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
-import { formatBusinessIsoDate, formatIsoDate, todayBusinessIso } from '../../lib/dates'
+import { businessDayStartMs, daysInPeriod, formatBusinessIsoDate, formatIsoDate, todayBusinessIso } from '../../lib/dates'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { formatTariffError } from './errors'
 import type { AppSettings, DynamicPriceHistory, DynamicPricePoint, DynamicTariffSource, Tariff } from '../../types/api'
@@ -36,10 +36,21 @@ export function intervalLabel(validFrom: string, validTo: string, settings: AppS
 /** What the history view needs from the tariff it was opened for, if any. */
 export type TariffValidityContext = Pick<Tariff, 'valid_from' | 'valid_to' | 'minimum_price_chf_per_kwh'>
 
-function daysBefore(isoDate: string, days: number): string {
+function shiftIsoDate(isoDate: string, days: number): string {
   const value = new Date(`${isoDate}T12:00:00Z`)
-  value.setUTCDate(value.getUTCDate() - days)
+  value.setUTCDate(value.getUTCDate() + days)
   return value.toISOString().slice(0, 10)
+}
+
+/** Up to six Swiss-midnight tick candidates. */
+export function compactHistoryTicks(dateFrom: string, dateTo: string): number[] | undefined {
+  const days = daysInPeriod(dateFrom, dateTo)
+  if (days < 1) return undefined
+
+  const step = Math.ceil(days / 6)
+  return Array.from({ length: Math.ceil(days / step) }, (_, index) => (
+    businessDayStartMs(shiftIsoDate(dateFrom, index * step))
+  ))
 }
 
 /**
@@ -101,9 +112,9 @@ export function defaultHistoryDateRange(
       // lands on a local month boundary here — the inclusive last covered
       // day is the one before it.
       dateFrom: formatIsoDate(new Date(source.covers_from)),
-      dateTo: daysBefore(formatIsoDate(new Date(source.covers_to)), 1),
+      dateTo: shiftIsoDate(formatIsoDate(new Date(source.covers_to)), -1),
     }
-    : { dateFrom: daysBefore(today, tariff ? 29 : 6), dateTo: today }
+    : { dateFrom: shiftIsoDate(today, tariff ? -29 : -6), dateTo: today }
   return tariff ? clampToValidity(base, tariff, today) : base
 }
 
@@ -163,16 +174,7 @@ type PanelProps = {
   compact?: boolean
 }
 
-/**
- * The date-range picker, stats, chart and point table for one dynamic
- * source's fetched prices. Split out from `DynamicPriceHistoryModal` so the
- * tariff detail drawer can show it inline — there is room for it there, and
- * it is the one thing on that drawer a click used to be needed for (#728) —
- * while the dynamic-sources admin table, which opens it out of context from
- * a table row rather than an already-open detail view, still wants it as a
- * modal.
- */
-export function DynamicPriceHistoryPanel({ source, tariff, compact = false }: PanelProps) {
+export const DynamicPriceHistoryPanel = memo(function DynamicPriceHistoryPanel({ source, tariff, compact = false }: PanelProps) {
   const { t } = useTranslation()
   const { settings } = useAppSettings()
   const today = todayBusinessIso()
@@ -204,6 +206,7 @@ export function DynamicPriceHistoryPanel({ source, tariff, compact = false }: Pa
     [historyQuery.data, historyQuery.dataUpdatedAt],
   )
   const { start: rangeStart, end: rangeEnd } = windowBounds(dateFrom, dateTo)
+  const axisTicks = useMemo(() => compact ? compactHistoryTicks(dateFrom, dateTo) : undefined, [compact, dateFrom, dateTo])
   const chartData = useMemo(
     () => dynamicChartData(points, gaps, rangeStart, rangeEnd),
     [points, gaps, rangeStart, rangeEnd],
@@ -318,7 +321,8 @@ export function DynamicPriceHistoryPanel({ source, tariff, compact = false }: Pa
         >
           <ResponsiveContainer width="100%" height={compact ? 220 : 280}>
             <LineChart data={chartData} margin={{ top: 8, right: 18, left: 8, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRIDLINE} />
+              {/* Give the grid its ticks before the X axis registers. */}
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRIDLINE} verticalValues={axisTicks} />
               {gaps.map((gap) => (
                 <ReferenceArea
                   key={gap.from}
@@ -334,6 +338,7 @@ export function DynamicPriceHistoryPanel({ source, tariff, compact = false }: Pa
                 type="number"
                 scale="time"
                 domain={[rangeStart, rangeEnd]}
+                ticks={axisTicks}
                 allowDataOverflow
                 tickFormatter={(value: number) => (
                   compact
@@ -389,7 +394,7 @@ export function DynamicPriceHistoryPanel({ source, tariff, compact = false }: Pa
       ) : records}
     </div>
   )
-}
+})
 
 type ModalProps = {
   source: DynamicTariffSource | null
