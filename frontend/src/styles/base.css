@@ -113,3 +113,13 @@ label :is(input, select, textarea) {
   opacity: 1;
   cursor: default;
 }
+
+.response-list {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+}
+
+.content-main ul:has(> li:only-child) {
+  list-style: none;
+  padding-inline-start: 0;
+}

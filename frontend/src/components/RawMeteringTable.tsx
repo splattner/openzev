@@ -249,7 +249,7 @@ function HourGrid({
                     aria-label={t('pages.meteringData.rawTable.cellDetailTitle')}
                 >
                     <strong>{t('pages.meteringData.rawTable.cellDetailTitle')}</strong>
-                    <ul>
+                    <ul role="list">
                         {selectedCell.readings.map((reading) => (
                             <li key={reading.timestamp}>
                                 <span className="raw-metering-cell-detail-time">{formatMeteringTimestamp(reading.timestamp, settings)}</span>{' '}

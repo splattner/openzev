@@ -214,7 +214,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
                                 <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />{' '}
                                 {t('pages.tariffs.import.documentErrors', { count: preview.errors.length })}
                             </p>
-                            <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                            <ul role="list" className="response-list">
                                 {preview.errors.map((error) => (
                                     <li key={`${error.tariff}-${error.error}`}>
                                         <strong>{error.tariff}</strong>: {error.error}
@@ -378,7 +378,7 @@ function ResultList({ title, empty, children }: { title: string; empty?: string;
         <section>
             <h3 className="mt-0">{title}</h3>
             {hasItems ? (
-                <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>{children}</ul>
+                <ul role="list" className="response-list">{children}</ul>
             ) : (
                 <p className="muted m-0">{empty}</p>
             )}

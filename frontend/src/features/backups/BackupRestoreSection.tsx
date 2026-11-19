@@ -210,7 +210,7 @@ export function BackupRestoreSection({ status }: { status?: BackupStatus } = {})
                     <strong>{t('pages.backups.restore.failed')}</strong>
                     <div>{job.error_message}</div>
                     {'verification_failures' in job.plan_json && (job.plan_json.verification_failures ?? []).length > 0 && (
-                        <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem' }}>
+                        <ul role="list" className="response-list mt-05">
                             {(job.plan_json.verification_failures ?? []).map((failure) => (
                                 <li key={failure} style={{ overflowWrap: 'anywhere' }}>{failure}</li>
                             ))}
