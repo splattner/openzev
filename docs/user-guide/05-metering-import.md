@@ -428,6 +428,7 @@ If you find errors in imported data:
 
 ## Deleting imports
 
+Use the **Delete import** trash icon on an eligible row to delete a single import.
 Single and bulk deletion remove eligible import logs plus all readings still
 linked to their batches, including held SDAT-CH values, then refresh metering
 data. **Imports that replaced billable or held values cannot be deleted**,

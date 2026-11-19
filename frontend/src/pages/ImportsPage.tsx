@@ -534,6 +534,7 @@ export function ImportsContent() {
                             {
                                 key: 'delete',
                                 label: t('pages.imports.actions.deleteImport'),
+                                iconButtonLabel: `${t('pages.imports.actions.deleteImport')}: ${ctx.row.original.filename || formatDateTime(ctx.row.original.created_at, settings)}`,
                                 icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
                                 danger: true,
                                 disabled: deleteImportMutation.isPending || dialogLoading,

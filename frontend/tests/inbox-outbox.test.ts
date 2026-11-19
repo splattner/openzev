@@ -124,15 +124,15 @@ describe('Outbox table', () => {
         page.unmount()
     })
 
-    it('puts Withdraw in a menu and not beside Download, and offers none to a read-only role', async () => {
+    it('shows Withdraw beside Download and hides it for a read-only role', async () => {
         vi.mocked(inboxApi.listInboxDocuments).mockResolvedValue([doc({ id: 'a' })])
         const page = render()
         await settled(page, 'House rules')
 
         const row = page.container.querySelector('.doc-wide tbody tr') as HTMLElement
-        const labels = [...row.querySelectorAll('button')].map((button) => button.getAttribute('aria-label'))
-        expect(labels).toEqual(['inbox.downloadLabel', 'inbox.outbox.moreActions'])
-        expect(row.textContent).not.toContain('inbox.outbox.withdraw')
+        const labels = [...row.querySelectorAll('button')].map((button) => button.getAttribute('aria-label') ?? button.textContent)
+        expect(labels).toEqual(['inbox.downloadLabel', 'inbox.outbox.withdraw'])
+        expect(page.container.querySelector('.doc-card-actions')?.textContent).toContain('inbox.outbox.withdraw')
         page.unmount()
 
         canWrite = false

@@ -12,7 +12,7 @@ import type { Zev } from '../src/types/api'
 /** Admin ZEV creation wizard — bank fields. */
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
-        t: (k: string, options?: { number?: number }) => options?.number ? `${k}:${options.number}` : k,
+        t: (k: string, options?: { number?: number; name?: string }) => options?.name ? `${k}: ${options.name}` : options?.number ? `${k}:${options.number}` : k,
         i18n: { language: 'en', changeLanguage: vi.fn() },
     }),
 }))
@@ -178,7 +178,7 @@ describe('ZevListPage creation wizard — bank fields', () => {
         const { container, root } = await renderZevListPage()
         try {
             const buttons = container.querySelectorAll<HTMLButtonElement>('tbody tr .actions-cell button')
-            expect(buttons[0].getAttribute('aria-label')).toBe('common.edit: Muster ZEV')
+            expect(buttons[0].getAttribute('aria-label')).toBe('common.editNamed: Muster ZEV')
             expect(buttons[1].textContent).toBe('pages.zevs.manage')
             await act(async () => buttons[1].click())
             expect(mockSetSelectedZevId).toHaveBeenCalledWith('z1')

@@ -27,13 +27,14 @@ async function tariffs(page: Page, series: TariffSeries[], language = 'en') {
   await page.route('**/api/v1/tariffs/tariffs/series/**', route => route.fulfill({ json: series }))
 }
 
-test('band Delete has the same danger color as the delete menu before hover', async ({ page }) => {
+test('band and version Delete buttons use the same danger color before hover', async ({ page }) => {
   await tariffs(page, [{ ...grid, versions: [current], version_count: 1 }])
   await page.goto('/tariffs?tariff=42%3AGrid&version=current')
   const remove = page.locator('.tariff-period-actions .button-danger').first()
   await expect(remove).toBeVisible()
-  await page.locator('.tariff-version-card-actions button[aria-haspopup="menu"]').click()
-  const reference = await page.getByRole('menuitem', { name: 'Delete this version', exact: true }).evaluate(element => getComputedStyle(element).color)
+  const deleteVersion = page.getByRole('button', { name: /^Delete this version:/ })
+  await expect(deleteVersion).toHaveText('')
+  const reference = await deleteVersion.evaluate(element => getComputedStyle(element).color)
   await expect(remove).toHaveCSS('color', reference)
   await expect(remove.locator('svg')).toHaveCSS('color', reference)
 })

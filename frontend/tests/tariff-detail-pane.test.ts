@@ -3,10 +3,9 @@ import { act } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TariffDetailPane } from '../src/features/tariffs/TariffDetailPane'
 import { renderWithProviders } from './helpers/render'
-import { waitForCondition } from './helpers/waitForCondition'
 import type { TariffSeries, TariffVersion } from '../src/types/api'
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string, values?: { name?: string }) => key.endsWith('Named') && values?.name ? `${key}: ${values.name}` : key }) }))
 vi.mock('../src/lib/auth', () => ({ useAuth: () => ({ user: { id: 1, role: 'admin' } }) }))
 vi.mock('../src/lib/api/tariffs', () => ({ fetchDynamicTariffSources: vi.fn().mockResolvedValue([]) }))
 
@@ -43,7 +42,7 @@ describe('TariffDetailPane', () => {
         const onEditTariff = vi.fn()
         const container = await pane({ onEditTariff })
         const edit = container.querySelector<HTMLButtonElement>('[data-action-key="edit-next"]')!
-        expect(edit.getAttribute('aria-label')).toBe('common.edit: 01.01.2999 – pages.tariffs.openEnded')
+        expect(edit.getAttribute('aria-label')).toBe('common.editNamed: 01.01.2999 – pages.tariffs.openEnded')
         expect(edit.textContent).toBe('')
         act(() => edit.click())
         expect(onEditTariff).toHaveBeenCalledExactlyOnceWith(next, 'edit-next')
@@ -108,16 +107,13 @@ describe('TariffDetailPane', () => {
         expect(shown.querySelectorAll('.tariff-version-toggle')[0].getAttribute('aria-expanded')).toBe('true')
     })
 
-    it('offers deleting a version from a menu on its card, which asks the page and does not delete itself', async () => {
+    it('uses a named trash icon on the version card to ask the page to confirm', async () => {
         const onDeleteVersion = vi.fn()
         const container = await pane({ onDeleteVersion })
-        const trigger = container.querySelector<HTMLButtonElement>('.tariff-version-card [aria-haspopup="menu"]')!
-        expect(trigger.getAttribute('aria-label')).toBe('pages.tariffs.versions.moreActions')
-        act(() => trigger.click())
-        await waitForCondition(() => !!document.querySelector('[role="menuitem"]'), 'the version menu')
-        const item = document.querySelector<HTMLElement>('[role="menuitem"]')!
-        expect(item.textContent).toBe('pages.tariffs.versions.deleteVersion')
-        act(() => item.click())
+        const button = container.querySelector<HTMLButtonElement>('.tariff-version-card .button-destructive')!
+        expect(button.textContent).toBe('')
+        expect(button.getAttribute('aria-label')).toBe('pages.tariffs.versions.deleteVersion: 01.01.2001 \u2013 pages.tariffs.openEnded')
+        act(() => button.click())
         expect(onDeleteVersion).toHaveBeenCalledTimes(1)
         expect(onDeleteVersion.mock.calls[0][0].id).toBe('current')
         // The confirmation names which version goes, by its validity window.

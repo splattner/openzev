@@ -76,6 +76,26 @@ const rows: InvoicePeriodParticipantRow[] = [
   } },
 ]
 
+test('settling an invoice keeps focus on its row when the menu becomes a button', async ({ page }) => {
+  const sent: Invoice = {
+    ...invoice, status: 'sent', pdf_url: null, paid_chf: '10.00', outstanding_chf: '113.45',
+  }
+  const paid: Invoice = { ...sent, status: 'paid', paid_chf: '123.45', outstanding_chf: '0.00' }
+  const state: ApiState = { periodRows: [{ ...row, invoice: sent }] }
+  await mockApi(page, state)
+  await page.route('**/api/v1/invoices/invoices/1/payments/', async route => {
+    state.periodRows = [{ ...row, invoice: paid }]
+    await route.fulfill({ json: paid })
+  })
+  await page.goto('/billing/invoices')
+  await page.locator('.invoice-row-actions button[aria-haspopup="menu"]').click()
+  await page.getByRole('menuitem', { name: 'Record payment', exact: true }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('button', { name: 'Record payment', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Generate PDF', exact: true })).toBeFocused()
+})
+
 // Long identity, several meters, every issue at once and a large amount.
 const demanding: InvoicePeriodParticipantRow = {
   ...row, participant_id: 'p4', participant_name: 'Genossenschaft Sonnenhof Wohnbau und Gewerbe Oberwinterthur',

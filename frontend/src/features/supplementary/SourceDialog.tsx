@@ -106,7 +106,7 @@ export function SourceDetails({ source, sources, eligible = NO_CAPABILITY, confi
 
     const confirmCapability = (options: Omit<ConfirmOptions, 'isDangerous'>) => confirm({ ...options, isDangerous: false })
 
-    // One visible action: what keeps the connection working right now. Everything else is in the menu.
+    // Promote the action that keeps the connection working right now.
     const limited = !!onBehalfOf
     const needsNewKey = !limited && isSolar && (disconnected || source.status === 'reconnect_required')
     const canSync = !limited && (isSolar || isForecastSolar) && !disconnected && (hasHistory || source.provides_forecast) && source.status !== 'reconnect_required'

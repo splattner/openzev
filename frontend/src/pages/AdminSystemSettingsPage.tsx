@@ -1,7 +1,8 @@
+import { IconActionButton } from '../components/IconActionButton'
 import { SortableHeader, useTableSorting } from '../components/tableSorting'
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Skeleton, Switch, Tooltip } from '@mantine/core'
+import { Skeleton, Switch } from '@mantine/core'
 import { AppTabs } from '../components/AppTabs'
 import { useReducedMotion } from '@mantine/hooks'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -437,64 +438,58 @@ export function AdminSystemSettingsPage() {
                     {!oauthProvidersQuery.isLoading && providers.length === 0 && <p className="muted">{t('adminOAuth.noProviders')}</p>}
 
                     {providers.length > 0 && (
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <SortableHeader {...providerSort.header('colName')}>{t('adminOAuth.colName')}</SortableHeader>
-                                    <SortableHeader {...providerSort.header('colClientId')}>{t('adminOAuth.colClientId')}</SortableHeader>
-                                    <SortableHeader {...providerSort.header('colRedirectUrl')}>{t('adminOAuth.colRedirectUrl')}</SortableHeader>
-                                    <SortableHeader {...providerSort.header('colScope')}>{t('adminOAuth.colScope')}</SortableHeader>
-                                    <SortableHeader {...providerSort.header('colEnabled')} style={{ textAlign: 'center' }}>{t('adminOAuth.colEnabled')}</SortableHeader>
-                                    <th>{t('common.actions')}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {providerSort.rows.map((provider) => (
-                                    <tr key={provider.id}>
-                                        <td>
-                                            <strong>{provider.display_name}</strong>
-                                            <br />
-                                            <code style={{ fontSize: '0.8em' }}>{provider.name}</code>
-                                        </td>
-                                        <td><code style={{ fontSize: '0.8em' }}>{provider.client_id}</code></td>
-                                        <td>
-                                            <code style={{ fontSize: '0.8em', wordBreak: 'break-all' }}>{provider.redirect_url}</code>
-                                        </td>
-                                        <td style={{ fontSize: '0.85em' }}>{provider.scope}</td>
-                                        <td style={{ textAlign: 'center' }}>
-                                            <span className={`badge ${provider.enabled ? 'badge-success' : 'badge-neutral'}`}>
-                                                {provider.enabled ? t('common.yes') : t('common.no')}
-                                            </span>
-                                        </td>
-                                        <td className="actions-cell">
-                                            <div className="actions-cell-content">
-                                                <Tooltip label={`${t('common.edit')}: ${provider.display_name}`} events={{ hover: true, focus: true, touch: false }}>
-                                                    <button
-                                                        type="button"
-                                                        className="button button-secondary button-compact button-icon"
+                        <div className="table-scroll">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <SortableHeader {...providerSort.header('colName')}>{t('adminOAuth.colName')}</SortableHeader>
+                                        <SortableHeader {...providerSort.header('colClientId')}>{t('adminOAuth.colClientId')}</SortableHeader>
+                                        <SortableHeader {...providerSort.header('colRedirectUrl')}>{t('adminOAuth.colRedirectUrl')}</SortableHeader>
+                                        <SortableHeader {...providerSort.header('colScope')}>{t('adminOAuth.colScope')}</SortableHeader>
+                                        <SortableHeader {...providerSort.header('colEnabled')} style={{ textAlign: 'center' }}>{t('adminOAuth.colEnabled')}</SortableHeader>
+                                        <th>{t('common.actions')}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {providerSort.rows.map((provider) => (
+                                        <tr key={provider.id}>
+                                            <td>
+                                                <strong>{provider.display_name}</strong>
+                                                <br />
+                                                <code style={{ fontSize: '0.8em' }}>{provider.name}</code>
+                                            </td>
+                                            <td><code style={{ fontSize: '0.8em' }}>{provider.client_id}</code></td>
+                                            <td>
+                                                <code style={{ fontSize: '0.8em', wordBreak: 'break-all' }}>{provider.redirect_url}</code>
+                                            </td>
+                                            <td style={{ fontSize: '0.85em' }}>{provider.scope}</td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                <span className={`badge ${provider.enabled ? 'badge-success' : 'badge-neutral'}`}>
+                                                    {provider.enabled ? t('common.yes') : t('common.no')}
+                                                </span>
+                                            </td>
+                                            <td className="actions-cell">
+                                                <div className="actions-cell-content">
+                                                    <IconActionButton
+                                                        label={t('common.editNamed', { name: provider.display_name })}
                                                         onClick={() => openEditOAuthForm(provider)}
-                                                        aria-label={`${t('common.edit')}: ${provider.display_name}`}
                                                     >
                                                         <FontAwesomeIcon icon={faPen} fixedWidth />
-                                                    </button>
-                                                </Tooltip>
-                                                <Tooltip label={`${t('common.delete')}: ${provider.display_name}`} events={{ hover: true, focus: true, touch: false }}>
-                                                    <button
-                                                        type="button"
-                                                        className="button button-danger button-compact button-icon"
+                                                    </IconActionButton>
+                                                    <IconActionButton
+                                                        label={t('common.deleteNamed', { name: provider.display_name })} danger
                                                         onClick={() => confirmDeleteOAuthProvider(provider)}
                                                         disabled={deleteOAuthMutation.isPending || dialogLoading}
-                                                        aria-label={`${t('common.delete')}: ${provider.display_name}`}
                                                     >
                                                         <FontAwesomeIcon icon={faTrash} fixedWidth />
-                                                    </button>
-                                                </Tooltip>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                                    </IconActionButton>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
                 </div>
                 </AppTabs.Panel>

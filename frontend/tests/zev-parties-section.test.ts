@@ -36,7 +36,6 @@ vi.mock('../src/lib/api/zev', () => ({
 
 import { assignPartyRole, endPartyRole, fetchBuildings, fetchParties, fetchPartyRoles, fetchZevAccess, setPartyRoleBuilding } from '../src/lib/api/zev'
 import { ZevPartiesSection } from '../src/features/zev/ZevPartiesSection'
-import { waitForCondition } from './helpers/waitForCondition'
 
 const party = (id: string, name: string, over: Partial<Party> = {}): Party => ({
     id, zev: 'z1', kind: 'person', title: '', first_name: '', last_name: name, organisation_name: '', name_addition: '',
@@ -88,14 +87,6 @@ const buttons = (container: Element, label: string) =>
     Array.from(container.querySelectorAll('button')).filter((button) => button.textContent?.includes(label))
 
 const landownerRow = (container: Element) => container.querySelector('.zev-role-list > li')!
-const menuItem = (label: string) =>
-    Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find((item) => item.textContent?.includes(label))
-async function openMenu(row: Element, label: string) {
-    await act(async () => row.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')!.click())
-    await waitForCondition(() => menuItem(label) !== undefined, `menu item ${label}`)
-    return menuItem(label)!
-}
-
 async function click(element: Element) {
     await act(async () => { (element as HTMLElement).click() })
 }
@@ -157,20 +148,19 @@ describe('ZevPartiesSection', () => {
         expect(assignPartyRole).toHaveBeenCalledWith({ zev: 'z1', party: 'v', role: 'representative', valid_from: '2026-06-15' })
     })
 
-    it('keeps ending a landowner in the row menu and the building next to it', async () => {
+    it('shows End beside Set building when no access actions apply', async () => {
         vi.mocked(fetchBuildings).mockResolvedValue([{ id: 'b1', zev: 'z1', name: 'Haus A' } as Building])
         const container = await render(true)
         const row = landownerRow(container)
-        // One visible action; the rare one is in the menu, not a second button.
         expect(buttons(row, 'pages.zevSettings.parties.setBuilding')).toHaveLength(1)
-        expect(buttons(row, 'pages.zevSettings.parties.end')).toHaveLength(0)
-        await openMenu(row, 'pages.zevSettings.parties.end')
+        expect(buttons(row, 'pages.zevSettings.parties.end')).toHaveLength(1)
+        expect(row.querySelector('button[aria-haspopup="menu"]')).toBeNull()
     })
 
     it('asks before ending a landowner on a chosen day', async () => {
         const container = await render(true)
         const row = landownerRow(container)
-        await act(async () => { (await openMenu(row, 'pages.zevSettings.parties.end')).click() })
+        await click(buttons(row, 'pages.zevSettings.parties.end')[0])
         const form = container.querySelector<HTMLFormElement>('.zev-role-inline-form')!
         // Neutral, not a red destructive button.
         expect(form.querySelector('button[type="submit"]')!.className).toContain('button-secondary')

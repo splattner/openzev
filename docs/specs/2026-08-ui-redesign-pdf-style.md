@@ -1159,7 +1159,7 @@ contracts are unchanged.
   - Band windows: an unnamed `band` uses its window as its name and prints that window once. Non-flat bands without both time bounds are the catch-all of their months and weekdays and say "all other hours" (`pages.tariffs.rateCard.allOtherHours`), preserving any weekday/season text, for energy and percentage rates alike; an unlabelled `band` catch-all is named "all other hours" once instead of repeating it. Tariffs without a catch-all keep the first-band fallback (§3.2 of the billing-engine spec). The PDFs use the same wording (`tariff_other_hours` in `invoices/contract_translations.py`).
   - Interaction and permissions: the name button owns the open action (`aria-expanded`, row click stays for the row); the row for the series and version shown in the pane is `.is-selected`. The row has no write actions: Edit and version actions live in the detail pane. Warnings beside the name only (gap count, "Price fetch failed"). History rows read greyed (`.is-ended`).
   - Responsive: the list measures its own container. Below 56rem a row is a small card with one block per band, each with its own CHF, so wrapping cannot detach a price from its hours; validity last. The shared `.invoice-rows` header hiding is overridden for `.tariff-list`, so the category band stays on cards.
-- Detail pane (`DetailPane` in `components/DetailPane.tsx`, styles in `styles/components/detail-pane.css`; used by `TariffDetailPane` and the audit log's `AuditEventPane`, SPEC-2026-10-tariff-split-view §5, §6): in flow beside the list on a wide page (`.detail-split[data-layout='wide']`, sticky, scrolling on its own), the whole area on a narrow one with the list `hidden`. A `section` named by its `h2`, without `aria-modal`; no scrim, scroll lock or focus trap. The header shows the name, one muted facts line and only the fetch-failure issue text; the body shows the version block (validity window, status badge, Edit, the price of a tariff without bands, notes), the gap warning, the dynamic source (details in a disclosure), the bands (icon-only edit/delete), then the version picker (current, scheduled, past folded; hidden for a single version; a `⋮` menu per row) and the price history in a disclosure.
+- Detail pane (`DetailPane` in `components/DetailPane.tsx`, styles in `styles/components/detail-pane.css`; used by `TariffDetailPane` and the audit log's `AuditEventPane`, SPEC-2026-10-tariff-split-view §5, §6): in flow beside the list on a wide page (`.detail-split[data-layout='wide']`, sticky, scrolling on its own), the whole area on a narrow one with the list `hidden`. A `section` named by its `h2`, without `aria-modal`; no scrim, scroll lock or focus trap. The header shows the name, one muted facts line and only the fetch-failure issue text; the body shows the version block (validity window, status badge, Edit, the price of a tariff without bands, notes), the gap warning, the dynamic source (details in a disclosure), the bands (icon-only edit/delete), then the version cards and the history disclosure. Editable cards show a named **Delete this version** trash icon beside the edit pencil.
 - Buttons: the primary `.button` is flat `--brand-deep` with a small forest
   drop shadow, no gradient or inner highlight; hover lightens it to
   `--brand`.
@@ -1220,8 +1220,7 @@ contracts are unchanged.
   - **Building sheet** (`.metering-sheet` + `.building-group`; one per building, for one
     building as for several): a plain header on the sheet with a hairline below it
     (`BuildingHeader`): name, address, EGID, landowners and the meter count.
-    Managers see the named edit pencil first, then "Add metering point" and an
-    icon-only `ActionMenu` offering "Delete building" while the building is empty.
+    Managers can edit the building, add a metering point or delete an empty building.
     The header is not a toggle: buildings do not fold. A role that has no buildings loaded
     (participants), or a community whose buildings have not arrived yet, gets one plain sheet
     of rows without a header.
@@ -1262,7 +1261,7 @@ contracts are unchanged.
   - **Details** (`.metering-point-detail`, two `.metering-detail-card`s, the
     assignments twice as wide as the measurement; the Measurement card alone for a
     role that has no assignment data): Assignments (every assignment, current
-    first, with state badge, dates, icon-only Edit and Remove controls (Edit first, participant-specific names and focus/hover tooltips; removal confirms), and "Add
+    first, with state badge, dates, Edit and Remove icons, and "Add
     assignment") and Measurement (last and first reading, reading count, data
     quality link with the health badge, and the supplementary source chip unless
     it already sits on the row). The building, the location, the type and

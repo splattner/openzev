@@ -275,7 +275,7 @@ ZEV settings.
   (`MeteringPointsList`, SPEC-2026-08-ui-redesign-pdf-style §15.4): its own sheet, ordered by
   building name, starting with a `BuildingHeader`: name, address, EGID, landowners whose
   role names it and the metering-point count, with "Add metering point" and a visible
-  "Edit building" button for managers. An `ActionMenu` ("More") offers "Delete building"
+  "Edit building" button for managers. A "Delete building" trash icon appears
   (confirm) only while the building has no metering points. The name is an `h2`
   (`metering-building-${building.id}`) labelling that building's metering-point table. Buildings do not fold. A building with no
   metering points still shows its header with "No metering points in this building yet".

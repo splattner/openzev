@@ -758,11 +758,10 @@ price; click one to show its card — marked **Ended** — underneath. A tariff
 without ended versions has no history. Switching versions in the pane does not
 change the version shown in the list.
 
-To delete a version, open the **⋮** menu beside **Edit** on its card and choose
-**Delete this version**; to delete a band, click the trash icon beside its
-pencil. Both ask for confirmation first, and the confirmation repeats that
-existing invoices are not recalculated. Correcting a superseded version's end
-date is a normal follow-up to adding a new one, so **Edit** is on every card.
+Click the trash icon beside the edit pencil to delete a version or band. Both
+ask for confirmation first and explain that existing invoices are not
+recalculated. Correcting a superseded version's end date is a normal follow-up
+to adding a new one, so **Edit** is on every card.
 
 The pane stays open across a page reload or a shared link — the URL records
 which tariff and version you're looking at. **X**, **Escape** and the browser's

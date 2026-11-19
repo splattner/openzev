@@ -1,4 +1,4 @@
-import { Tooltip } from '@mantine/core'
+import { IconActionButton } from '../../components/IconActionButton'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faBuilding, faEllipsis, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
@@ -42,11 +42,11 @@ export function BuildingHeader({
   const address = buildingAddress(building)
 
   const menuItems: ActionMenuItem[] = []
-  // Rare and destructive: overflow + confirm, and only once nothing is left in it.
   if (onDelete && building.metering_point_count === 0) {
     menuItems.push({
       key: 'delete',
       label: t('pages.meteringPoints.buildings.deleteTitle'),
+      iconButtonLabel: `${t('pages.meteringPoints.buildings.deleteTitle')}: ${building.name}`,
       icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
       danger: true,
       disabled: deletePending,
@@ -72,11 +72,9 @@ export function BuildingHeader({
       <div className="building-header-side">
         {canManage && (
           <div className="building-header-actions actions-row actions-row-wrap">
-            <Tooltip label={`${t('pages.meteringPoints.buildings.edit')}: ${building.name}`} events={{ hover: true, focus: true, touch: false }}>
-              <button type="button" className="button button-secondary button-compact button-icon" aria-label={`${t('pages.meteringPoints.buildings.edit')}: ${building.name}`} onClick={() => onEdit(building)}>
-                <FontAwesomeIcon icon={faPen} fixedWidth />
-              </button>
-            </Tooltip>
+            <IconActionButton label={`${t('pages.meteringPoints.buildings.edit')}: ${building.name}`} onClick={() => onEdit(building)}>
+              <FontAwesomeIcon icon={faPen} fixedWidth />
+            </IconActionButton>
             {onAddMeteringPoint && (
               <button type="button" className="button button-secondary button-compact" onClick={() => onAddMeteringPoint(building)}>
                 <FontAwesomeIcon icon={faPlus} fixedWidth />

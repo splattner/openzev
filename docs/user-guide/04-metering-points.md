@@ -86,7 +86,7 @@ are, and both are recorded. Buildings are managed on this page.
   "No metering points in this building yet". Search and the other filters apply
   within the groups; the **Building** filter shows one group.
 - A building can be deleted only once it is empty: move or delete its meters
-  first, then **More → Delete building** appears in its header. Landowner rows that pointed at a deleted building are
+  first, then the **Delete building** trash icon appears in its header. Landowner rows that pointed at a deleted building are
   kept, without a building.
 
 > **Check the buildings of an existing community.** When OpenZEV added
@@ -313,9 +313,7 @@ Each meter on the **Metering Points** page is one row that shows, at a glance
   assignment's validity window.
 - The **last reading** date, or "Never"
 
-**Chart**, **⋯ More** and the expand arrow use outlined buttons. **Chart** opens
-the metering point's full reading history, and
-**⋯ More** has **Assign participant**, **Edit**, **Delete data** (admins) and
+Select **Chart** to open the metering point's full reading history. Use **⋯** for **Assign participant**, **Edit**, **Delete data** (admins) and
 **Delete**. With exactly one current assignment, the menu also offers editing or removing
 that assignment. Point IDs and participant names are selectable text.
 Viewers see no editing controls.
@@ -324,8 +322,7 @@ Click a row, or the arrow at its end, to open its details in place:
 
 - **Assignments** — every assignment, current first, with its validity window
   and its state (*Upcoming* or *Ended* for the others). Use **Add assignment**,
-  the pencil (**Edit**, first) and bin (**Remove**) buttons here. Hover or focus
-  either button to see its action and participant name. Removal confirms the participant, point and dates,
+  the pencil (**Edit**) or bin (**Remove**). The removal confirmation shows the participant, point and dates,
   then deletes the record. When a tenant moves out, use **Edit** to set an end date
   and retain the assignment history.
 - **Measurement** — last and first reading, how many readings there are, and the

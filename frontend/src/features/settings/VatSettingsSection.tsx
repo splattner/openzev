@@ -1,4 +1,4 @@
-import { Tooltip } from '@mantine/core'
+import { IconActionButton } from '../../components/IconActionButton'
 import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -191,52 +191,50 @@ export function VatSettingsSection() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {sorting.rows.map((rate) => (
-                                        <tr key={rate.id}>
-                                            <td>{(Number(rate.rate) * 100).toFixed(2)}%</td>
-                                            <td>{formatShortDate(rate.valid_from, settings)}</td>
-                                            <td>{rate.valid_to ? formatShortDate(rate.valid_to, settings) : t('adminVatSettings.table.openEnded')}</td>
-                                            <td className="actions-cell">
-                                                <div className="actions-cell-content">
-                                                    <Tooltip label={`${t('common.edit')}: ${(Number(rate.rate) * 100).toFixed(2)}% · ${formatShortDate(rate.valid_from, settings)}`} events={{ hover: true, focus: true, touch: false }}>
-                                                        <button
-                                                            className="button button-secondary button-compact button-icon"
-                                                            type="button"
+                                    {sorting.rows.map((rate) => {
+                                        const percentage = Number(rate.rate) * 100
+                                        const displayRate = percentage.toFixed(2)
+                                        const validFrom = formatShortDate(rate.valid_from, settings)
+                                        const description = `${displayRate}% · ${validFrom}`
+                                        return (
+                                            <tr key={rate.id}>
+                                                <td>{displayRate}%</td>
+                                                <td>{validFrom}</td>
+                                                <td>{rate.valid_to ? formatShortDate(rate.valid_to, settings) : t('adminVatSettings.table.openEnded')}</td>
+                                                <td className="actions-cell">
+                                                    <div className="actions-cell-content">
+                                                        <IconActionButton
+                                                            label={t('common.editNamed', { name: description })}
                                                             onClick={() => {
                                                                 setEditingId(rate.id)
                                                                 setForm({
-                                                                    rate_percent: (Number(rate.rate) * 100).toFixed(4).replace(/\.?0+$/, ''),
+                                                                    rate_percent: percentage.toFixed(4).replace(/\.?0+$/, ''),
                                                                     valid_from: rate.valid_from,
                                                                     valid_to: rate.valid_to ?? null,
                                                                 })
                                                             }}
-                                                            aria-label={`${t('common.edit')}: ${(Number(rate.rate) * 100).toFixed(2)}% · ${formatShortDate(rate.valid_from, settings)}`}
                                                         >
                                                             <FontAwesomeIcon icon={faPen} fixedWidth />
-                                                        </button>
-                                                    </Tooltip>
-                                                    <Tooltip label={`${t('common.delete')}: ${(Number(rate.rate) * 100).toFixed(2)}% · ${formatShortDate(rate.valid_from, settings)}`} events={{ hover: true, focus: true, touch: false }}>
-                                                        <button
-                                                            className="button button-danger button-compact button-icon"
-                                                            type="button"
+                                                        </IconActionButton>
+                                                        <IconActionButton
+                                                            label={t('common.deleteNamed', { name: description })} danger
                                                             disabled={deleteMutation.isPending || dialogLoading}
                                                             onClick={() => confirm({
                                                                 title: t('adminVatSettings.deleteTitle'),
-                                                                message: t('adminVatSettings.deleteMessage', { rate: (Number(rate.rate) * 100).toFixed(2) }),
+                                                                message: t('adminVatSettings.deleteMessage', { rate: displayRate }),
                                                                 confirmText: t('common.delete'),
                                                                 cancelText: t('common.cancel'),
                                                                 isDangerous: true,
                                                                 onConfirm: () => deleteMutation.mutate(rate.id),
                                                             })}
-                                                            aria-label={`${t('common.delete')}: ${(Number(rate.rate) * 100).toFixed(2)}% · ${formatShortDate(rate.valid_from, settings)}`}
                                                         >
                                                             <FontAwesomeIcon icon={faTrash} fixedWidth />
-                                                        </button>
-                                                    </Tooltip>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                        </IconActionButton>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
                                 </tbody>
                             </table>
                         </div>

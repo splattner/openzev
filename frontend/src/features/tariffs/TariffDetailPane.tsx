@@ -1,4 +1,4 @@
-import { Tooltip } from '@mantine/core'
+import { IconActionButton } from '../../components/IconActionButton'
 import { useState, type ReactNode, type Ref } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
@@ -222,17 +222,13 @@ export function TariffDetailPane({
                     )}
                     {!readOnly && (
                         <div className="tariff-version-card-actions">
-                            <Tooltip label={`${t('common.edit')}: ${dateWindow(version)}`} events={{ hover: true, focus: true, touch: false }}>
-                                <button
-                                    className="button button-secondary button-compact button-icon"
-                                    type="button"
-                                    data-action-key={`edit-${version.id}`}
-                                    onClick={() => onEditTariff(version, `edit-${version.id}`)}
-                                    aria-label={`${t('common.edit')}: ${dateWindow(version)}`}
-                                >
-                                    <FontAwesomeIcon icon={faPen} fixedWidth />
-                                </button>
-                            </Tooltip>
+                            <IconActionButton
+                                label={t('common.editNamed', { name: dateWindow(version) })}
+                                data-action-key={`edit-${version.id}`}
+                                onClick={() => onEditTariff(version, `edit-${version.id}`)}
+                            >
+                                <FontAwesomeIcon icon={faPen} fixedWidth />
+                            </IconActionButton>
                             <ActionMenu
                                 iconOnly
                                 label={t('pages.tariffs.versions.moreActions')}
@@ -240,6 +236,7 @@ export function TariffDetailPane({
                                 items={[{
                                     key: 'delete',
                                     label: t('pages.tariffs.versions.deleteVersion'),
+                                    iconButtonLabel: `${t('pages.tariffs.versions.deleteVersion')}: ${dateWindow(version)}`,
                                     icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
                                     danger: true,
                                     onClick: () => onDeleteVersion(version, dateWindow(version)),

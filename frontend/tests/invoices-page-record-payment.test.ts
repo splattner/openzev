@@ -134,16 +134,10 @@ describe('recording a payment from the period row menu', () => {
             () => container.textContent?.includes('100.00') && !container.textContent?.includes('75.00'),
             'the settled balance',
         )
-        await act(async () => {
-            container.querySelector<HTMLButtonElement>('tbody tr button[aria-haspopup="menu"]')!.click()
-        })
-        await waitForCondition(
-            () => [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].length > 0,
-            'the reopened menu',
-        )
-        expect(
-            [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].map((node) => node.textContent),
-        ).not.toContain('pages.invoiceDetail.payments.record')
+        const actions = container.querySelector('tbody tr .invoice-row-actions')!
+        expect(actions.querySelector('button[aria-haspopup="menu"]')).toBeNull()
+        expect([...actions.querySelectorAll('button')].map((button) => button.textContent))
+            .toEqual(['pages.invoices.generatePdf'])
     })
 
     it('locks other invoice menus while a dismissed payment is still pending', async () => {

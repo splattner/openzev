@@ -28,7 +28,9 @@ for (const focus of ['trigger', 'item']) {
     await trigger.press('Enter')
     await expect(page.getByRole('menu')).toBeVisible()
     await expect(page.getByRole('menuitem', { name: 'Delete data', exact: true })).toHaveClass(/action-menu-item-danger/)
-    if (focus === 'trigger') await trigger.focus()
+    const escapeTarget = focus === 'trigger' ? trigger : page.getByRole('menuitem', { name: 'Edit', exact: true })
+    await escapeTarget.focus()
+    await expect(escapeTarget).toBeFocused()
     await page.keyboard.press('Escape')
     await expect(page.getByRole('menu')).toHaveCount(0)
     await expect(trigger).toBeFocused()
@@ -36,26 +38,22 @@ for (const focus of ['trigger', 'item']) {
 }
 
 for (const width of [1440, 400]) {
-  test(`metering row controls use the standard square button style at ${width}px`, async ({ page }, testInfo) => {
+  test(`metering row controls are reachable with the keyboard at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 })
     const actions = page.locator('.metering-point-actions').first()
-    const controls = actions.locator('a, button')
-    await expect(controls).toHaveCount(3)
-    const reference = await page.locator('.building-header-actions button').first().evaluate(element => {
-      const style = getComputedStyle(element)
-      return { background: style.backgroundColor, border: style.borderColor }
-    })
-    for (const control of await controls.all()) {
-      await expect(control).toHaveClass(/button-secondary/)
-      await expect(control).toHaveClass(/button-icon/)
-      const appearance = await control.evaluate(element => {
-        const style = getComputedStyle(element)
-        const box = element.getBoundingClientRect()
-        return { background: style.backgroundColor, border: style.borderColor, width: box.width, height: box.height }
-      })
-      expect(appearance).toEqual({ ...reference, width: 32, height: 32 })
-    }
-    await actions.evaluate(element => element.scrollIntoView({ block: 'center' }))
+    const chart = actions.getByRole('link', { name: /Chart/ })
+    const expand = actions.getByRole('button', { name: /details/i })
+    await chart.focus()
+    await expect(page.getByRole('tooltip')).toHaveText((await chart.getAttribute('aria-label'))!)
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('tooltip')).toHaveCount(0)
+    await expect(chart).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(rowMenu(page)).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(expand).toBeFocused()
+    await expect(expand).toBeInViewport()
+    await expect(page.getByRole('tooltip', { name: (await expand.getAttribute('aria-label'))!, exact: true })).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath(`metering-controls-${width}.png`), animations: 'disabled' })
   })
 
@@ -75,7 +73,7 @@ for (const width of [1440, 400]) {
     await buttons.nth(0).focus()
     await page.keyboard.press('Tab')
     await expect(buttons.nth(1)).toBeFocused()
-    await expect(page.getByRole('tooltip')).toHaveText('Remove assignment for Anna Consumer')
+    await expect(page.getByRole('tooltip', { name: 'Remove assignment for Anna Consumer', exact: true })).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath(`assignment-actions-${width}.png`), animations: 'disabled' })
     await buttons.nth(1).click()
     const dialog = page.getByRole('dialog')

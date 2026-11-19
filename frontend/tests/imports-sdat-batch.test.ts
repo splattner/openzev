@@ -356,7 +356,7 @@ describe('ImportsPage SDAT-CH deletion gating', () => {
         const rows = Array.from(container.querySelectorAll('tbody tr'))
         const heldRow = rows.find((row) => row.textContent?.includes('held.xml'))!
         const actions = Array.from(heldRow.querySelectorAll('button')).find(
-            (button) => button.getAttribute('aria-label') === 'pages.imports.actions.rowActions',
+            (button) => button.getAttribute('aria-label')?.startsWith('pages.imports.actions.deleteImport:'),
         )!
         expect(actions).toBeUndefined()
         const protocol = Array.from(heldRow.querySelectorAll('button')).find(
