@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useRef, type ReactNode } from 'react'
-import { Menu } from '@mantine/core'
+import { Menu, Tooltip } from '@mantine/core'
 import { closePopupOnEscape } from '../lib/popupKeyboard'
 
 export interface ActionMenuItem {
@@ -47,22 +47,23 @@ export function ActionMenu({ label, items, icon, iconOnly = false, compact = tru
             middlewares={{ size: true }}
             transitionProps={{ transition: 'pop-top-right' }}
         >
-            <Menu.Target>
-                <button
-                    ref={triggerRef}
-                    type="button"
-                    className={`button button-secondary${compact ? ' button-compact' : ''}`}
-                    disabled={availableItems.length === 0}
-                    aria-haspopup="menu"
-                    data-action-key={actionKey}
-                    onKeyDown={closePopupOnEscape}
-                    aria-label={iconOnly ? label : undefined}
-                    title={iconOnly ? label : undefined}
-                >
-                    {icon ? <span className="menu-item-icon" aria-hidden="true">{icon}</span> : null}
-                    {iconOnly ? null : label}
-                </button>
-            </Menu.Target>
+            <Tooltip label={label} disabled={!iconOnly} events={{ hover: true, focus: true, touch: false }}>
+                <Menu.Target>
+                    <button
+                        ref={triggerRef}
+                        type="button"
+                        className={`button button-secondary${compact ? ' button-compact' : ''}${iconOnly ? ' button-icon' : ''}`}
+                        disabled={availableItems.length === 0}
+                        aria-haspopup="menu"
+                        data-action-key={actionKey}
+                        onKeyDownCapture={closePopupOnEscape}
+                        aria-label={iconOnly ? label : undefined}
+                    >
+                        {icon ? <span className="menu-item-icon" aria-hidden="true">{icon}</span> : null}
+                        {iconOnly ? null : label}
+                    </button>
+                </Menu.Target>
+            </Tooltip>
             <Menu.Dropdown className="action-menu-dropdown">
                 {renderedItems.map(({ item, showSection, showDivider }) => (
                     <Fragment key={item.key}>

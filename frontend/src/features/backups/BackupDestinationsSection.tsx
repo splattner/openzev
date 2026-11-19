@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Switch } from '@mantine/core'
+import { Switch, Tooltip } from '@mantine/core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faPen, faPlug, faPlus, faTrash, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
@@ -42,6 +42,16 @@ function DestinationActionsCell({ row }: CellContext<BackupDestination, unknown>
     const destination = row.original
     return (
         <div className="actions-cell-content">
+            <Tooltip label={`${t('common.edit')}: ${destination.name}`} events={{ hover: true, focus: true, touch: false }}>
+                <button
+                    type="button"
+                    className="button button-secondary button-compact button-icon"
+                    onClick={() => actions.edit(destination)}
+                    aria-label={`${t('common.edit')}: ${destination.name}`}
+                >
+                    <FontAwesomeIcon icon={faPen} fixedWidth />
+                </button>
+            </Tooltip>
             <button
                 type="button"
                 className="button button-secondary button-compact"
@@ -51,23 +61,17 @@ function DestinationActionsCell({ row }: CellContext<BackupDestination, unknown>
                 <FontAwesomeIcon icon={faPlug} fixedWidth />
                 {t('pages.backups.destinations.test')}
             </button>
-            <button
-                type="button"
-                className="button button-secondary button-compact"
-                onClick={() => actions.edit(destination)}
-            >
-                <FontAwesomeIcon icon={faPen} fixedWidth />
-                {t('common.edit')}
-            </button>
-            <button
-                type="button"
-                className="button button-danger button-compact"
-                disabled={actions.deleting}
-                onClick={() => actions.delete(destination)}
-            >
-                <FontAwesomeIcon icon={faTrash} fixedWidth />
-                {t('common.delete')}
-            </button>
+            <Tooltip label={`${t('common.delete')}: ${destination.name}`} events={{ hover: true, focus: true, touch: false }}>
+                <button
+                    type="button"
+                    className="button button-danger button-compact button-icon"
+                    disabled={actions.deleting}
+                    onClick={() => actions.delete(destination)}
+                    aria-label={`${t('common.delete')}: ${destination.name}`}
+                >
+                    <FontAwesomeIcon icon={faTrash} fixedWidth />
+                </button>
+            </Tooltip>
         </div>
     )
 }

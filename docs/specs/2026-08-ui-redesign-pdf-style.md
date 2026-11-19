@@ -1162,6 +1162,8 @@ contracts are unchanged.
   `--brand`.
   Secondary, outline, ghost and row-level buttons replace the background and
   draw no shadow of their own except the secondary's `--shadow-sheet`.
+- Delete/Remove icons use `--danger-700` before hover as well as on hover;
+  tariff bands and wizard removal have no neutral-color exception.
 - Row actions: see §7.4. `.button-secondary.button-destructive` and compact
   danger buttons are the quiet destructive style (imports' "Delete imports",
   admin invoice/ZEV rows); confirm dialogs keep the solid red.
@@ -1214,9 +1216,9 @@ contracts are unchanged.
   details remain in the expanded row.
   - **Building sheet** (`.metering-sheet` + `.building-group`; one per building, for one
     building as for several): a plain header on the sheet with a hairline below it
-    (`BuildingHeader`): name, address, EGID, landowners and the meter count, "Add metering point"
-    and a visible "Edit building" button
-    (an `ActionMenu` offers "Delete building" while the building is empty); the last two for managers only.
+    (`BuildingHeader`): name, address, EGID, landowners and the meter count.
+    Managers see the named edit pencil first, then "Add metering point" and an
+    icon-only `ActionMenu` offering "Delete building" while the building is empty.
     The header is not a toggle: buildings do not fold. A role that has no buildings loaded
     (participants), or a community whose buildings have not arrived yet, gets one plain sheet
     of rows without a header.
@@ -1232,8 +1234,8 @@ contracts are unchanged.
     sheets, `MeteringPointTypeLegend`, pairs each icon with its name for the types
     on the page, `pages.meteringPoints.typeLegend` labelling the list), the holder (name, "+N" for further current
     holders, "since", Community badge, "N earlier"; an upcoming-only holder
-    shows its Upcoming badge), the last reading's date ("Never") and a quiet
-    action cluster: Chart link, `⋯` menu (Assign participant, Edit, Delete data,
+    shows its Upcoming badge), the last reading's date ("Never") and a compact
+    action cluster of standard outlined square secondary controls: Chart link, `⋯` menu (Assign participant, Edit, Delete data,
     Delete) and the expand button. A
     meter with no holder today that is active shows the one primary
     action inline in the holder column: **Assign participant**
@@ -1257,7 +1259,7 @@ contracts are unchanged.
   - **Details** (`.metering-point-detail`, two `.metering-detail-card`s, the
     assignments twice as wide as the measurement; the Measurement card alone for a
     role that has no assignment data): Assignments (every assignment, current
-    first, with state badge, dates, Edit and a direct Remove button with confirmation, and "Add
+    first, with state badge, dates, icon-only Edit and Remove controls (Edit first, participant-specific names and focus/hover tooltips; removal confirms), and "Add
     assignment") and Measurement (last and first reading, reading count, data
     quality link with the health badge, and the supplementary source chip unless
     it already sits on the row). The building, the location, the type and

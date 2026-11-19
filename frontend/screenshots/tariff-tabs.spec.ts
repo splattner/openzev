@@ -85,7 +85,8 @@ test('keyboard switches retain filters and hash without replaying focus after re
 test('keyboard draft guard keeps edits on cancel and discards them on a real switch', async ({ page }) => {
   await page.goto('/tariffs')
   await page.getByRole('button', { name: 'Tariff 42', exact: true }).click()
-  await page.locator('.detail-pane').getByRole('button', { name: 'Edit', exact: true }).click()
+  const edit = page.locator('.detail-pane').getByRole('button', { name: /^Edit: / })
+  await edit.click()
   const notes = page.locator('.tariff-pane-form textarea')
   await notes.fill('Unsaved draft')
   const components = page.getByRole('tab', { name: 'Tariff components' })
@@ -105,7 +106,7 @@ test('keyboard draft guard keeps edits on cancel and discards them on a real swi
   await expect(progression).toBeFocused()
   await page.keyboard.press('ArrowLeft')
   await expect(components).toBeFocused()
-  await page.locator('.detail-pane').getByRole('button', { name: 'Edit', exact: true }).click()
+  await edit.click()
   await expect(notes).toHaveValue('')
 })
 

@@ -222,6 +222,9 @@ test.describe('User Guide Screenshots', () => {
   test('04-metering-points', async ({ page }) => {
     await navigateTo(page, '/metering-points')
     await page.waitForSelector('table, .card', { timeout: 10_000 })
+    const point = page.locator('.metering-point-card').filter({ hasText: 'CH-DEMO-CONS-0001' }).first()
+    await point.locator('.metering-point-expand').click()
+    await expect(page.locator('.metering-assignment-actions .button-icon').first()).toHaveAccessibleName(/Anna Consumer/)
     await screenshotFull(page, '04-metering-points')
   })
 

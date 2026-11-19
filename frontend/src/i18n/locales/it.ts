@@ -3187,7 +3187,6 @@ export const it = {
                 allocationModeCommunity: 'Comunitaria',
                 allocationModeHint: "Con l'allocazione comunitaria, l'energia e le tariffe di questo contatore vengono ripartite tra tutti i partecipanti in base al loro peso di allocazione, invece di essere addebitate solo al partecipante assegnato.",
             },
-            removeAssignment: 'Rimuovi',
             deleteTitle: 'Elimina punto di misura',
             deleteMessage: "Eliminare il punto di misura \"{{meterId}}\" e le sue {{assignmentCount}} assegnazioni? Rimuovere prima le misure e le fonti di energia collegate.",
             deleteConfirm: 'Elimina punto di misura',

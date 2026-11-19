@@ -153,12 +153,11 @@ export function InvoiceActionButton({ action, compact = true, variant = 'primary
 }
 
 /** Eligibility and read-only restrictions remain with the caller. */
-export function InvoiceRowActions({ primary, menuItems = [], children, variant, iconOnlyMenu = false }: {
+export function InvoiceRowActions({ primary, menuItems = [], children, variant }: {
     primary?: InvoiceButtonAction | null
     menuItems?: ActionMenuItem[]
     children?: ReactNode
     variant?: InvoiceButtonVariant
-    iconOnlyMenu?: boolean
 }) {
     const { t } = useTranslation()
     return (
@@ -168,7 +167,7 @@ export function InvoiceRowActions({ primary, menuItems = [], children, variant, 
             {menuItems.length > 0 && (
                 <ActionMenu
                     label={t('pages.invoices.moreActions')}
-                    iconOnly={iconOnlyMenu}
+                    iconOnly
                     icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
                     items={menuItems}
                 />

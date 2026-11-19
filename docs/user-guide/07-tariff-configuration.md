@@ -737,7 +737,8 @@ own card, the one in force first:
 
 - The card opens with its status — **Current** or **Upcoming** — and its
   validity window, so you can't mistake a future version for the current rate,
-  and has its own **Edit** button. Below come the dynamic source if there is
+  and has its own pencil button (**Edit**). Hover or focus it to see the action
+  and validity window. Below come the dynamic source if there is
   one, or the price bands with a pencil on each and **Add Period** under them.
   The notes appear on a card only when they differ from the ones the list row
   already shows.

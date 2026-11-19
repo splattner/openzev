@@ -1,3 +1,4 @@
+import { Tooltip } from '@mantine/core'
 import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -197,37 +198,41 @@ export function VatSettingsSection() {
                                             <td>{rate.valid_to ? formatShortDate(rate.valid_to, settings) : t('adminVatSettings.table.openEnded')}</td>
                                             <td className="actions-cell">
                                                 <div className="actions-cell-content">
-                                                    <button
-                                                        className="button button-secondary button-compact"
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setEditingId(rate.id)
-                                                            setForm({
-                                                                rate_percent: (Number(rate.rate) * 100).toFixed(4).replace(/\.?0+$/, ''),
-                                                                valid_from: rate.valid_from,
-                                                                valid_to: rate.valid_to ?? null,
-                                                            })
-                                                        }}
-                                                    >
-                                                        <FontAwesomeIcon icon={faPen} fixedWidth />
-                                                        {t('common.edit')}
-                                                    </button>
-                                                    <button
-                                                        className="button button-danger button-compact"
-                                                        type="button"
-                                                        disabled={deleteMutation.isPending || dialogLoading}
-                                                        onClick={() => confirm({
-                                                            title: t('adminVatSettings.deleteTitle'),
-                                                            message: t('adminVatSettings.deleteMessage', { rate: (Number(rate.rate) * 100).toFixed(2) }),
-                                                            confirmText: t('common.delete'),
-                                                            cancelText: t('common.cancel'),
-                                                            isDangerous: true,
-                                                            onConfirm: () => deleteMutation.mutate(rate.id),
-                                                        })}
-                                                    >
-                                                        <FontAwesomeIcon icon={faTrash} fixedWidth />
-                                                        {t('common.delete')}
-                                                    </button>
+                                                    <Tooltip label={`${t('common.edit')}: ${(Number(rate.rate) * 100).toFixed(2)}% · ${formatShortDate(rate.valid_from, settings)}`} events={{ hover: true, focus: true, touch: false }}>
+                                                        <button
+                                                            className="button button-secondary button-compact button-icon"
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setEditingId(rate.id)
+                                                                setForm({
+                                                                    rate_percent: (Number(rate.rate) * 100).toFixed(4).replace(/\.?0+$/, ''),
+                                                                    valid_from: rate.valid_from,
+                                                                    valid_to: rate.valid_to ?? null,
+                                                                })
+                                                            }}
+                                                            aria-label={`${t('common.edit')}: ${(Number(rate.rate) * 100).toFixed(2)}% · ${formatShortDate(rate.valid_from, settings)}`}
+                                                        >
+                                                            <FontAwesomeIcon icon={faPen} fixedWidth />
+                                                        </button>
+                                                    </Tooltip>
+                                                    <Tooltip label={`${t('common.delete')}: ${(Number(rate.rate) * 100).toFixed(2)}% · ${formatShortDate(rate.valid_from, settings)}`} events={{ hover: true, focus: true, touch: false }}>
+                                                        <button
+                                                            className="button button-danger button-compact button-icon"
+                                                            type="button"
+                                                            disabled={deleteMutation.isPending || dialogLoading}
+                                                            onClick={() => confirm({
+                                                                title: t('adminVatSettings.deleteTitle'),
+                                                                message: t('adminVatSettings.deleteMessage', { rate: (Number(rate.rate) * 100).toFixed(2) }),
+                                                                confirmText: t('common.delete'),
+                                                                cancelText: t('common.cancel'),
+                                                                isDangerous: true,
+                                                                onConfirm: () => deleteMutation.mutate(rate.id),
+                                                            })}
+                                                            aria-label={`${t('common.delete')}: ${(Number(rate.rate) * 100).toFixed(2)}% · ${formatShortDate(rate.valid_from, settings)}`}
+                                                        >
+                                                            <FontAwesomeIcon icon={faTrash} fixedWidth />
+                                                        </button>
+                                                    </Tooltip>
                                                 </div>
                                             </td>
                                         </tr>

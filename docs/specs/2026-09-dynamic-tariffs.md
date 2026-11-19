@@ -795,7 +795,8 @@ positive coverage and maintenance-link permissions.
 - **`AdminDynamicSourcesPanel`** — routed as `/admin/dynamic-sources` in the
   Admin Overview hub. It displays global source/point/reuse/failure KPIs and a
   `DataTable` with current fetch state, last error/time and reuse counts. Its
-  `ActionMenu` opens history or source-filtered audit activity, queues refresh
+  icon-only ellipsis `ActionMenu` (named with the source label, with a hover/focus
+  tooltip) opens history or source-filtered audit activity, queues refresh
   or supported backfill, re-checks discovered capabilities (§10.3's
   `recheck`, for correcting a wrongly-negative `supports_backfill`), edits
   configuration (including enabling/disabling scheduled refreshes), and opens

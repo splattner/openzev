@@ -22,6 +22,12 @@ Each Overview tab describes its platform-wide scope. The invoice-status
 summary links to **All invoices**, and email statistics links to **System
 health**. Your selected community is preserved when you open these views.
 
+In the ZEV, account, OAuth-provider and VAT-rate lists, the pencil is **Edit**
+and the bin is **Delete** where deletion is offered. Hover or focus a button
+to see its action and the item it targets. Actions such as **Manage** and
+**Disable** keep their text labels. Edit is first in the row; the **⋯** button
+opens the remaining actions without a separate visible "More" label.
+
 ## ZEV Management
 
 Admins can view and manage all ZEVs in the system.

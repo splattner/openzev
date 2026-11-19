@@ -1,7 +1,7 @@
 import { SortableHeader, useTableSorting } from '../components/tableSorting'
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Skeleton, Switch } from '@mantine/core'
+import { Skeleton, Switch, Tooltip } from '@mantine/core'
 import { AppTabs } from '../components/AppTabs'
 import { useReducedMotion } from '@mantine/hooks'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -468,23 +468,27 @@ export function AdminSystemSettingsPage() {
                                         </td>
                                         <td className="actions-cell">
                                             <div className="actions-cell-content">
-                                                <button
-                                                    type="button"
-                                                    className="button button-primary button-compact"
-                                                    onClick={() => openEditOAuthForm(provider)}
-                                                >
-                                                    <FontAwesomeIcon icon={faPen} fixedWidth />
-                                                    {t('common.edit')}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="button button-danger button-compact"
-                                                    onClick={() => confirmDeleteOAuthProvider(provider)}
-                                                    disabled={deleteOAuthMutation.isPending || dialogLoading}
-                                                >
-                                                    <FontAwesomeIcon icon={faTrash} fixedWidth />
-                                                    {t('common.delete')}
-                                                </button>
+                                                <Tooltip label={`${t('common.edit')}: ${provider.display_name}`} events={{ hover: true, focus: true, touch: false }}>
+                                                    <button
+                                                        type="button"
+                                                        className="button button-secondary button-compact button-icon"
+                                                        onClick={() => openEditOAuthForm(provider)}
+                                                        aria-label={`${t('common.edit')}: ${provider.display_name}`}
+                                                    >
+                                                        <FontAwesomeIcon icon={faPen} fixedWidth />
+                                                    </button>
+                                                </Tooltip>
+                                                <Tooltip label={`${t('common.delete')}: ${provider.display_name}`} events={{ hover: true, focus: true, touch: false }}>
+                                                    <button
+                                                        type="button"
+                                                        className="button button-danger button-compact button-icon"
+                                                        onClick={() => confirmDeleteOAuthProvider(provider)}
+                                                        disabled={deleteOAuthMutation.isPending || dialogLoading}
+                                                        aria-label={`${t('common.delete')}: ${provider.display_name}`}
+                                                    >
+                                                        <FontAwesomeIcon icon={faTrash} fixedWidth />
+                                                    </button>
+                                                </Tooltip>
                                             </div>
                                         </td>
                                     </tr>

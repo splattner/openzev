@@ -123,8 +123,10 @@ describe('billing email history request ownership', () => {
         const old = deferred(), latest = deferred()
         vi.mocked(fetchEmailLogs).mockReturnValueOnce(old.promise).mockReturnValueOnce(latest.promise)
         act(() => historyButtons()[1].click())
-        act(() => Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
-            .find(button => button.textContent?.trim() === 'common.close')!.click())
+        const close = container.querySelector<HTMLButtonElement>('.email-logs-footer button')!
+        expect(close.textContent).toBe('common.close')
+        act(() => close.click())
+        expect(container.querySelector('[role="dialog"]')).toBeNull()
         expect(historyButtons().every(button => !button.disabled)).toBe(true)
         act(() => historyButtons()[0].click())
         await act(async () => { latest.resolve([]); await latest.promise })

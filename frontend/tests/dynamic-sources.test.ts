@@ -112,6 +112,11 @@ it('sorts source reuse by total links and keeps equal totals tied', async () => 
     const button = Array.from(container.querySelectorAll<HTMLButtonElement>('th button'))
       .find(button => button.textContent?.startsWith('pages.dynamicSources.columns.reuse'))!
     const labels = () => Array.from(container.querySelectorAll('tbody tr')).map(row => row.querySelector('strong')?.textContent)
+    const menus = Array.from(container.querySelectorAll('tbody button[aria-haspopup="menu"]'))
+    expect(menus.map(menu => menu.textContent)).toEqual(['', '', ''])
+    expect(menus.map(menu => menu.getAttribute('aria-label'))).toEqual(expect.arrayContaining([
+      'common.actions: Both', 'common.actions: Tariffs', 'common.actions: Communities',
+    ]))
     await act(async () => button.click())
     expect(labels()).toEqual(['Both', 'Tariffs', 'Communities'])
     await act(async () => button.click())

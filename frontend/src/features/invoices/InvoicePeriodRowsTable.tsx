@@ -140,7 +140,7 @@ export function InvoicePeriodRowsTable({
                     {live ? <InvoiceTotal invoice={live} currency={false} /> : <InvoiceAmount value={null} currency={false} />}
                   </td>
                   <td role="cell" className="invoice-actions-cell">
-                    <InvoiceRowActions primary={getPrimaryRowAction(row)} menuItems={getRowMenuItems(row)} variant="secondary" iconOnlyMenu />
+                    <InvoiceRowActions primary={getPrimaryRowAction(row)} menuItems={getRowMenuItems(row)} variant="secondary" />
                   </td>
                 </tr>
               )

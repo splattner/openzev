@@ -5,7 +5,8 @@
 .actions-cell-content {
   display: flex;
   gap: 0.375rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  white-space: nowrap;
   justify-content: flex-end;
   align-items: center;
   min-height: 100%;

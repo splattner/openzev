@@ -95,7 +95,7 @@ defined by shared frontend primitives and CSS contracts.
 
 | File | Export | Contract |
 |---|---|---|
-| `frontend/src/components/ActionMenu.tsx` | `ActionMenu` | Overflow action trigger for lower-priority row/card actions. Uses labelled menu items, optional icons, section headers, and danger styling. Default button class: `button button-secondary button-compact`. Choosing an item moves focus to the trigger before the item runs, so a dialog it opens returns focus to the trigger when it closes. The dropdown is capped to the room on screen (Mantine's `size` middleware) and scrolls, so a long menu stays reachable on a short viewport. Passing an icon retains visible text by default; `iconOnly` explicitly opts in to an accessible icon-only trigger. |
+| `frontend/src/components/ActionMenu.tsx` | `ActionMenu` | Overflow action trigger for lower-priority row/card actions. Uses labelled menu items, optional icons, section headers, and danger styling. Default button class: `button button-secondary button-compact`. Choosing an item moves focus to the trigger before the item runs, so a dialog it opens returns focus to the trigger when it closes. The dropdown is capped to the room on screen (Mantine's `size` middleware) and scrolls, so a long menu stays reachable on a short viewport. Passing an icon retains visible text by default; `iconOnly` explicitly opts in to a square accessible icon-only trigger with a tooltip on hover and keyboard focus. Ellipsis overflow triggers use this mode; named task menus such as the tariff overview PDF retain text. |
 | `frontend/src/components/ConfirmDialog.tsx` | `useConfirmDialog`, `ConfirmDialog` | Required wrapper for destructive or high-impact actions. Supports `title`, `message`, `isDangerous`, `confirmDisabled`, optional children, and async confirm handlers. `confirmText` and `cancelText` default to `common.confirm` / `common.cancel`. Uses the [dialog behavior](#dialog-behavior) below. |
 | `frontend/src/components/FormModal.tsx` | `FormModal`, `useFormModalGuard` | Generic modal shell for CRUD forms and small workflow dialogs. Props: `isOpen`, `title`, `children`, `onClose`, optional `size` (`xs` 480px, `sm` 600px (default), `md` 760px, `lg` 960px, `xl` 1080px, as `.form-modal-<size>` max widths under the 90% responsive bound), `dirty` (explicit unsaved-input override), and `returnFocusRef` (`RefObject<HTMLElement \| null>`). Uses the shared [dialog behavior](#dialog-behavior). **Dirty guard:** X, Escape, scrim click, `FormModalFooter`/`FormModalCancelButton` Cancel and in-app navigation (a router blocker, only under a data router) ask **Discard changes?** (`ConfirmDialog`, `common.unsavedChanges.*`) when the form holds unsaved input, and close at once otherwise; `beforeunload` raises the browser's own prompt. Unsaved input is read from the dialog's own controls by `useUnsavedInput` (`input`, `select`, `textarea`, including Mantine's hidden inputs): the controls are snapshotted at the first key or pointer press inside the dialog and compared when asked, so prefilled and late-loaded forms are clean until touched and an undone change is clean again. A dialog without controls never asks. `dirty` overrides the reading: `false` for a finished step (`ZevListPage` wizard step 5, `ZevImportModal` result), `true` for a draft outside the controls. A save's own `onClose` bypasses the guard, which wraps only user dismissals. A Cancel written by hand inside a dialog uses `FormModalCancelButton` (or `useFormModalGuard()` from a component rendered inside the dialog); outside a `FormModal` both run the action unguarded. The shared logic is `useDraftConfirm`/`useRouterDraftBlock`/`useDraftGuard` in `components/useDraftGuard.ts`, also used by the tariff pane. |
 | `frontend/src/components/FormModalFooter.tsx` | `FormModalFooter`, `FormModalCancelButton` | Cancel (`button-secondary`, `type="button"`) then the primary submit (`formId` when the footer sits outside its form); `compact`, icons and labels optional. Cancel goes through the surrounding `FormModal`'s dirty guard; in the tariff pane the page's own guard wraps `onCancel`. |
@@ -356,7 +356,18 @@ scroll the table instead of squeezing its dates into tall rows.
   decorative icons to headings or ordinary prose. Sidebar navigation is outside
   this restriction.
 - Use `fixedWidth` on action icons to align labels vertically.
+- The compact Edit controls for backup destinations, buildings, assignments, VAT rates,
+  tariff versions, accounts, OAuth providers and ZEVs, and Delete for backup
+  destinations, assignment removal and VAT/OAuth rows, use `.button-icon` with record-specific
+  accessible names. They and the wizard's numbered meter-removal buttons use
+  Mantine `Tooltip` with hover and focus enabled. Email history retains a
+  labelled footer Close; task-specific actions such as Test, Manage and Add
+  metering point retain visible text. Ellipsis overflow controls are icon-only,
+  while the menu items retain their labels.
 - Do not embed symbols such as `+` in translated button labels when the button already renders an icon.
+- Enabled Delete/Remove controls use the shared danger color in both rows and
+  menus, including tariff bands, wizard removal, backup files and payments.
+  Disabled controls retain their disabled treatment.
 - Destructive actions use the trash icon; edit uses pen; create/add uses plus; import/export use upload/download; cancel/close uses x-mark; approval/save uses check when a stronger visual cue is useful.
 
 ## 5. API contracts
@@ -566,7 +577,7 @@ artifacts, not visual regression assertions or proof of internal drawer clipping
 
 ### 7.3 Action hierarchy
 
-Each record or page should expose actions in priority order:
+Each record or page should distinguish actions by priority:
 
 | Level | Placement | Typical usage |
 |---|---|---|
@@ -577,6 +588,10 @@ Each record or page should expose actions in priority order:
 
 Rules:
 
+- Within a horizontal record row or header action group, place Edit first
+  (leftmost, including keyboard/DOM order), then the other visible actions,
+  with an overflow menu last. Icon-only Edit uses the neutral secondary style.
+  Table action groups stay on one line; narrow tables scroll horizontally.
 - Avoid rendering many equal-weight buttons in every row.
 - Destructive actions must use `ConfirmDialog`.
 - If a record only has one frequent action and one destructive action, both may remain visible as compact buttons.
@@ -670,7 +685,8 @@ These pages define the current management-page reference set.
 ### 7.7 Responsive rules
 
 - Summary stats must wrap rather than overflow.
-- Card headers and row action groups must wrap on narrow screens.
+- Card headers wrap on narrow screens; table action groups stay together within
+  the horizontally scrolling table.
 - Multi-column detail grids must collapse cleanly to a single column where necessary.
 - Apply the same icon-label rule on mobile as on desktop (UI patterns §10.3
   rule 5): obvious icons need no visible label; ambiguous actions keep theirs.
@@ -744,7 +760,8 @@ These pages define the current management-page reference set.
   - top-level create/import/export actions use icon + label buttons
   - destructive actions require confirmation
   - translated labels do not render duplicated `+` signs or icon text artifacts
-  - mobile-width layouts wrap action groups and summary stats without overflow
+  - mobile-width layouts keep table action groups on one line within horizontal
+    table scrolling; card actions and summary stats wrap without overflow
 
 ### Acceptance criteria
 

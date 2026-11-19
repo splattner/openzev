@@ -68,7 +68,7 @@ async function render(page: typeof ZevListPage | typeof AdminDynamicSourcesPanel
 }
 async function click(text: string) {
     const find = () => Array.from(document.querySelectorAll<HTMLElement>('button, [role=menuitem]'))
-        .find(element => element.textContent?.trim() === text)
+        .find(element => (element.getAttribute('aria-label') ?? element.textContent)?.trim() === text)
     await waitForCondition(() => !!find(), text)
     const button = find()
     expect(button).toBeDefined()
@@ -88,7 +88,7 @@ describe('typed confirmation dispatch', () => {
             await render(action === 'purge' ? ZevListPage : AdminDynamicSourcesPanel)
             if (action === 'purge') await click('pages.zevs.purge')
             else {
-                await click('common.actions')
+                await click(`common.actions: ${source.label}`)
                 await click(action === 'clear' ? 'pages.dynamicSources.clearAction' : 'pages.dynamicSources.deleteAction')
             }
             const expected = action === 'purge' ? zev.name : source.label
@@ -113,7 +113,7 @@ it('shows the translated coded source error without exposing response metadata',
         }],
     } } })
     await render(AdminDynamicSourcesPanel)
-    await click('common.actions')
+    await click(`common.actions: ${source.label}`)
     await click('pages.dynamicSources.clearAction')
     fill(source.label)
     await act(async () => { await submitted.handleConfirm!() })

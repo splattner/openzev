@@ -388,12 +388,3 @@
   flex-wrap: wrap;
   gap: 0.5rem;
 }
-
-/* A band's delete: the same outlined icon as its pen until it is pointed at, then danger. */
-.tariff-period-actions .button-danger {
-  color: var(--text-muted);
-}
-
-.tariff-period-actions .button-danger:is(:hover, :focus-visible):not(:disabled) {
-  color: var(--danger-700);
-}

@@ -6,7 +6,7 @@ import { MantineProvider } from '@mantine/core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('react-i18next', () => ({
-    useTranslation: () => ({ t: (key: string, options?: Record<string, unknown>) => (key.endsWith('removeAssignMessage') || key.endsWith('issueFor') ? `${key}:${JSON.stringify(options)}` : options?.count === undefined ? key : `${key}:${options.count}`), i18n: { language: 'en' } }),
+    useTranslation: () => ({ t: (key: string, options?: Record<string, unknown>) => (key.endsWith('removeAssignMessage') || key.endsWith('issueFor') ? `${key}:${JSON.stringify(options)}` : options?.name ? `${key}:${options.name}` : options?.count === undefined ? key : `${key}:${options.count}`), i18n: { language: 'en' } }),
 }))
 vi.mock('../src/lib/appSettings', () => ({
     formatShortDate: (value: string) => value,
@@ -202,17 +202,24 @@ describe('MeteringPointsList', () => {
         expect(table.querySelector('.metering-point-detail')!.getAttribute('colspan')).toBe('4')
     })
 
-    it('keeps IDs and holders as text and offers a labelled building-edit button with a pencil', () => {
+    it('keeps IDs and holders as text and places the named building-edit icon before Add', () => {
         const editBuilding = vi.fn()
+        const addPoint = vi.fn()
         const view = render({ points,
-            renderGroupHeader: (group) => createElement(BuildingHeader, { building: group.building, landowners: [], canManage: true, onEdit: editBuilding }),
+            renderGroupHeader: (group) => createElement(BuildingHeader, { building: group.building, landowners: [], canManage: true, onEdit: editBuilding, onAddMeteringPoint: addPoint }),
         })
         expect(view.querySelector('.metering-point-id-main button')).toBeNull()
         expect(view.querySelector('.metering-holder-name button')).toBeNull()
         const edit = view.querySelector<HTMLButtonElement>('.building-header-actions button')!
         expect(edit.querySelector('svg[data-icon="pen"]')).not.toBeNull()
+        expect(edit.textContent).toBe('')
+        expect(edit.getAttribute('aria-label')).toBe('pages.meteringPoints.buildings.edit: Haus A')
         act(() => edit.click())
         expect(editBuilding).toHaveBeenCalledWith(expect.objectContaining({ id: 'b1' }))
+        const add = view.querySelectorAll<HTMLButtonElement>('.building-header-actions button')[1]
+        expect(add.textContent).toBe('pages.meteringPoints.buildings.addMeteringPoint')
+        act(() => add.click())
+        expect(addPoint).toHaveBeenCalledWith(expect.objectContaining({ id: 'b1' }))
         expect(view.querySelector('.metering-point-detail')).toBeNull()
     })
 
@@ -293,6 +300,14 @@ describe('MeteringPointsList', () => {
         expect(detail.querySelector('[aria-haspopup="menu"]')).toBeNull()
         const removeButtons = detail.querySelectorAll<HTMLButtonElement>('.metering-assignment-actions .button-danger')
         expect(removeButtons).toHaveLength(2)
+        expect(Array.from(removeButtons, button => button.textContent)).toEqual(['', ''])
+        expect(Array.from(removeButtons, button => button.getAttribute('aria-label'))).toEqual([
+            'pages.meteringPoints.removeAssignmentFor:Anna Consumer',
+            'pages.meteringPoints.removeAssignmentFor:Ben Consumer',
+        ])
+        expect(Array.from(detail.querySelectorAll('.metering-assignment-actions'), group =>
+            Array.from(group.querySelectorAll('button svg'), icon => icon.getAttribute('data-icon')),
+        )).toEqual([['pen', 'trash'], ['pen', 'trash']])
         act(() => removeButtons[1].click())
         expect(remove).not.toHaveBeenCalled()
         expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ isDangerous: true }))

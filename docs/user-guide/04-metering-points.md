@@ -81,8 +81,8 @@ are, and both are recorded. Buildings are managed on this page.
 - The metering points are **grouped by building**, ordered by name, each
   building in a card of its own, whether the community has one building or
   several. The header shows the address, EGID, landowners and number of
-  metering points. **Add metering point** (that building preselected) is in the header, and
-  **Edit building** next to it. A building without metering points shows
+  metering points. The header starts with the **Edit building** pencil, followed
+  by **Add metering point** (that building preselected). A building without metering points shows
   "No metering points in this building yet". Search and the other filters apply
   within the groups; the **Building** filter shows one group.
 - A building can be deleted only once it is empty: move or delete its meters
@@ -313,7 +313,8 @@ Each meter on the **Metering Points** page is one row that shows, at a glance
   assignment's validity window.
 - The **last reading** date, or "Never"
 
-**Chart** (the chart icon) opens the metering point's full reading history, and
+**Chart**, **⋯ More** and the expand arrow use outlined buttons. **Chart** opens
+the metering point's full reading history, and
 **⋯ More** has **Assign participant**, **Edit**, **Delete data** (admins) and
 **Delete**. With exactly one current assignment, the menu also offers editing or removing
 that assignment. Point IDs and participant names are selectable text.
@@ -323,7 +324,8 @@ Click a row, or the arrow at its end, to open its details in place:
 
 - **Assignments** — every assignment, current first, with its validity window
   and its state (*Upcoming* or *Ended* for the others). Use **Add assignment**,
-  **Edit** and **Remove** here. Removal confirms the participant, point and dates,
+  the pencil (**Edit**, first) and bin (**Remove**) buttons here. Hover or focus
+  either button to see its action and participant name. Removal confirms the participant, point and dates,
   then deletes the record. When a tenant moves out, use **Edit** to set an end date
   and retain the assignment history.
 - **Measurement** — last and first reading, how many readings there are, and the

@@ -3187,7 +3187,6 @@ export const fr = {
                 allocationModeCommunity: 'Communautaire',
                 allocationModeHint: "En mode communautaire, l'énergie et les frais de ce compteur sont répartis entre tous les participants selon leur pondération d'attribution, au lieu d'être facturés uniquement au participant assigné.",
             },
-            removeAssignment: 'Supprimer',
             deleteTitle: 'Supprimer le point de mesure',
             deleteMessage: "Supprimer le point de mesure \"{{meterId}}\" et ses {{assignmentCount}} affectations ? Supprimez d’abord les mesures et les sources d’énergie connectées.",
             deleteConfirm: 'Supprimer le point de mesure',

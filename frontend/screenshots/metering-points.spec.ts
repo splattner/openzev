@@ -45,7 +45,7 @@ for (const width of [1440, 400]) {
     await row.locator('.metering-point-expand').click()
     const assignmentPeriod = await table.locator('.metering-assignment-main > .muted').first().innerText()
     const [assignmentFrom, assignmentTo] = assignmentPeriod.split(' – ')
-    const assignmentEdit = table.locator('.metering-assignment-row').first().getByRole('button', { name: 'Bearbeiten', exact: true })
+    const assignmentEdit = table.locator('.metering-assignment-row').first().getByRole('button', { name: `Bearbeiten: ${participantName}`, exact: true })
     await assignmentEdit.focus()
     await assignmentEdit.press('Enter')
     await expect(page.getByRole('dialog').getByRole('combobox', { name: 'Teilnehmer *', exact: true }).locator('option:checked')).toHaveText(participantName)
@@ -57,8 +57,8 @@ for (const width of [1440, 400]) {
     await row.locator('.metering-point-expand').click()
 
     const building = table.locator('..').locator('.building-header')
-    const buildingEdit = building.getByRole('button', { name: 'Gebäude bearbeiten', exact: true })
     const buildingName = await building.getByRole('heading').innerText()
+    const buildingEdit = building.getByRole('button', { name: `Gebäude bearbeiten: ${buildingName}`, exact: true })
     await buildingEdit.focus()
     await buildingEdit.press('Enter')
     await expect(page.getByRole('dialog').getByRole('textbox', { name: /^Name/ })).toHaveValue(buildingName)

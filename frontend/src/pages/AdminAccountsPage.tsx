@@ -1,3 +1,4 @@
+import { Tooltip } from '@mantine/core'
 import { SortableHeader, useTableSorting } from '../components/tableSorting'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -470,17 +471,20 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                                         </td>
                                         <td className="actions-cell">
                                             <div className="actions-cell-content">
-                                                <button
-                                                    className="button button-primary button-compact"
-                                                    type="button"
-                                                    onClick={() => openEditUserModal(account)}
-                                                >
-                                                    <FontAwesomeIcon icon={faPen} fixedWidth />
-                                                    {t('common.edit')}
-                                                </button>
+                                                <Tooltip label={`${t('common.edit')}: ${account.username}`} events={{ hover: true, focus: true, touch: false }}>
+                                                    <button
+                                                        className="button button-secondary button-compact button-icon"
+                                                        type="button"
+                                                        onClick={() => openEditUserModal(account)}
+                                                        aria-label={`${t('common.edit')}: ${account.username}`}
+                                                    >
+                                                        <FontAwesomeIcon icon={faPen} fixedWidth />
+                                                    </button>
+                                                </Tooltip>
                                                 <ActionMenu
-                                                    label={t('pages.accounts.moreActions')}
+                                                    label={`${t('pages.accounts.moreActions')}: ${account.username}`}
                                                     icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
+                                                    iconOnly
                                                     items={isSelf ? menuItems.filter((item) => item.key !== 'delete') : menuItems}
                                                 />
                                             </div>

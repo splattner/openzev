@@ -1,3 +1,4 @@
+import { Tooltip } from '@mantine/core'
 import { SortableHeader, useTableSorting } from '../components/tableSorting'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
@@ -679,17 +680,17 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                         <li key={key} className="wizard-metering-point" data-testid="wizard-metering-point-row">
                                             <div className="wizard-metering-point-header">
                                                 <strong>{t('pages.zevs.wizard.meteringPointNumber', { number: index + 1 })}</strong>
-                                                <button
-                                                    className="button button-ghost button-compact"
-                                                    type="button"
-                                                    onClick={() => removeMeteringPoint(key)}
-                                                    disabled={createForm.metering_points.length === 1}
-                                                    aria-label={t('pages.zevs.wizard.removeMeteringPoint', { number: index + 1 })}
-                                                    title={t('pages.zevs.wizard.removeMeteringPoint', { number: index + 1 })}
-                                                >
-                                                    <FontAwesomeIcon icon={faTrash} fixedWidth />
-                                                    {t('common.delete')}
-                                                </button>
+                                                <Tooltip label={t('pages.zevs.wizard.removeMeteringPoint', { number: index + 1 })} events={{ hover: true, focus: true, touch: false }}>
+                                                    <button
+                                                        className="button button-danger button-compact button-icon"
+                                                        type="button"
+                                                        onClick={() => removeMeteringPoint(key)}
+                                                        disabled={createForm.metering_points.length === 1}
+                                                        aria-label={t('pages.zevs.wizard.removeMeteringPoint', { number: index + 1 })}
+                                                    >
+                                                        <FontAwesomeIcon icon={faTrash} fixedWidth />
+                                                    </button>
+                                                </Tooltip>
                                             </div>
                                             <div className="wizard-metering-point-fields">
                                                 <label>
@@ -964,6 +965,16 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                         <td>{t(`pages.zevs.billingIntervals.${zev.billing_interval}` as Parameters<typeof t>[0], { defaultValue: zev.billing_interval })}</td>
                                         <td className="actions-cell">
                                             <div className="actions-cell-content">
+                                                <Tooltip label={`${t('common.edit')}: ${zev.name}`} events={{ hover: true, focus: true, touch: false }}>
+                                                    <button
+                                                        className="button button-secondary button-compact button-icon"
+                                                        type="button"
+                                                        onClick={() => startEdit(zev)}
+                                                        aria-label={`${t('common.edit')}: ${zev.name}`}
+                                                    >
+                                                        <FontAwesomeIcon icon={faPen} fixedWidth />
+                                                    </button>
+                                                </Tooltip>
                                                 <button
                                                     className="button button-secondary button-compact"
                                                     type="button"
@@ -974,10 +985,6 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                                 >
                                                     <FontAwesomeIcon icon={faArrowRight} fixedWidth />
                                                     {t('pages.zevs.manage')}
-                                                </button>
-                                                <button className="button button-primary button-compact" type="button" onClick={() => startEdit(zev)}>
-                                                    <FontAwesomeIcon icon={faPen} fixedWidth />
-                                                    {t('common.edit')}
                                                 </button>
                                                 {zev.disabled_at && (
                                                     <button

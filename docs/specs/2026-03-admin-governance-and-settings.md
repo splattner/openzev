@@ -405,6 +405,14 @@ Template: `TEMPLATE_NAME = "invoices/invoice_pdf.html"` — editable by admins v
 
 Record tables for VAT, OAuth providers, accounts, access credentials and communities use the shared sorting contract in [management-page design §7.2](2026-04-frontend-management-page-design.md#72-information-architecture-rules). Sorting uses raw values (numbers, dates and identities); actions remain attached to their original records and are not sortable.
 
+Edit for VAT rates, OAuth providers, accounts and communities, and Delete for
+VAT rates and OAuth providers, are compact icon-only controls. Accessible names
+include the rate and start date, provider display name, username or community
+name. Mantine tooltips show the same names on hover and keyboard focus.
+Horizontal row action groups stay on one line and place the neutral secondary
+Edit button before other actions. Account and
+dynamic-source overflow triggers are icon-only ellipses named for their record.
+
 ### 9.1 AppSettings provider
 
 **File:** `frontend/src/lib/appSettings.tsx`

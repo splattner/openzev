@@ -92,6 +92,7 @@ describe('InvoicePaymentsCard', () => {
         })
         expect(container.textContent).toContain('pages.invoiceDetail.payments.summary')
         expect(container.textContent).toContain('E-Banking')
+        expect(container.querySelector('[aria-label="pages.invoiceDetail.payments.remove"]')?.classList.contains('button-danger')).toBe(true)
         expect(byText(container, 'pages.invoices.markRestPaid')).toBeTruthy()
         act(() => root.unmount())
         container.remove()

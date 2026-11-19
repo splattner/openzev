@@ -122,8 +122,15 @@ function setValue(element: HTMLInputElement | HTMLSelectElement, value: string) 
     element.dispatchEvent(new Event(element instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }))
 }
 
-const button = (container: Element, text: string) =>
-    Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find((b) => b.textContent?.includes(text))
+const button = (container: Element, name: string) => {
+    const matches = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).filter((b) => {
+        const content = b.cloneNode(true) as HTMLElement
+        content.querySelectorAll('[aria-hidden="true"]').forEach((element) => element.remove())
+        return (b.getAttribute('aria-label') ?? content.textContent ?? '').trim() === name
+    })
+    expect(matches.length).toBeLessThanOrEqual(1)
+    return matches[0]
+}
 
 async function click(element: Element | undefined | null) {
     expect(element).toBeTruthy()
@@ -134,7 +141,7 @@ const labelled = (container: Element, key: string) =>
     Array.from(container.querySelectorAll('label')).find((l) => l.textContent?.includes(key))
 
 it.each([
-    ['destination', 'testBackupDestination', 'common.edit', 'pages.backups.destinations.test'],
+    ['destination', 'testBackupDestination', 'common.edit: nightly-disk', 'pages.backups.destinations.test'],
     ['job', 'verifyBackupJob', 'pages.backups.jobs.details', 'pages.backups.jobs.check'],
 ] as const)('keeps %s action focus while another action is pending', async (_kind, operation, focusLabel, triggerLabel) => {
     setup({ jobs: [completed()] })
@@ -142,7 +149,7 @@ it.each([
     api[operation].mockReturnValueOnce(new Promise<void>((resolve) => { finish = resolve }))
     const container = await render()
     const focused = button(container, focusLabel)!
-    focused.focus()
+    act(() => focused.focus())
     const trigger = button(container, triggerLabel)!
     await click(trigger)
     await waitForCondition(() => trigger.disabled, 'pending action')
@@ -216,7 +223,8 @@ for (const kind of ['destination', 'file']) {
             const operation = kind === 'destination' ? api.deleteBackupDestination : api.deleteBackupArtifact
             operation.mockReturnValueOnce(new Promise((_, fail) => { reject = fail }))
             const container = await render()
-            const trigger = button(container, kind === 'destination' ? 'common.delete' : 'pages.backups.jobs.deleteFile')!
+            const trigger = button(container, kind === 'destination' ? 'common.delete: nightly-disk' : 'pages.backups.jobs.deleteFile')!
+            expect(trigger.classList.contains('button-danger')).toBe(true)
             await click(trigger)
             await click(button(container.querySelector('[role="dialog"]')!, kind === 'destination' ? 'common.delete' : 'pages.backups.jobs.deleteFile'))
             expect(operation).toHaveBeenCalledOnce()
@@ -339,6 +347,35 @@ describe('destinations', () => {
         const container = await render()
         expect(container.textContent).toContain('nightly-disk')
         expect(container.textContent).toContain('/var/backups/openzev')
+    })
+
+    it('names the edit action and its focus tooltip, and edits the selected destination', async () => {
+        const other = { ...disk, id: 'other', name: 'weekly-disk' }
+        setup({ destinations: [disk, other] })
+        api.updateBackupDestination.mockResolvedValue(other)
+        const container = await render()
+        const edit = button(container, 'common.edit: weekly-disk')!
+        expect(edit.textContent).toBe('')
+        expect(Array.from(edit.closest('tr')!.querySelectorAll('button')).map((button) =>
+            button.getAttribute('aria-label') ?? button.textContent,
+        )).toEqual(['common.edit: weekly-disk', 'pages.backups.destinations.test', 'common.delete: weekly-disk'])
+        act(() => edit.focus())
+        await waitForCondition(() => document.querySelector('[role="tooltip"]')?.textContent === 'common.edit: weekly-disk', 'edit tooltip on focus')
+        await click(edit)
+        expect(labelled(container, 'pages.backups.form.name')!.querySelector('input')!.value).toBe('weekly-disk')
+        await act(async () => { container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
+        expect(api.updateBackupDestination).toHaveBeenCalledWith('other', expect.objectContaining({ name: 'weekly-disk' }))
+    })
+
+    it('deletes the named destination rather than the first row', async () => {
+        setup({ destinations: [disk, { ...disk, id: 'other', name: 'weekly-disk' }] })
+        api.deleteBackupDestination.mockResolvedValue(undefined)
+        const container = await render()
+        const remove = button(container, 'common.delete: weekly-disk')!
+        expect(remove.textContent).toBe('')
+        await click(remove)
+        await click(button(container.querySelector('[role="dialog"]')!, 'common.delete'))
+        expect(api.deleteBackupDestination).toHaveBeenCalledExactlyOnceWith('other')
     })
 
     it('shows an empty state when there are none', async () => {
