@@ -2509,7 +2509,7 @@ many emails were queued and how many participants were skipped because they have
 no email address. The text of that email is edited by admins under <strong>Platform →
 Templates → Email templates</strong>.</p>
 <ul>
-<li><strong>Withdraw</strong> — takes an uploaded notice back from participants (for example sent
+<li><strong>Withdraw</strong>, beside <strong>Download</strong>, takes an uploaded notice back from participants (for example sent
   to the wrong person). The record and the file are kept and the row stays here,
   marked as withdrawn. Invoices, statements and the other issued documents are
   corrected by issuing again, never withdrawn.</li>
@@ -2627,14 +2627,15 @@ first, then the progress and the actions.</p>
 </ul>
 <h2 id="row-and-batch-actions">Row and Batch Actions<a class="headerlink" href="#row-and-batch-actions" title="Permanent link">&para;</a></h2>
 <p>Each row shows its next step as an outlined button — <strong>Generate invoice</strong>,
-<strong>Approve</strong>, <strong>Send Email</strong> or <strong>Mark Paid</strong>, depending on the status — and puts
-the rest under <strong>More</strong>:</p>
+<strong>Approve</strong>, <strong>Send Email</strong> or <strong>Mark Paid</strong>, depending on the status. If one
+other action is available it appears as a button. If several are available they
+appear under <strong>More</strong>.</p>
 <table>
 <thead>
 <tr>
 <th>Status</th>
-<th>Button</th>
-<th>Under <strong>More</strong></th>
+<th>Next step</th>
+<th>Other actions</th>
 </tr>
 </thead>
 <tbody>
@@ -2681,9 +2682,9 @@ including when the filter is selected. Changing period or community clears the f
 <p>The <strong>batch actions</strong> in the command bar always act on the whole period,
 including rows hidden by a filter. The recommended next step is the page's one
 filled button and names how many invoices it touches (for example <em>Approve 4
-invoices</em>); <strong>Download all PDFs</strong> sits beside it, and <strong>More batch actions</strong>
-holds <strong>Generate all</strong>, <strong>Approve all</strong>, <strong>Send all</strong> and <strong>Regenerate all
-PDFs</strong>. Operations with no eligible invoices are omitted from the menu. While a
+invoices</em>). <strong>Download all PDFs</strong> sits beside it. The remaining operations
+(<strong>Generate all</strong>, <strong>Approve all</strong>, <strong>Send all</strong> or <strong>Regenerate all PDFs</strong>)
+appear as a labelled button if only one applies, or under <strong>More batch actions</strong>. While a
 batch request runs, its controls are disabled. Generation remains disabled
 for queued targets until their invoices arrive. <strong>Send all</strong> counts only
 approved invoices with an email address, and stays disabled while any email
@@ -2860,8 +2861,7 @@ regenerate it.</p>
 <li><strong>Regenerate</strong> — replaces an existing PDF (e.g. after the HTML template was updated).</li>
 <li><strong>Open PDF</strong> — opens the generated PDF in a new browser tab.</li>
 </ul>
-<p><strong>More → Open PDF</strong> opens the document. Generation and regeneration are also
-under <strong>More</strong> for any invoice that exists. <strong>Download all
+<p>These actions are available on the invoice row when applicable. <strong>Download all
 PDFs</strong> in the command bar downloads the period's documents together.</p>
 <p>If document details keep changing during rendering, generation can stop with
 <strong>PDF missing</strong>. Use <strong>Generate PDF</strong> again once those changes are finished.
