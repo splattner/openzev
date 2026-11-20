@@ -159,18 +159,20 @@ describe('shared invoice presentation', () => {
         const sort = [...container.querySelectorAll<HTMLButtonElement>('.data-table-sort')]
             .find(button => button.textContent?.includes('adminInvoices.total'))!
         await act(async () => sort.click())
-        expect(container.querySelector('tbody tr')?.textContent).toContain('129.00 CHF')
+        const firstRow = () => container.querySelector('tbody tr')!
+        expect(firstRow().querySelector('code')?.textContent).toBe('INV-129')
+        // The header names the currency; the cell carries only the amount.
+        expect(firstRow().querySelector('td.numeric')?.textContent).toBe('129.00')
         await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="common.pagination.next"]')!.click())
         expect(container.querySelectorAll('tbody tr')).toHaveLength(30)
-        expect(container.querySelector('tbody tr')?.textContent).toContain('29.00 CHF')
+        expect(firstRow().querySelector('code')?.textContent).toBe('INV-29')
         const input = container.querySelector('input[type="search"]') as HTMLInputElement
         await act(async () => {
             Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'INV-29')
             input.dispatchEvent(new Event('input', { bubbles: true }))
         })
-        await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
         expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
-        expect(container.querySelector('tbody')?.textContent).toContain('29.00 CHF')
+        expect(firstRow().querySelector('code')?.textContent).toBe('INV-29')
         expect(container.querySelector('.data-table-footer')).toBeNull()
     })
 })
