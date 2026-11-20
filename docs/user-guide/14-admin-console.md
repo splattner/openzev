@@ -525,15 +525,15 @@ The admin invoice page provides a searchable, sortable table of **every invoice 
 | **ZEV** | The ZEV the invoice belongs to |
 | **Participant** | Participant name |
 | **Period** | Billing period date range |
-| **Total** | Invoice total in CHF |
+| **Total (CHF)** | Invoice total; the header names the currency, so the cells show the amount only |
 | **Status** | Badge showing `Draft`, `Approved`, `Sent`, `Paid`, or `Cancelled` |
 | **Actions** | Delete button |
 
 ### Searching and Filtering
 
-- Use the **quick filter** search bar in the toolbar to search across all columns.
+- Use the **search** field above the table to find invoices by number, ZEV, participant or period.
+- Use the **status** dropdown beside it to show only invoices in one status.
 - Click on a column header to **sort** by that column.
-- Use column-level filters for more targeted searching (e.g., filter by status using the dropdown).
 
 ### Deleting Invoices
 

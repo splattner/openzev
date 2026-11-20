@@ -5211,7 +5211,7 @@ export const de = {
         zev: 'ZEV',
         participant: 'Teilnehmer',
         period: 'Zeitraum',
-        total: 'Total',
+        total: 'Total (CHF)',
         status: 'Status',
         allStatuses: 'Alle Status',
         quickFilterPlaceholder: 'Rechnungen suchen…',
