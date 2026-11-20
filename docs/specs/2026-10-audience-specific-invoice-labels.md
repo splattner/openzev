@@ -68,8 +68,8 @@ The outcome: each audience sees the information that helps it.
    invoice payload gains `due_date`. Overdue is issue text (a concrete problem);
    the other states are plain text, nothing green (UI patterns §10.1).
 4. **Staff screens.** Draft / Approved / Sent / Paid / Cancelled (and Partly
-   paid) stay, as one neutral `.badge-tag` (`INVOICE_STATUS_BADGE_CLASS`)
-   instead of a coloured capsule per row.
+   paid) stay, as one neutral `.badge-tag` (`InvoiceStatusBadge`, via the `invoice`
+   domain in `badgeTones.ts`) instead of a coloured capsule per row.
 5. **Translations and tests.** `pdf_translations.py` gains `marking_draft` and
    `marking_cancelled` (de, fr, it, en); frontend `invoice.payment.*` and
    renamed participant column headers (**Payment**). Tests:

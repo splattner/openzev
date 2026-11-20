@@ -8,7 +8,6 @@ import {
     liveEligible,
     liveIngestUrl,
     sourceFor,
-    statusTone,
     withheldReasonKey,
 } from '../src/lib/supplementary'
 import type { GrossEnergy } from '../src/types/api'
@@ -60,17 +59,6 @@ describe('withheldReasonKey', () => {
     it('has none when there is a rate or no figures', () => {
         expect(withheldReasonKey(gross())).toBeNull()
         expect(withheldReasonKey(null)).toBeNull()
-    })
-})
-
-describe('statusTone', () => {
-    it('maps each status to a tone', () => {
-        expect(statusTone('ok')).toBe('success')
-        expect(statusTone('error')).toBe('warning')
-        expect(statusTone('reconnect_required')).toBe('danger')
-        expect(statusTone('pending')).toBe('neutral')
-        expect(statusTone('disabled')).toBe('neutral')
-        expect(statusTone(null)).toBe('neutral')
     })
 })
 

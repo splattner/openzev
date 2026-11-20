@@ -2,6 +2,7 @@ import { useRef, useState, type FormEvent, type ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { Badge } from '../../components/Badge'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faEnvelope, faUserMinus } from '@fortawesome/free-solid-svg-icons'
 import { CivilDateInput } from '../../components/CivilDateInput'
@@ -162,13 +163,13 @@ export function describeAccess({
             {byRole.length > 0 && (
                 <span className="party-access-line">
                     {/* On the issuer's and representative's own rows the heading already says the login manages. */}
-                    {!managingRole && <span className="badge badge-tag">{t('pages.zevSettings.access.managesByRole')}</span>}
+                    {!managingRole && <Badge tone="tag">{t('pages.zevSettings.access.managesByRole')}</Badge>}
                     {login && login !== shownEmail && <span className="muted">{login}</span>}
                 </span>
             )}
             {grants.map((grant) => (
                 <span key={grant.id} className="party-access-line">
-                    <span className="badge badge-tag">{t(`pages.zevSettings.access.level.${grant.role}`)}</span>
+                    <Badge tone="tag">{t(`pages.zevSettings.access.level.${grant.role}`)}</Badge>
                     {grant.user.pending_invitation && <IssueText tone="warning">{t('pages.zevSettings.access.pending')}</IssueText>}
                     <span className="muted">
                         {grant.user.email !== shownEmail && grant.user.email}

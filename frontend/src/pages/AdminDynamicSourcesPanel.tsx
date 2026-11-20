@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowsRotate, faChartLine, faClockRotateLeft, faEllipsis, faEraser, faMagnifyingGlass, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
+import { Badge } from '../components/Badge'
 import { ActionMenu } from '../components/ActionMenu'
 import { Toolbar } from '../components/Toolbar'
 import { DataTable, type ColumnDef } from '../components/DataTable'
@@ -30,12 +31,6 @@ import { Link } from 'react-router-dom'
 import { usePageNavigation } from '../lib/usePageNavigation'
 import { Notice } from '../components/Notice'
 import { PageState } from '../components/PageState'
-
-function statusClass(status: DynamicTariffSource['last_fetch_status']): string {
-  if (status === 'ok') return 'badge badge-success'
-  if (status === 'failed') return 'badge badge-danger'
-  return 'badge badge-neutral'
-}
 
 export function AdminDynamicSourcesPanel() {
   const { t } = useTranslation()
@@ -170,11 +165,11 @@ export function AdminDynamicSourcesPanel() {
       header: t('pages.dynamicSources.columns.status'),
       cell: ({ row }) => (
         <div>
-          <span className={row.original.enabled ? statusClass(row.original.last_fetch_status) : 'badge badge-neutral'}>
+          <Badge status={row.original.enabled ? row.original.last_fetch_status : 'disabled'} domain="priceSource">
             {row.original.enabled
               ? t(`pages.dynamicSources.status.${row.original.last_fetch_status}` as Parameters<typeof t>[0])
               : t('pages.dynamicSources.status.disabled')}
-          </span>
+          </Badge>
           {row.original.last_fetch_status === 'failed' && <DynamicFetchFailure source={row.original} className="text-danger" />}
           {row.original.recovery_from && (
             <div className="muted">{t('pages.dynamicSources.recoveryFrom', { date: formatDateTime(row.original.recovery_from, settings) })}</div>
@@ -288,13 +283,9 @@ export function AdminDynamicSourcesPanel() {
       accessorKey: 'status',
       header: t('pages.dynamicSources.columns.status'),
       cell: ({ row }) => (
-        <span className={
-          row.original.status === 'failed' ? 'badge badge-danger'
-            : row.original.status === 'success' ? 'badge badge-success'
-              : 'badge badge-info'
-        }>
+        <Badge status={row.original.status} domain="audit">
           {t(`pages.auditLogs.statuses.${row.original.status}`)}
-        </span>
+        </Badge>
       ),
     },
     { accessorKey: 'summary', header: t('pages.dynamicSources.activity.event') },

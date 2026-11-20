@@ -4,6 +4,7 @@ import { formatDateTime, useAppSettings } from '../lib/appSettings'
 import { useTranslation } from 'react-i18next'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faRotate, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { Badge } from './Badge'
 import { FormModal } from './FormModal'
 
 interface EmailLogsModalProps {
@@ -14,12 +15,6 @@ interface EmailLogsModalProps {
     onRetry?: (emailLogId: string) => void
     isRetrying?: boolean
     returnFocusRef?: RefObject<HTMLElement | null>
-}
-
-const statusClasses: Record<string, string> = {
-    pending: 'badge-info',
-    sent: 'badge-success',
-    failed: 'badge-danger badge-quiet',
 }
 
 export function EmailLogsModal({
@@ -63,9 +58,9 @@ export function EmailLogsModal({
                                         {t('pages.invoices.emailLogs.subject', { subject: log.subject })}
                                     </div>
                                 </div>
-                                <span className={`badge ${statusClasses[log.status] ?? 'badge-neutral'}`}>
+                                <Badge status={log.status} domain="email">
                                     {statusLabels[log.status] ?? statusLabels.unknown}
-                                </span>
+                                </Badge>
                             </div>
 
                             <div className="email-log-meta">

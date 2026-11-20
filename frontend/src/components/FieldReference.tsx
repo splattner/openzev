@@ -2,6 +2,7 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TemplateField, TemplateFieldGroup } from '../types/api'
 import type { Translate } from '../lib/translate'
+import { Badge } from './Badge'
 
 export interface FieldReferenceProps {
     groups: TemplateFieldGroup[]
@@ -294,7 +295,7 @@ export function FieldReference({ groups, content, onInsert }: FieldReferenceProp
                                         {counts && (
                                             <td className="field-reference__count">
                                                 {count !== undefined && count > 0 && (
-                                                    <span className="badge badge-info">×{count}</span>
+                                                    <Badge tone="info">×{count}</Badge>
                                                 )}
                                             </td>
                                         )}

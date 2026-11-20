@@ -101,12 +101,6 @@ export function isAssignmentCurrent(assignment: MeteringPointAssignment, todayIs
   return getAssignmentState(assignment, todayIso) === 'current'
 }
 
-export function assignmentStateBadgeClass(state: AssignmentState): string {
-  if (state === 'current') return 'badge badge-success'
-  if (state === 'upcoming') return 'badge badge-info'
-  return 'badge badge-neutral'
-}
-
 export function assignmentStateSortOrder(state: AssignmentState): number {
   if (state === 'current') return 0
   if (state === 'upcoming') return 1

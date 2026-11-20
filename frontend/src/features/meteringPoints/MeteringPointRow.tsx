@@ -19,13 +19,13 @@ import {
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
+import { Badge } from '../../components/Badge'
 import { IssueText } from '../../components/IssueText'
 import { formatDateTime, formatShortDate } from '../../lib/appSettings'
 import { formatBusinessIsoDate } from '../../lib/dates'
 import { formatNumber } from '../../lib/numbers'
 import type { AppSettings, MeteringPoint, MeteringPointAssignment } from '../../types/api'
 import {
-  assignmentStateBadgeClass,
   assignmentStateSortOrder,
   getAssignmentState,
   meteringPointNeedsAttention,
@@ -253,7 +253,7 @@ export function MeteringPointRow({
             {t('pages.meteringPoints.since', { date: formatShortDate(current[0].valid_from, settings) })}
           </span>
           {current[0].allocation_mode === 'community' && (
-            <span className="badge badge-tag">{t('pages.meteringPoints.communityBadge')}</span>
+            <Badge tone="tag">{t('pages.meteringPoints.communityBadge')}</Badge>
           )}
           {earlierCount > 0 && (
             <span className="muted metering-holder-since">{t('pages.meteringPoints.earlierAssignments', { count: earlierCount })}</span>
@@ -265,7 +265,7 @@ export function MeteringPointRow({
       return (
         <>
           <strong className="metering-holder-name">{nameOf(upcoming[0])}</strong>
-          <span className={assignmentStateBadgeClass('upcoming')}>{t('pages.meteringPoints.assignmentState.upcoming')}</span>
+          <Badge status="upcoming" domain="assignment">{t('pages.meteringPoints.assignmentState.upcoming')}</Badge>
           <span className="muted metering-holder-since">
             {t('pages.meteringPoints.fromDate', { date: formatShortDate(upcoming[0].valid_from, settings) })}
           </span>
@@ -304,7 +304,7 @@ export function MeteringPointRow({
             {point.secondary_meter_id && (
               <span className="muted">{t('pages.meteringPoints.secondaryId', { id: point.secondary_meter_id })}</span>
             )}
-            {!point.is_active && <span className="badge badge-neutral">{t('pages.meteringPoints.inactive')}</span>}
+            {!point.is_active && <Badge tone="neutral">{t('pages.meteringPoints.inactive')}</Badge>}
             {/* The flag the manager sets, as plain text: a classification is not a pill (UI patterns §10.1). */}
             {point.has_behind_meter_generation && <span className="muted">{t('behindMeter.badge')}</span>}
           </div>
@@ -393,12 +393,12 @@ export function MeteringPointRow({
                             <span className="metering-assignment-line">
                               <strong>{nameOf(assignment)}</strong>
                               {state !== 'current' && (
-                                <span className={assignmentStateBadgeClass(state)}>
+                                <Badge status={state} domain="assignment">
                                   {t(`pages.meteringPoints.assignmentState.${state}`)}
-                                </span>
+                                </Badge>
                               )}
                               {assignment.allocation_mode === 'community' && (
-                                <span className="badge badge-tag">{t('pages.meteringPoints.communityBadge')}</span>
+                                <Badge tone="tag">{t('pages.meteringPoints.communityBadge')}</Badge>
                               )}
                             </span>
                             <span className="muted">

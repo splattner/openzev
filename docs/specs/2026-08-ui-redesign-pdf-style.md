@@ -1176,6 +1176,8 @@ contracts are unchanged.
   Choose the base class by meaning; add `.badge-quiet` when an outlined status
   is sufficient in context. The modifier changes emphasis, not severity: danger
   remains red. Attributes use `.badge-tag`; actionable problems use `IssueText`.
+  In React, render badges with `Badge` (`tone`/`quiet`, or `status` + `domain`
+  looked up in `badgeTones.ts`), never with raw `badge-*` class strings.
 
   | Treatment | Fill / border / text | Use |
   |---|---|---|

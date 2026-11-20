@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  assignmentStateBadgeClass,
   assignmentStateSortOrder,
   defaultAssignmentForm,
   defaultMeteringPointForm,
@@ -60,11 +59,7 @@ describe('metering point form helpers', () => {
     expect(getAssignmentState(ended, today)).toBe('ended')
   })
 
-  it('maps assignment state to badge classes and sort order', () => {
-    expect(assignmentStateBadgeClass('current')).toBe('badge badge-success')
-    expect(assignmentStateBadgeClass('upcoming')).toBe('badge badge-info')
-    expect(assignmentStateBadgeClass('ended')).toBe('badge badge-neutral')
-
+  it('orders assignment states current, upcoming, ended', () => {
     expect(assignmentStateSortOrder('current')).toBeLessThan(assignmentStateSortOrder('upcoming'))
     expect(assignmentStateSortOrder('upcoming')).toBeLessThan(assignmentStateSortOrder('ended'))
   })

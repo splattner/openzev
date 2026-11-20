@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import type { ColumnDef, ColumnFiltersState } from '../components/DataTable'
+import { Badge } from '../components/Badge'
 import { ConfirmDialog, consumeReportedError, useConfirmDialog } from '../components/ConfirmDialog'
 import { DataTable } from '../components/DataTable'
 import { EmptyState } from '../components/EmptyState'
@@ -116,12 +117,12 @@ export function AdminInvoicesContent() {
                         <span className="actions-row actions-row-wrap">
                             <InvoiceStatusBadge status={status} paidChf={invoice.paid_chf} />
                             {invoice.needs_data_review && (
-                                <span
-                                    className="badge badge-warning"
+                                <Badge
+                                    tone="warning"
                                     title={t('pages.invoices.dataReview.genericNotice', { count: invoice.open_data_impact_count ?? 0 })}
                                 >
                                     {t('pages.invoices.dataReview.badge')}
-                                </span>
+                                </Badge>
                             )}
                         </span>
                     )
