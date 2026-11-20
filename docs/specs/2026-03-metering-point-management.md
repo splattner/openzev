@@ -161,7 +161,8 @@ Direction inference is applied during the import pipeline (see
 
 ### 3.3 MeteringPointAssignment
 
-Defined in `zev.models`.
+Defined in `zev.models`. German product copy calls the dated link between a
+**Teilnehmer** and a **Messpunkt** a **Zuweisung**.
 
 | Field | Type | Description |
 |---|---|---|

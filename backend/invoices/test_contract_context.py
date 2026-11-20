@@ -1239,6 +1239,6 @@ class ContractPdfRenderingTests(TestCase):
         no_meter_participant = make_participant(self.zev, first="No", last="Meter")
 
         markup = _render_contract_markup(no_meter_participant)
-        self.assertEqual(markup.count("Noch kein Messpunkt zugeordnet"), 2)  # consumption + production
+        self.assertEqual(markup.count("Noch kein Messpunkt zugewiesen"), 2)  # consumption + production
         self.assertNotIn('meter-chip--empty">CH', markup)
         self.assertNotIn("CH</span><br>\n<span class=\"meter-chip meter-chip--empty\">CH", markup)
