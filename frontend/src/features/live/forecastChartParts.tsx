@@ -1,5 +1,6 @@
 import { useXAxisScale, useYAxisScale } from 'recharts'
 import { AXIS_COLOR, CHART_LOCAL } from '../../lib/chartTokens'
+import { formatBusinessWeekday } from '../../lib/dates'
 import { formatClockMinutes, kwFigure } from '../../lib/live'
 
 /**
@@ -25,11 +26,9 @@ export interface ForecastHourBar {
     band: [number, number] | null
 }
 
-const dayFormatter = new Intl.DateTimeFormat(undefined, { timeZone: 'Europe/Zurich', weekday: 'short', day: 'numeric', month: 'numeric' })
-
-/** `Mon 3.11. 12:00`, the tooltip heading of both charts. */
+/** Weekday, date and time, the tooltip heading of both charts. */
 export function forecastTooltipLabel(ts: number): string {
-    return `${dayFormatter.format(new Date(ts))} ${formatClockMinutes(ts)}`
+    return `${formatBusinessWeekday(new Date(ts))} ${formatClockMinutes(ts)}`
 }
 
 /** A kW value, or a `[min, max]` band as `3.8–6.5 kW`; the tooltip's text for every series of both charts. */

@@ -6,6 +6,7 @@ import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { AXIS_COLOR, CHART_GRIDLINE, CHART_LOCAL, FLOW_GRID_EXP, FLOW_LOCAL_CONS } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
 import { dashboardKwhFigure, kwhTick } from '../../lib/dashboardFormatting'
+import { formatBusinessWeekday } from '../../lib/dates'
 import { formatKwh, formatPercent, formatPercentFigure } from '../../lib/numbers'
 import { grossRate, withheldReasonKey } from '../../lib/supplementary'
 import type { GrossEnergy } from '../../types/api'
@@ -18,13 +19,13 @@ interface Props {
     participantName?: string
     formatBucketLabel: (value: string) => string
     formatBucketTooltipLabel: (label: unknown) => string
-    /** Hourly buckets over several days: label the axis once per day (`Mon 9.11.`) instead of at arbitrary hours. */
+    /** Hourly buckets over several days: label the axis once per day (weekday and date) instead of at arbitrary hours. */
     dayAxis?: boolean
 }
 
 const zurichHour = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Zurich', hour: '2-digit', hourCycle: 'h23' })
-const dayLabel = new Intl.DateTimeFormat(undefined, { timeZone: 'Europe/Zurich', weekday: 'short', day: 'numeric', month: 'numeric' })
 const isMidnight = (bucket: string) => Number(zurichHour.format(new Date(bucket))) === 0
+const dayTick = (bucket: string) => formatBusinessWeekday(new Date(bucket))
 
 /**
  * What a net-metered participant's own system measured: production, consumption, import, export and
@@ -96,7 +97,7 @@ export function GrossEnergyCard({ gross, whose, participantName, formatBucketLab
                             stroke={AXIS_COLOR}
                             ticks={dayTicks}
                             interval={dayTicks ? 0 : undefined}
-                            tickFormatter={dayTicks ? (bucket: string) => dayLabel.format(new Date(bucket)) : formatBucketLabel}
+                            tickFormatter={dayTicks ? dayTick : formatBucketLabel}
                         />
                         <YAxis tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} unit=" kWh" width={60} tickFormatter={kwhTick} />
                         <Tooltip

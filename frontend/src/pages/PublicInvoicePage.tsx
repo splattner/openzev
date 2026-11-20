@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
+import { appLocale } from '../lib/dates'
 
 import { groupItemsByCategory } from '../features/publicInvoice/grouping'
 import { paymentState } from '../features/invoices/invoiceStatus'
@@ -77,13 +78,14 @@ export function PublicInvoicePage() {
 
     // Swiss formatting in the document's language, so the figures on screen
     // are punctuated the way the printed ones are.
-    const locale = language ? `${language}-CH` : i18n.language
+    const locale = language ? `${language}-CH` : appLocale()
 
     const formatMoney = (value: string) =>
         new Intl.NumberFormat(locale, { minimumFractionDigits: 2 }).format(Number(value))
 
-    const formatDate = (value: string) =>
-        new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(value))
+    // Format period dates in UTC so the viewer's time zone cannot shift the day.
+    const formatPeriodDate = (value: string) =>
+        new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(value))
 
     // The invoice's own language, like the page itself.
     useDocumentTitle(!prefix || !secret || isError
@@ -125,7 +127,7 @@ export function PublicInvoicePage() {
                         <div className="public-invoice-zev">{data.zev_name}</div>
                         <h1>{t('pages.publicInvoice.title', { number: data.invoice_number })}</h1>
                         <p className="muted">
-                            {formatDate(data.period_start)} – {formatDate(data.period_end)}
+                            {formatPeriodDate(data.period_start)} – {formatPeriodDate(data.period_end)}
                         </p>
                     </div>
                     <div className="public-invoice-total">

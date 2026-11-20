@@ -125,6 +125,22 @@ describe('PublicInvoicePage language', () => {
         unmount()
     })
 
+    it('shows the period dates of the invoice in its language, whatever the viewer\'s zone', async () => {
+        // West of UTC, a date-only bound read in the local zone would show as 30 June.
+        const savedTz = process.env.TZ
+        process.env.TZ = 'America/New_York'
+        fetchPublicInvoice.mockResolvedValue(invoice({ period_start: '2026-07-01', period_end: '2026-07-31' }))
+        try {
+            const { container, unmount } = await renderPage()
+
+            expect(container.textContent).toContain('1 juil. 2026')
+            expect(container.textContent).not.toContain('juin')
+            unmount()
+        } finally {
+            process.env.TZ = savedTz
+        }
+    })
+
     it('marks up the page with the document language, not the document root', async () => {
         const { container, unmount } = await renderPage()
 

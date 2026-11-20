@@ -415,7 +415,7 @@ Account and dynamic-source overflow use an ellipsis.
 - `AppSettingsContext` with `useAppSettings()` hook providing `{ settings, isLoading, isError }`. Authenticated fetch failures set `isError`, including failed refreshes with cached settings.
 - `DEFAULT_APP_SETTINGS`: `date_format_short: 'dd.MM.yyyy'`, `date_format_long: 'd MMMM yyyy'`, `date_time_format: 'dd.MM.yyyy HH:mm'`. Defaults omit MFA policy fields.
 - `SHORT_DATE_FORMAT_OPTIONS`, `LONG_DATE_FORMAT_OPTIONS`, `DATE_TIME_FORMAT_OPTIONS` — arrays of `{ value, label }` for dropdowns.
-- `formatDateByPattern(value, pattern)` — Pure function that parses ISO date strings and formats using the chosen pattern. Uses `Intl.DateTimeFormat` for month names.
+- `formatDateByPattern(value, pattern)` — Formats ISO dates using the configured pattern. Month names use the app's Swiss locale.
 - `formatShortDate(value, settings)` — Convenience wrapper.
 - `formatDateTime(value, settings)` — Formats ISO datetime strings.
 

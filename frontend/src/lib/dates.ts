@@ -44,6 +44,46 @@ export interface ZonedParts {
     minutes: number
 }
 
+/** App language with Swiss regional conventions, kept on `<html lang>` by `i18n/index.ts`. */
+export function appLocale(): string {
+    return (typeof document !== 'undefined' && document.documentElement.lang) || 'en-CH'
+}
+
+interface MonthNameOptions {
+    /** Only for a document with its own language; defaults to `appLocale()`. */
+    locale?: string
+    /** Omit to read the date in the viewer's zone. */
+    timeZone?: string
+    month?: 'long' | 'short'
+}
+
+const dateNameFormatters = new Map<string, Intl.DateTimeFormat>()
+
+function formatDateName(date: Date, { locale = appLocale(), ...options }: Intl.DateTimeFormatOptions & { locale?: string }): string {
+    const key = `${locale}|${JSON.stringify(options)}`
+    let formatter = dateNameFormatters.get(key)
+    if (!formatter) {
+        formatter = new Intl.DateTimeFormat(locale, options)
+        dateNameFormatters.set(key, formatter)
+    }
+    return formatter.format(date)
+}
+
+/** A month's name, e.g. `Juli` in de-CH. */
+export function formatMonthName(date: Date, { month = 'long', ...options }: MonthNameOptions = {}): string {
+    return formatDateName(date, { ...options, month })
+}
+
+/** A month and year, e.g. `Juli 2026` in de-CH. */
+export function formatMonthYear(date: Date, { month = 'long', ...options }: MonthNameOptions = {}): string {
+    return formatDateName(date, { ...options, month, year: 'numeric' })
+}
+
+/** An instant's weekday and day in Zurich, for day-axis ticks: `Di., 3.11.` in de-CH, `Tue, 03.11` in en-CH. */
+export function formatBusinessWeekday(date: Date): string {
+    return formatDateName(date, { timeZone: BUSINESS_TIME_ZONE, weekday: 'short', day: 'numeric', month: 'numeric' })
+}
+
 const businessFormatter = new Intl.DateTimeFormat('en-CA', {
     timeZone: BUSINESS_TIME_ZONE,
     year: 'numeric',
