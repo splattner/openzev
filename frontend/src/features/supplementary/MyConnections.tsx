@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { Badge } from '../../components/Badge'
 import { capabilityProblem } from '../../lib/supplementary'
 import { CapabilityProblemText } from './CapabilityProblemText'
 import type { EligibleMeteringPoint, SupplementarySource } from '../../types/api'
@@ -52,7 +53,7 @@ export function MyConnections({ sources, held, onOpenSource, selectedSourceId }:
                                     const problem = capabilityProblem(source, capability)
                                     return (
                                         <span key={capability} className="connection-capability">
-                                            <span className="badge badge-tag">{t(`supplementary.capability.${capability}`)}</span>
+                                            <Badge tone="tag">{t(`supplementary.capability.${capability}`)}</Badge>
                                             <CapabilityProblemText problem={problem} />
                                         </span>
                                     )

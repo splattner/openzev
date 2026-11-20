@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Badge } from './Badge'
 
 const SOURCE_LABEL_KEYS = {
     builtIn: 'templates.source.builtIn',
@@ -21,9 +22,9 @@ export function TemplateSourceStatus({ source, changed = false, action, descript
     return (
         <div className="template-source">
             <div className="template-source-main">
-                <span className={`badge ${source === 'customized' || source === 'zev' ? 'badge-info' : 'badge-neutral'}`}>
+                <Badge tone={source === 'customized' || source === 'zev' ? 'info' : 'neutral'}>
                     {label}
-                </span>
+                </Badge>
                 {changed && <span className="muted" role="status">{t('templates.source.unsavedChanges')}</span>}
                 {action}
             </div>

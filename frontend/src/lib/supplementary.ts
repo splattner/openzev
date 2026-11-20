@@ -7,7 +7,6 @@ import type {
     GrossEnergy,
     SourceCapability,
     SupplementarySource,
-    SupplementaryStatus,
 } from '../types/api'
 
 /** i18n key explaining why a rate is shown as a dash, or `null` when there is a rate to show. */
@@ -47,23 +46,6 @@ export function grossRate(gross: GrossEnergy | null | undefined, kind: GrossRate
     return kind === 'self_sufficiency' ? gross.self_sufficiency_rate : gross.self_consumption_rate
 }
 
-export type StatusTone = 'success' | 'warning' | 'danger' | 'neutral'
-
-export function statusTone(status: SupplementaryStatus | null | undefined): StatusTone {
-    switch (status) {
-        case 'ok':
-            return 'success'
-        case 'pending':
-            return 'neutral'
-        case 'error':
-            return 'warning'
-        case 'reconnect_required':
-            return 'danger'
-        default:
-            return 'neutral'
-    }
-}
-
 /** What is wrong with one capability of a source, for text next to it; `muted` is a note, not a problem. */
 export interface CapabilityProblem {
     tone: 'error' | 'warning' | 'muted'
@@ -84,13 +66,6 @@ export function capabilityProblem(source: SupplementarySource, capability: 'hist
         return null
     }
     return source.status === 'pending' ? { tone: 'muted', labelKey: 'supplementary.status.pending' } : null
-}
-
-export const STATUS_BADGE_CLASS: Record<StatusTone, string> = {
-    success: 'badge badge-success',
-    warning: 'badge badge-warning badge-quiet',
-    danger: 'badge badge-danger badge-quiet',
-    neutral: 'badge badge-neutral',
 }
 
 /** The URL a push client posts to, absolute so it can be pasted into Home Assistant or n8n. */

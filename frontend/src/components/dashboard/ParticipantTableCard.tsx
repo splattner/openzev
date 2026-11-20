@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DataTable, type CellContext, type ColumnDef } from '../DataTable'
+import { Badge } from '../Badge'
 import { BehindMeterBadge } from '../BehindMeterBadge'
 import { dashboardKwhStat } from '../../lib/dashboardFormatting'
 import { formatPercent } from '../../lib/numbers'
@@ -53,7 +54,7 @@ function ParticipantNameCell({ row }: CellContext<ParticipantRow, unknown>) {
                 {participant.participant_name || '-'}
             </button>
             {ownParticipantIds.includes(participant.participant_id) && (
-                <span className="badge badge-info">{t('pages.dashboard.youBadge')}</span>
+                <Badge tone="info">{t('pages.dashboard.youBadge')}</Badge>
             )}
             {participant.has_behind_meter_generation && (
                 <BehindMeterBadge hintKey={behindMeterHintKey('participant', participant.gross_energy)} />

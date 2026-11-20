@@ -9,6 +9,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faPen, faPlus, faTrash, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { usePageNavigation } from '../lib/usePageNavigation'
 import { useTranslation } from 'react-i18next'
+import { Badge } from '../components/Badge'
 import {
     createOAuthProviderConfig,
     deleteOAuthProviderConfig,
@@ -464,9 +465,9 @@ export function AdminSystemSettingsPage() {
                                             </td>
                                             <td style={{ fontSize: '0.85em' }}>{provider.scope}</td>
                                             <td style={{ textAlign: 'center' }}>
-                                                <span className={`badge ${provider.enabled ? 'badge-success' : 'badge-neutral'}`}>
+                                                <Badge tone={provider.enabled ? 'success' : 'neutral'}>
                                                     {provider.enabled ? t('common.yes') : t('common.no')}
-                                                </span>
+                                                </Badge>
                                             </td>
                                             <td className="actions-cell">
                                                 <div className="actions-cell-content">

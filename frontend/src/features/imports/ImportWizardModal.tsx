@@ -10,6 +10,7 @@ import {
 import { useEffect, useRef, type RefObject } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { Badge } from '../../components/Badge'
 import { FormModal } from '../../components/FormModal'
 import { MAX_UPLOAD_BYTES, type CsvColumnMap, type CsvFormatProfile, type DetectionState, type FilePreview } from './importUtils'
 import { SDAT_UPLOAD_ACCEPT } from './sdatOutcome'
@@ -32,12 +33,8 @@ function formatDirections(directions: string[] | undefined, t: (key: string) => 
         .join(', ')
 }
 
-function Badge({ label, ok }: { label: string; ok: boolean }) {
-    return (
-        <span className={`badge ${ok ? 'badge-success' : 'badge-danger badge-quiet'}`}>
-            {label}
-        </span>
-    )
+function CheckBadge({ label, ok }: { label: string; ok: boolean }) {
+    return <Badge tone={ok ? 'success' : 'danger'} quiet={!ok}>{label}</Badge>
 }
 
 export type ImportSource = 'csv' | 'sdatch'
@@ -170,8 +167,8 @@ function FilePreviewBlock({ entry, heading }: { entry: FilePreview; heading: boo
             {preview && (
                 <>
                     <div className="actions-row actions-row-wrap">
-                        <Badge label={t('pages.imports.previewFound', { count: preview.summary.existing_metering_points })} ok={preview.summary.existing_metering_points > 0} />
-                        <Badge label={t('pages.imports.previewMissing', { count: preview.summary.missing_metering_points })} ok={preview.summary.missing_metering_points === 0} />
+                        <CheckBadge label={t('pages.imports.previewFound', { count: preview.summary.existing_metering_points })} ok={preview.summary.existing_metering_points > 0} />
+                        <CheckBadge label={t('pages.imports.previewMissing', { count: preview.summary.missing_metering_points })} ok={preview.summary.missing_metering_points === 0} />
                     </div>
 
                     {preview.summary.rows_skipped_existing > 0 && (
@@ -211,7 +208,7 @@ function FilePreviewBlock({ entry, heading }: { entry: FilePreview; heading: boo
                                             <td style={{ padding: '0.4rem 0.6rem' }}>{row.row}</td>
                                             <td style={{ padding: '0.4rem 0.6rem' }}>{row.meter_id ?? '-'}</td>
                                             <td style={{ padding: '0.4rem 0.6rem' }}>
-                                                <Badge label={row.metering_point_exists ? t('pages.imports.preview.exists') : t('pages.imports.preview.missing')} ok={row.metering_point_exists} />
+                                                <CheckBadge label={row.metering_point_exists ? t('pages.imports.preview.exists') : t('pages.imports.preview.missing')} ok={row.metering_point_exists} />
                                             </td>
                                             <td style={{ padding: '0.4rem 0.6rem' }}>{row.timestamp ?? '-'}</td>
                                             <td style={{ padding: '0.4rem 0.6rem' }}>{formatDirections(row.directions, t)}</td>

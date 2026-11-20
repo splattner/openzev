@@ -1,10 +1,10 @@
 import type { Ref } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { Badge } from '../../components/Badge'
 import { fetchAuditEvent } from '../../lib/api/audit'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
-import type { AuditEventStatus } from '../../types/api'
 import { DetailPane } from '../../components/DetailPane'
 import { Disclosure } from '../../components/Disclosure'
 import { auditActionLabel, auditActorLabel, auditTargetLabel } from './auditEventText'
@@ -13,7 +13,6 @@ import { ChangesDiff } from './ChangesDiff'
 type AuditEventPaneProps = {
     eventId: string
     onClose: () => void
-    statusBadgeClass: (status: AuditEventStatus) => string
     /** The title is where focus lands when the pane is opened on purpose. */
     titleRef?: Ref<HTMLHeadingElement>
 }
@@ -32,7 +31,7 @@ function Field({ label, children }: { label: string, children: React.ReactNode }
  * row swaps the contents in place, which is the point when stepping through a
  * log (SPEC-2026-10-ui-patterns §5 rule C).
  */
-export function AuditEventPane({ eventId, onClose, statusBadgeClass, titleRef }: AuditEventPaneProps) {
+export function AuditEventPane({ eventId, onClose, titleRef }: AuditEventPaneProps) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
 
@@ -59,9 +58,9 @@ export function AuditEventPane({ eventId, onClose, statusBadgeClass, titleRef }:
                                 {formatDateTime(event.created_at, settings)}
                             </Field>
                             <Field label={t('pages.auditLogs.detail.status')}>
-                                <span className={statusBadgeClass(event.status)}>
+                                <Badge status={event.status} domain="audit">
                                     {t(`pages.auditLogs.statuses.${event.status}`)}
-                                </span>
+                                </Badge>
                             </Field>
                             <Field label={t('pages.auditLogs.detail.actor')}>
                                 {auditActorLabel(t, event)}

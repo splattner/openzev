@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faRotate } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
+import { Badge } from '../components/Badge'
 import { fetchAuditEvents, fetchAuditFilterOptions } from '../lib/api/audit'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
@@ -75,13 +76,6 @@ const LINK_FILTER_PARAMS = {
     actionType: 'action_type',
     targetType: 'target_type',
     targetId: 'target_id',
-}
-
-function statusBadgeClass(status: AuditEventStatus): string {
-    if (status === 'success') return 'badge badge-success'
-    if (status === 'failed' || status === 'denied') return 'badge badge-danger'
-    if (status === 'queued') return 'badge badge-info'
-    return 'badge badge-neutral'
 }
 
 /** `embedded` drops the page header inside the Overview and Settings hubs. */
@@ -534,7 +528,7 @@ export function AuditLogsPage({ scope, embedded = false }: AuditLogsPageProps & 
                                                         </button>
                                                         {/* Only what went wrong is flagged; a log of successes needs no badge per row. */}
                                                         {event.status !== 'success' && (
-                                                            <span className={statusBadgeClass(event.status)}>{t(`pages.auditLogs.statuses.${event.status}`)}</span>
+                                                            <Badge status={event.status} domain="audit">{t(`pages.auditLogs.statuses.${event.status}`)}</Badge>
                                                         )}
                                                     </div>
                                                     {target && <span className="audit-row-target">{target}</span>}
@@ -580,7 +574,6 @@ export function AuditLogsPage({ scope, embedded = false }: AuditLogsPageProps & 
                     <AuditEventPane
                         eventId={selectedEventId}
                         onClose={closePane}
-                        statusBadgeClass={statusBadgeClass}
                         titleRef={paneTitleRef}
                     />
                 )}

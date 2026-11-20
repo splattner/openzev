@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useCommunityAccess } from '../lib/communityAccess'
+import { Badge } from '../components/Badge'
 import { EmailLogsModal } from '../components/EmailLogsModal'
 import { ScopeGuard } from '../components/ScopeGuard'
 import { Notice } from '../components/Notice'
@@ -31,7 +32,7 @@ function EmailStatus({ status }: { status: string | null | undefined }) {
     if (!status) return <span className="muted">{t('pages.billingEmails.noEmailYet')}</span>
     const label = t(`pages.invoices.emailLogs.status.${status}`)
     if (status === 'failed') return <IssueText>{label}</IssueText>
-    if (status === 'pending') return <span className="badge badge-info">{label}</span>
+    if (status === 'pending') return <Badge status={status} domain="email">{label}</Badge>
     return <span>{label}</span>
 }
 
