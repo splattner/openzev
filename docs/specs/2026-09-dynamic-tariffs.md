@@ -163,7 +163,8 @@ Global, **not** ZEV-scoped — see ADR 0018.
 | `enabled` | `BooleanField` | disabled sources retain evidence; no automatic initial backfill or scheduled refresh |
 | `last_fetch_status` | `CharField(10)` | `pending` \| `ok` \| `failed` |
 | `last_fetch_at` / `last_success_at` | `DateTimeField`, null | |
-| `last_fetch_error` | `CharField(500)`, blank | **User-safe text only** |
+| `last_fetch_error` | `CharField(500)`, blank | **User-safe text only**, retained for existing API consumers |
+| `last_fetch_diagnostics` | `JSONField`, default `[]`, blank | Up to three distinct `{code, params}` diagnostics; parameters are allowlisted and validated; no rendered text is stored |
 | `covers_from` / `covers_to` | `DateTimeField`, null | Denormalised series extent |
 | `recovery_from` | `DateTimeField`, null | Earliest unresolved fetch window; retained until a successful refresh attempts it |
 
@@ -182,6 +183,9 @@ be re-enabled, fetched or used for billing; create a named replacement. Raw
 | `source` | FK, CASCADE | |
 | `valid_from` / `valid_to` | `DateTimeField` | UTC, half-open interval |
 | `price_chf_per_kwh` | `DecimalField(8, 5)` | **Signed** |
+
+The v1, v2 and BFE parsers reject NaN and infinite prices with
+`component_value_invalid`. Finite negative prices remain valid.
 
 `UniqueConstraint(source, valid_from)` (whose backing index also serves ordered
 source lookups) plus `CheckConstraint(valid_to > valid_from)`.
@@ -543,6 +547,44 @@ a published static tariff rate.
 
 ### 10.1 VSE importer
 
+Import UI messages are translated by the existing frontend `react-i18next`
+resources. The backend keeps English diagnostics and attaches optional
+`{code, params}` metadata only to normal outcomes, billing warnings and actionable
+failures. No Django catalogs, request-language decorator or language headers are
+needed. Published names, candidate keys, prices and document digests are unchanged.
+
+`config/ui_notices.py::UiNotice` is a string carrying that metadata; the original
+string remains the legacy API/CLI text. Response serializers add nullable
+`detail_diagnostic`, `error_diagnostic` or `reason_diagnostic` objects, and
+parallel `warning_diagnostics` arrays. Arrays preserve order and use `null` for
+unclassified details. Created tariff results use
+`dynamic_source_warning_diagnostics` alongside `dynamic_source_warnings`.
+Archive errors attach a nullable top-level `diagnostic`; entry errors attach a
+`diagnostics` map parallel to their `errors` fields.
+
+The frontend validates and formats known notices with semantic parameters.
+Shared-source warnings carry up to three normalized fetch diagnostics and reuse
+the existing source-error renderer. Unknown/malformed metadata uses a translated
+contextual headline. The original safe English detail is mounted only after the
+user opens the shared `Disclosure` labelled “Technical details”; generic document
+or parser failures (`keepsTechnicalDetails`), and a reused-source failure whose
+stored diagnostics yield no usable cause, also retain that disclosure. Dynamic
+source types in `tariff_type`, `components` and `extra_components` are shown
+through `pages.dynamicSources.types.*`. Known notices include omitted
+charges, first-band fallback, version boundaries and double-billing warnings.
+A series conflict on the billing mode the user chose (`tariff_mode_conflict`)
+names the mode to choose; other field conflicts (`tariff_conflict`) can only be
+resolved by renaming. An unreadable storage refund (`storage_unreadable`) is
+distinct from a published-but-not-imported one (`storage_omitted`). Serializers
+expose the metadata through the read-only `NoticeField` (and `notice_list` for
+the parallel arrays). Request failures (`importRequestFailure`) translate a
+known top-level `diagnostic`; otherwise coded `validation_errors` are rendered
+by `formatTariffErrorData`, keeping every entry and its field label. The modals
+store the raw request error and translate it at render time. Archive
+inspection falls back to `zevTransfer.unreadableArchive`, import to
+`zevTransfer.importFailed`.
+Logs, low-level parser messages and model validation prose are not translated.
+
 `backend/tariffs/importers/vse_json.py`. A `tariffForm: dynamic` entry no
 longer returns a single blocked candidate; `_dynamic_candidate()` builds an
 *importable* one carrying `dynamic_url` and `dynamic_tariff_type`. Dynamic
@@ -813,8 +855,38 @@ Source and linked-tariff failures use the shared
 [tariff API error contract](2026-03-tariffs-and-billing-engine.md#tariff-api-error-contract).
 Source deletion and invoice-protected price clearing have distinct codes; linked
 source errors carry tariff/community counts. Remote diagnostics retain safe text,
-while `log_detail` stays private. Stored `last_fetch_error` and asynchronous tasks
-are unchanged.
+while `log_detail` stays private. Background refreshes preserve up to three distinct
+coded failures in read-only `last_fetch_diagnostics`, deduplicated by code and
+validated parameters before capping. Only `{code, params}` is stored; legacy
+envelope fields are ignored by readers. The same backend normalizer protects
+storage, serialization and import summaries, including original transport
+codes/parameters through window aggregation. Deterministic refusals take precedence
+over transport failures: `invalid_dynamic_response` identifies other parser failures,
+`billed_price_changed` identifies protected price changes, and
+`price_series_conflict` identifies other storage conflicts. Actionable parser
+failures use `timestamp_missing`, `timestamp_invalid`, `timestamp_offset_missing`,
+`component_value_invalid`, `price_interval_invalid`, `price_intervals_overlap`,
+`product_response_missing` and `product_mismatch`, with field/value, interval or
+product parameters as applicable. Unexpected exceptions
+clear diagnostics and retain only the existing safe legacy summary. Successful
+refreshes (including partial transport success), successful probe initialization,
+price clearing and demo reseeding clear both error fields. Celery retry rules are
+unchanged.
+
+Tariff source summaries, list/detail issue tooltips, pricing tooltips and source
+administration use `formatDynamicFetchError` with the existing tariff code and
+parameter validation whenever the fetch status is failed, including when the
+legacy string is empty. Both readers skip malformed entries, unknown codes and
+unusable parameters, retaining up to three distinct usable causes. A translated
+generic fetch failure appears only when no usable cause remains. Tooltips show
+only that translated text; the source summary and source administration
+(`DynamicFetchFailure`) also keep a non-empty `last_fetch_error` behind a lazy
+“Technical details” `Disclosure`, so uncoded parser causes stay diagnosable. Older records receive an empty
+list from migration 0021, without guessing codes from English text; their generic
+message becomes specific after the next failed fetch. Safe legacy text remains
+available to API consumers and command-line diagnostics.
+`price_series_conflict` gives neutral review guidance; it does not promise that
+a backfill will fix every kind of storage conflict.
 
 ## 11. Transfer archive
 
@@ -848,7 +920,7 @@ accepts version 1 static archives and legacy adapter-based dynamic descriptors.
 |---|---|
 | `tariffs/test_dynamic_parsing.py` | v1/v2 detection and parsing; unit selection (including a missing-unit warning); empty/malformed responses; DST; generic request construction |
 | `tariffs/test_dynamic_discovery.py` | Version/product discovery; named exact-v2 verification; override and empty-response fallback; standard, exact-URL, range, and query-spelling capability detection |
-| `tariffs/test_dynamic_fetch.py` | Chunking, UTC storage, upsert idempotency, same-price clipped overlap extension, half-open invoice evidence, partial conflict writes, resulting-set overlap checks, recovery cursors including old failed/unattempted windows, coverage gaps, windows, failure recording, tasks, source identity |
+| `tariffs/test_dynamic_fetch.py` | Coded failure persistence through aggregation, deduplication, success/reset cleanup, and private-detail exclusion; chunking, UTC storage, upsert idempotency, same-price clipped overlap extension, half-open invoice evidence, partial conflict writes, resulting-set overlap checks, recovery cursors including old failed/unattempted windows, coverage gaps, windows, failure recording, tasks, source identity |
 | `tariffs/test_dynamic_tariff_link.py` | `Tariff.clean()` rules, capability validation, static→dynamic series versioning, PROTECT retention, no dynamic price bands |
 | `zev/test_transfer.py::DynamicTariffTransferTests` | Natural-key match, recreation on a fresh instance, static tariffs unaffected |
 | `invoices/test_dynamic_evidence.py` | Frozen provenance after tariff mutation/deletion; legacy-refund refusal; migration backfill, interval-overlap, and exact-URL capability preflights; PostgreSQL barriers verify concurrent clear/overwrite waits for committed evidence or proceeds after rollback; equivalent billed-resolution no-op; price-use-timestamp bulk preflight including static-only scan avoidance, unused tariff types, non-zero percentage bases, and zero-percentage exclusion; UTC permissions; bounded migration batches |
@@ -895,6 +967,7 @@ Tests: `zev/test_seed_dynamic_tariff.py` and `zev/tests.py::SeedDemoEndToEndTest
 
 | Module | Coverage |
 |---|---|
+| `screenshots/dynamic-fetch-errors.spec.ts` | Translated source summary, list issue tooltip and source administration (German); legacy fallback with the “Technical details” disclosure, a language switch without refetching, desktop/400px screenshots and console checks |
 | `tests/dynamic-sources.test.ts` | Source/energy-type helpers; discovery; paginated list; manual create; bounded history query; fetch queueing; typed clear request; typed source delete (the aggregate expansion is served by the backend — see `test_dynamic_components.py`) |
 | `tests/dynamic-source-form-modal.test.ts` | Two-step rendering, version-only choices, absence of provider choices, and discovered component/product selection |
 | `tests/vse-tariff-import.test.ts` (extended) | A dynamic candidate is selectable, offers no billing-mode choice, can be the pre-selected recommendation |

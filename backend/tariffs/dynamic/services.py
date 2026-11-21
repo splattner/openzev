@@ -95,6 +95,7 @@ def initialise_source_from_probe(source, capabilities, *, now=None):
         last_fetch_at=now,
         last_success_at=now,
         last_fetch_error="",
+        last_fetch_diagnostics=[],
         recovery_from=None,
     )
     source.refresh_from_db()
@@ -160,5 +161,6 @@ def clear_source_points(source: DynamicTariffSource) -> int:
             last_fetch_at=None,
             last_success_at=None,
             last_fetch_error="",
+            last_fetch_diagnostics=[],
         )
     return deleted

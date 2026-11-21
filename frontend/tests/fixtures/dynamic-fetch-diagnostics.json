@@ -1,0 +1,38 @@
+{
+  "valid": [
+    {"code": "host_unresolved", "params": {"host": "operator.invalid"}},
+    {"code": "http_status", "params": {"status": 502}},
+    {"code": "download_failed", "params": {}},
+    {"code": "invalid_url", "params": {}},
+    {"code": "public_url", "params": {}},
+    {"code": "import_url", "params": {}},
+    {"code": "import_json", "params": {}},
+    {"code": "document_size", "params": {"size": 5}},
+    {"code": "invalid_dynamic_response", "params": {}},
+    {"code": "billed_price_changed", "params": {}},
+    {"code": "price_series_conflict", "params": {}},
+    {"code": "product_required", "params": {}},
+    {"code": "timestamp_missing", "params": {"field": "prices[0].start_timestamp"}},
+    {"code": "timestamp_invalid", "params": {"field": "prices[0].start_timestamp", "received": "bad"}},
+    {"code": "timestamp_offset_missing", "params": {"field": "prices[0].start_timestamp"}},
+    {"code": "component_value_invalid", "params": {"field": "prices[0].start_timestamp", "received": "bad"}},
+    {"code": "price_interval_invalid", "params": {"start": "2026-01-01T00:00:00Z", "end": "2026-01-01T00:15:00Z"}},
+    {"code": "price_intervals_overlap", "params": {"start": "2026-01-01T00:00:00Z", "end": "2026-01-01T00:15:00Z", "other_start": "2026-01-01T00:00:00Z", "other_end": "2026-01-01T00:30:00Z"}},
+    {"code": "product_response_missing", "params": {}},
+    {"code": "product_mismatch", "params": {"expected": "demo", "actual": "other"}}
+  ],
+  "mixed": [
+    null,
+    {"code": "future_code", "params": {}},
+    {"code": "http_status", "params": {"status": 502}},
+    {"code": "http_status", "params": {"status": true}},
+    {"code": "http_status", "params": {"status": 502}, "message": "obsolete English", "field": null, "path": []},
+    {"code": "document_size", "params": {"size": 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000}},
+    {"code": "host_unresolved", "params": {"host": "operator.invalid", "private": "hidden"}},
+    {"code": [], "params": {}}
+  ],
+  "expected": [
+    {"code": "http_status", "params": {"status": 502}},
+    {"code": "host_unresolved", "params": {"host": "operator.invalid"}}
+  ]
+}

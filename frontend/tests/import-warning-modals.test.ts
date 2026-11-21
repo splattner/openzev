@@ -1,6 +1,8 @@
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
+import i18n from 'i18next'
+import { en } from '../src/i18n/locales/en'
 import { VseTariffImportModal } from '../src/features/tariffs/VseTariffImportModal'
 import { ZevImportModal } from '../src/features/zev/ZevImportModal'
 import type { VseTariffImportResult, ZevArchiveImportResult } from '../src/types/api'
@@ -14,7 +16,11 @@ vi.mock('@tanstack/react-query', () => ({
     return { isPending: false, mutate: vi.fn() }
   },
 }))
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
+const translations = i18n.createInstance()
+beforeAll(async () => {
+  await translations.init({ lng: 'en', resources: { en: { translation: en } }, interpolation: { escapeValue: false } })
+})
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: translations.getFixedT('en') }) }))
 vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast: vi.fn() }) }))
 vi.mock('../src/lib/appSettings', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/lib/appSettings')>()
@@ -42,13 +48,20 @@ it('retains apply-time warnings under the created VSE tariff', () => {
   const result: VseTariffImportResult = {
     created: [{ name: 'Integrated', category: 'energy', billing_mode: 'energy',
       valid_from: '2026-01-01', valid_to: null, dynamic: true,
-      dynamic_source_warnings: ['Includes grid fees.', 'Source is disabled.'] }],
+      dynamic_source_warnings: ['RAW included components', 'RAW disabled source'],
+      dynamic_source_warning_diagnostics: [
+        { code: 'components_included', params: { tariff_type: 'energy', components: 'grid' } },
+        { code: 'source_disabled', params: { name: 'Integrated' } },
+      ] }],
     skipped: [], errors: [],
   }
   act(() => mutations[1].onSuccess(result))
   const row = Array.from(container.querySelectorAll('li')).find((item) => item.textContent?.includes('Integrated'))!
-  expect(row.textContent).toContain('Includes grid fees.')
-  expect(row.textContent).toContain('Source is disabled.')
+  expect(row.textContent).toContain(translations.t('importDiagnostics.components_included', {
+    tariff_type: 'energy', components: translations.t('pages.dynamicSources.types.grid'),
+  }))
+  expect(row.textContent).toContain(translations.t('importDiagnostics.source_disabled', { name: 'Integrated' }))
+  expect(row.textContent).not.toContain('RAW')
 })
 
 it('keeps transfer warnings visible until the operator closes the result', () => {
@@ -56,13 +69,15 @@ it('keeps transfer warnings visible until the operator closes the result', () =>
   act(() => root.render(createElement(ZevImportModal, { isOpen: true, onClose: vi.fn(), onImported })))
   const result: ZevArchiveImportResult = {
     zev_id: 'restored', zev_name: 'Restored', sections: ['zev'], counts: {},
-    warnings: ['Destination source is disabled.'],
+    warnings: ['RAW disabled destination'],
+    warning_diagnostics: [{ code: 'source_disabled', params: { name: 'Destination' } }],
   }
   act(() => mutations[1].onSuccess(result))
-  expect(container.textContent).toContain('Destination source is disabled.')
+  expect(container.textContent).toContain(translations.t('importDiagnostics.source_disabled', { name: 'Destination' }))
+  expect(container.textContent).not.toContain('RAW')
   expect(container.querySelector('input[type=file]')).toBeNull()
   expect(onImported).not.toHaveBeenCalled()
-  const close = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'common.close')!
+  const close = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === translations.t('common.close'))!
   act(() => close.click())
   expect(onImported).toHaveBeenCalledWith('restored')
 })

@@ -1,6 +1,7 @@
 import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { lowestTariffRate } from './rateLines'
-import { formatTariffError } from './errors'
+import { ImportDiagnostic } from '../../components/ImportDiagnostic'
+import { importRequestFailure } from '../../lib/importDiagnostics'
 import { useAppSettings } from '../../lib/appSettings'
 import { useMemo, useState, type FormEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -67,31 +68,33 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
     const [productByKey, setProductByKey] = useState<Record<string, string>>({})
     const [rememberUrl, setRememberUrl] = useState(true)
     const [year, setYear] = useState<number | null>(null)
+    // Kept raw so the message follows a language switch while the dialog is open.
+    const [requestError, setRequestError] = useState<unknown>(null)
 
     const previewMutation = useMutation({
         mutationFn: previewVseTariffImport,
         onSuccess: (data) => {
+            setRequestError(null)
             setPreview(data)
             setSelected(recommendedKeys(data.candidates))
             setModeByKey(defaultBillingModes(data.candidates))
             setProductByKey({})
             setYear(null)
         },
-        onError: (error) =>
-            pushToast(formatTariffError(error, t('pages.tariffs.import.errors.previewFailed'), t, settings), 'error'),
+        onError: error => setRequestError(error),
     })
 
     const applyMutation = useMutation({
         mutationFn: applyVseTariffImport,
         onSuccess: (data) => {
+            setRequestError(null)
             setResult(data)
             invalidateTariffQueries(queryClient, zevId)
             if (data.created.length > 0) {
                 pushToast(t('pages.tariffs.import.messages.imported', { count: data.created.length }), 'success')
             }
         },
-        onError: (error) =>
-            pushToast(formatTariffError(error, t('pages.tariffs.import.errors.applyFailed'), t, settings), 'error'),
+        onError: error => setRequestError(error),
     })
 
     const years = useMemo(() => candidateYears(preview?.candidates ?? []), [preview])
@@ -125,6 +128,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
     }
 
     function reset() {
+        setRequestError(null)
         setPreview(null)
         setResult(null)
         setSelected(new Set())
@@ -145,11 +149,13 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
 
     function submitUrl(event: FormEvent) {
         event.preventDefault()
+        setRequestError(null)
         previewMutation.mutate({ zev: zevId, url: url.trim() || undefined })
     }
 
     function submitImport() {
         if (!preview || selected.size === 0) return
+        setRequestError(null)
         applyMutation.mutate({
             zev: zevId,
             url: preview.source_url,
@@ -173,6 +179,9 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
             onClose={handleClose}
             size="xl"
         >
+            {requestError !== null && <div className="error-banner" role="alert">
+                <ImportDiagnostic {...importRequestFailure(requestError, t, settings)} fallback={t(`pages.tariffs.import.errors.${step === 'url' ? 'previewFailed' : 'applyFailed'}`)} />
+            </div>}
             {step === 'url' && (
                 <form onSubmit={submitUrl} className="page-stack">
                     <p className="muted">{t('pages.tariffs.import.intro')}</p>
@@ -217,7 +226,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
                             <ul role="list" className="response-list">
                                 {preview.errors.map((error) => (
                                     <li key={`${error.tariff}-${error.error}`}>
-                                        <strong>{error.tariff}</strong>: {error.error}
+                                        <strong>{error.tariff}</strong>: <ImportDiagnostic text={error.error} diagnostic={error.error_diagnostic} fallback={t('importDiagnostics.entryInvalid')} />
                                     </li>
                                 ))}
                             </ul>
@@ -337,8 +346,8 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
                                     ? t('pages.tariffs.import.dynamicBadge')
                                     : t(`pages.tariffs.billingModes.${item.billing_mode}`)} —{' '}
                                 {item.valid_from} … {item.valid_to ?? t('pages.tariffs.openEnded')}
-                                {(item.dynamic_source_warnings ?? []).map((warning) => (
-                                    <div className="warning-banner" key={warning}>{warning}</div>
+                                {(item.dynamic_source_warnings ?? []).map((warning, index) => (
+                                    <div className="warning-banner" key={index}><ImportDiagnostic text={warning} diagnostic={item.dynamic_source_warning_diagnostics?.[index]} fallback={t('importDiagnostics.importedWarningFallback')} /></div>
                                 ))}
                             </li>
                         ))}
@@ -347,7 +356,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
                         <ResultList title={t('pages.tariffs.import.result.skipped')}>
                             {result.skipped.map((item) => (
                                 <li key={`${item.name}-${item.reason}`}>
-                                    <strong>{item.name}</strong>: {item.reason}
+                                    <strong>{item.name}</strong>: <ImportDiagnostic text={item.reason} diagnostic={item.reason_diagnostic} fallback={t('importDiagnostics.notImported')} />
                                 </li>
                             ))}
                         </ResultList>
@@ -356,7 +365,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
                         <ResultList title={t('pages.tariffs.import.result.errors')}>
                             {result.errors.map((item) => (
                                 <li key={`${item.name}-${item.error}`}>
-                                    <strong>{item.name}</strong>: {item.error}
+                                    <strong>{item.name}</strong>: <ImportDiagnostic text={item.error} diagnostic={item.error_diagnostic} fallback={t('importDiagnostics.entryInvalid')} />
                                 </li>
                             ))}
                         </ResultList>
@@ -434,10 +443,10 @@ function CandidateRow({
                 {candidate.source_customer_type && (
                     <small className="muted">{candidate.source_customer_type}</small>
                 )}
-                {candidate.warnings.map((warning) => (
-                    <small key={warning} className="muted" style={{ display: 'block' }}>
-                        <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth /> {warning}
-                    </small>
+                {candidate.warnings.map((warning, index) => (
+                    <div key={index} className="muted">
+                        <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth /> <ImportDiagnostic text={warning} diagnostic={candidate.warning_diagnostics?.[index]} fallback={t('importDiagnostics.warningFallback')} />
+                    </div>
                 ))}
             </td>
             <td>
@@ -484,7 +493,7 @@ function CandidateRow({
                 <span className={`badge ${STATUS_BADGE[candidate.status]}`}>
                     {t(`pages.tariffs.import.status.${candidate.status}`)}
                 </span>
-                {candidate.detail && <small className="muted" style={{ display: 'block' }}>{candidate.detail}</small>}
+                {candidate.detail && <div className="muted"><ImportDiagnostic text={candidate.detail} diagnostic={candidate.detail_diagnostic} fallback={t(candidate.status === 'unsupported' ? 'importDiagnostics.tariff_unsupported' : 'importDiagnostics.notImported')} /></div>}
             </td>
         </tr>
     )

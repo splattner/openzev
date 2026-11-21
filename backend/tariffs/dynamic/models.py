@@ -115,6 +115,7 @@ class DynamicTariffSource(models.Model):
     # screen. ``importers.remote.TariffFetchError`` already splits the safe
     # message from the server-only detail.
     last_fetch_error = models.CharField(max_length=500, blank=True, default="")
+    last_fetch_diagnostics = models.JSONField(default=list, blank=True)
 
     # Denormalised extent of the stored series, so a picker and the readiness
     # check can say what is covered without aggregating 35 000 rows per year.

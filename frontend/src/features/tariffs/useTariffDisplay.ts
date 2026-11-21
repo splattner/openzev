@@ -1,3 +1,4 @@
+import { formatDynamicFetchError } from './errors'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { fetchDynamicTariffSources } from '../../lib/api/tariffs'
@@ -112,7 +113,7 @@ export function useTariffDisplay(settings: AppSettings, today: string) {
     function pricingTooltipFor(series: TariffSeries, version: TariffVersion, source?: DynamicTariffSource) {
         if (version.dynamic_source) {
             if (source?.last_fetch_status === 'failed') {
-                return t('pages.tariffs.dynamicFetchFailedTooltip', { error: source.last_fetch_error })
+                return t('pages.tariffs.dynamicFetchFailedTooltip', { error: formatDynamicFetchError(source, t) })
             }
             if (version.dynamic_price_summary?.status === 'partial') return t('pages.tariffs.dynamicAveragePartialTooltip')
             if (version.dynamic_price_summary?.status === 'complete') return t('pages.tariffs.dynamicAverageTooltip')
