@@ -9,7 +9,7 @@ import { deleteInvoice, fetchInvoices } from '../lib/api/invoices'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
 import { useToast } from '../lib/toast'
-import { InvoiceActionButton, InvoiceLink, InvoiceStatusBadge } from '../components/InvoicePresentation'
+import { InvoiceActionButton, InvoiceAmount, InvoiceLink, InvoiceStatusBadge } from '../components/InvoicePresentation'
 import type { Invoice } from '../types/api'
 
 // Stable empty array so the useMemo below keeps a consistent dependency reference.
@@ -96,13 +96,13 @@ export function AdminInvoicesContent() {
             {
                 accessorKey: 'period_sort',
                 header: t('adminInvoices.period'),
-                cell: (ctx) => `${formatShortDate(ctx.row.original.period_start, settings)} - ${formatShortDate(ctx.row.original.period_end, settings)}`,
+                cell: (ctx) => ctx.row.original.period_display,
             },
             {
                 accessorKey: 'total_value',
                 header: t('adminInvoices.total'),
                 meta: { numeric: true },
-                cell: (ctx) => `${ctx.row.original.total_chf} CHF`,
+                cell: (ctx) => <InvoiceAmount value={ctx.row.original.total_chf} currency={false} />,
             },
             {
                 accessorKey: 'status',
@@ -130,7 +130,6 @@ export function AdminInvoicesContent() {
                 id: 'actions',
                 header: '',
                 enableSorting: false,
-                meta: { numeric: false },
                 cell: (ctx) => (
                     <InvoiceActionButton action={{
                         label: t('adminInvoices.delete'),
@@ -141,7 +140,7 @@ export function AdminInvoicesContent() {
                 ),
             },
         ],
-        [t, settings, handleDelete, deleteMutation.isPending],
+        [t, handleDelete, deleteMutation.isPending],
     )
 
     return (
@@ -153,34 +152,31 @@ export function AdminInvoicesContent() {
                     <p className="muted">{t('adminInvoices.empty')}</p>
                 )}
                 {invoices.length > 0 && (
-                    <div className="page-stack sheet-table-body" style={{ width: '100%' }}>
-                        <div className="actions-row" style={{ flexWrap: 'wrap' }}>
+                    <div className="page-stack sheet-table-body">
+                        <div className="list-filters">
                             <input
                                 type="search"
                                 placeholder={t('adminInvoices.quickFilterPlaceholder')}
+                                aria-label={t('adminInvoices.quickFilterPlaceholder')}
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                style={{ maxWidth: '20rem' }}
                             />
-                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                                <span className="muted">{t('adminInvoices.status')}</span>
-                                <select
-                                    value={String(columnFilters.find((f) => f.id === 'status')?.value ?? '')}
-                                    onChange={(e) =>
-                                        setColumnFilters(
-                                            e.target.value
-                                                ? [{ id: 'status', value: e.target.value }]
-                                                : [],
-                                        )
-                                    }
-                                    style={{ width: 'auto' }}
-                                >
-                                    <option value="">{t('adminInvoices.allStatuses')}</option>
-                                    {(['draft', 'approved', 'sent', 'paid', 'cancelled'] as const).map((value) => (
-                                        <option key={value} value={value}>{t(`invoice.status.${value}`)}</option>
-                                    ))}
-                                </select>
-                            </label>
+                            <select
+                                aria-label={t('adminInvoices.status')}
+                                value={String(columnFilters.find((f) => f.id === 'status')?.value ?? '')}
+                                onChange={(e) =>
+                                    setColumnFilters(
+                                        e.target.value
+                                            ? [{ id: 'status', value: e.target.value }]
+                                            : [],
+                                    )
+                                }
+                            >
+                                <option value="">{t('adminInvoices.allStatuses')}</option>
+                                {(['draft', 'approved', 'sent', 'paid', 'cancelled'] as const).map((value) => (
+                                    <option key={value} value={value}>{t(`invoice.status.${value}`)}</option>
+                                ))}
+                            </select>
                         </div>
                         <DataTable
                             data={filteredRows}

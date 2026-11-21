@@ -5203,7 +5203,7 @@ export const en = {
         zev: 'ZEV',
         participant: 'Participant',
         period: 'Period',
-        total: 'Total',
+        total: 'Total (CHF)',
         status: 'Status',
         allStatuses: 'All statuses',
         quickFilterPlaceholder: 'Search invoices…',

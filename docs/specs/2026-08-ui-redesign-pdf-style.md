@@ -424,11 +424,13 @@ the loaded current-scope list before querying it. Invoice URLs accept historical
 ranges from community start; their default remains the previous complete period
 bounded by the first aligned period. Shared URL navigation retains unrelated
 query parameters/hash and the hubs' existing history/mounting contracts.
-Invoice lists reuse `InvoicePresentation` cells and links, with `formatChf`
-amounts in personal/period lists, translated missing-day plurals and labelled
-PDF controls. Admin invoice totals retain the trailing currency format
-(`114.94 CHF`). Row models, permissions, workflow eligibility and pagination
-stay consumer-owned.
+Invoice lists reuse `InvoicePresentation` cells and links, translated
+missing-day plurals and labelled PDF controls. The period and admin tables
+name the currency in the amount header (`Total (CHF)`) and show the bare
+amount (`114.94`); the period rows set CHF inline only in card mode, where
+that header is hidden. The documents list keeps `CHF 114.94` in each cell.
+Row models, permissions, workflow eligibility and pagination stay with each
+list.
 
 #### Dashboard
 
