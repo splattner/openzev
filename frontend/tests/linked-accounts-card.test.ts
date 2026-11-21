@@ -7,6 +7,10 @@ import { flush } from './pdf-test-utils'
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
 vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast: vi.fn() }) }))
+vi.mock('../src/lib/appSettings', async (importOriginal) => ({
+    ...await importOriginal<typeof import('../src/lib/appSettings')>(),
+    useAppSettings: () => ({ settings: { date_format_short: 'dd.MM.yyyy' } }),
+}))
 vi.mock('../src/lib/api/auth', () => ({
     fetchOAuthProviders: vi.fn(),
     fetchSocialAccounts: vi.fn(() => Promise.resolve([])),
