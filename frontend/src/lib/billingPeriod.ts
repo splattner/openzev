@@ -1,4 +1,4 @@
-import { formatIsoDate } from './dates'
+import { formatIsoDate, formatMonthName, formatMonthYear } from './dates'
 
 export type BillingInterval = 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
 
@@ -77,26 +77,17 @@ export function recentBillingPeriods(
     return periods.filter((range) => !minFrom || range.from >= minFrom)
 }
 
-const periodFormatters = new Map<string, { month: Intl.DateTimeFormat; monthYear: Intl.DateTimeFormat }>()
-
 /** Localized labels for whole-month ranges, including ranges across years. */
 export function billingPeriodName(fromIso: string, toIso: string, locale: string): string {
-    let formatters = periodFormatters.get(locale)
-    if (!formatters) {
-        formatters = {
-            month: new Intl.DateTimeFormat(locale, { month: 'long', timeZone: 'UTC' }),
-            monthYear: new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' }),
-        }
-        periodFormatters.set(locale, formatters)
-    }
-    const { month, monthYear } = formatters
+    const month = (date: Date) => formatMonthName(date, { locale, timeZone: 'UTC' })
+    const monthYear = (date: Date) => formatMonthYear(date, { locale, timeZone: 'UTC' })
     const from = new Date(`${fromIso}T00:00:00Z`)
     const to = new Date(`${toIso}T00:00:00Z`)
     const name = fromIso.slice(0, 7) === toIso.slice(0, 7)
-        ? monthYear.format(from)
+        ? monthYear(from)
         : fromIso.slice(0, 4) === toIso.slice(0, 4)
-            ? `${month.format(from)} – ${monthYear.format(to)}`
-            : `${monthYear.format(from)} – ${monthYear.format(to)}`
+            ? `${month(from)} – ${monthYear(to)}`
+            : `${monthYear(from)} – ${monthYear(to)}`
     return name.charAt(0).toLocaleUpperCase(locale) + name.slice(1)
 }
 

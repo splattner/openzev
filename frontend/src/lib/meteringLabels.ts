@@ -1,5 +1,5 @@
 import type { AppSettings, MeteringPoint } from '../types/api'
-import { BUSINESS_TIME_ZONE, zonedParts } from './dates'
+import { BUSINESS_TIME_ZONE, formatMonthName, zonedParts } from './dates'
 import type { Translate } from './translate'
 
 /**
@@ -19,7 +19,7 @@ function bucketParts(date: Date) {
     return {
         dayPadded: pad(p.day),
         monthPadded: pad(p.month),
-        monthShort: new Intl.DateTimeFormat(undefined, { month: 'short', timeZone: BUSINESS_TIME_ZONE }).format(date),
+        monthShort: formatMonthName(date, { month: 'short', timeZone: BUSINESS_TIME_ZONE }),
         year: p.year,
         hoursPadded: pad(p.hours),
         minutesPadded: pad(p.minutes),

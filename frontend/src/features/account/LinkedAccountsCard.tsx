@@ -5,6 +5,7 @@ import { useReducedMotion } from '@mantine/hooks'
 import { useTranslation } from 'react-i18next'
 import { deleteSocialAccount, fetchOAuthProviders, fetchSocialAccounts, oauthLinkInitiate } from '../../lib/api/auth'
 import { queryKeys } from '../../lib/api/queryKeys'
+import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { useToast } from '../../lib/toast'
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 /** External sign-in providers (OAuth) linked to this account. */
 export function LinkedAccountsCard({ onUnlink }: Props) {
     const { t } = useTranslation()
+    const { settings } = useAppSettings()
     const animate = !useReducedMotion()
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
@@ -76,7 +78,7 @@ export function LinkedAccountsCard({ onUnlink }: Props) {
                             <strong>{provider.display_name}</strong>
                             {linked && (
                                 <small className="muted" style={{ display: 'block' }}>
-                                    {t('account.linkedSince', { date: new Date(linked.created_at).toLocaleDateString() })}
+                                    {t('account.linkedSince', { date: formatShortDate(linked.created_at, settings) })}
                                 </small>
                             )}
                         </div>
