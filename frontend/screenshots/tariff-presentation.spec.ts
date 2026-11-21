@@ -198,7 +198,7 @@ test('shared sticky headers and the light raw-metering grid survive fractional z
       : [{ date: '2026-10-01', in_kwh: 1, out_kwh: 0, readings_count: 1 }] })
   })
   await page.goto('/metering/chart?metering_point=mp42')
-  await page.locator('.raw-metering-day').click()
+  await page.locator('.raw-metering-day-toggle').click()
   const operational = page.locator('.raw-metering-days thead th').first()
   const light = page.locator('.raw-metering-grid thead th').nth(1)
   for (const zoom of ['1.1', '1.25']) {

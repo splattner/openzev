@@ -3,7 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import { CHART_LOCAL, CONS_COLORS } from '../lib/chartTokens'
 import { CHART_AXIS_TICK } from '../lib/chartTheme'
 import { formatNumber } from '../lib/numbers'
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useId, useState } from 'react'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faChevronDown } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { fetchRawMeteringData, fetchRawMeteringDay } from '../lib/api/metering'
@@ -123,7 +125,7 @@ export function dataBarPercent(value: number, maxAbs: number): number {
  * (#641). A month-ish chunk keeps each page a natural, readable unit. */
 const DAYS_PER_PAGE = 31
 
-// ── Hour × 15-minute grid ───────────────────────────────────────────────────────
+// ── Hour × quarter-hour table ───────────────────────────────────────────────────
 
 const SLOT_MINUTES = [0, 15, 30, 45]
 const HOURS = Array.from({ length: 24 }, (_, h) => h)
@@ -158,92 +160,154 @@ function buildHourGrid(readings: RawMeteringReading[], direction: 'in' | 'out'):
     return grid
 }
 
-/** Compact grid: one column per hour (00–23), one row per 15-minute slot (:00–:45). */
-function HourGrid({
-    readings,
-    direction,
-    caption,
+export interface HourRow {
+    hour: number
+    /** One cell per entry of `slots`. */
+    cells: GridCell[]
+    /** Sum of the hour's cells; null when none holds a reading. */
+    total: number | null
+}
+
+/**
+ * Pivot one direction's readings into hour rows by Swiss hour (see buildHourGrid):
+ * four quarter-hour columns when any of the direction's readings is 15-minute
+ * or off the full hour, otherwise one (hourly or daily data). A missing
+ * quarter-hour is an empty cell, not a missing column.
+ */
+export function buildHourTable(
+    readings: RawMeteringReading[],
+    direction: 'in' | 'out',
+): { slots: number[]; rows: HourRow[] } {
+    const grid = buildHourGrid(readings, direction)
+    const quarterHourly =
+        readings.some((r) => r.direction === direction && r.resolution === '15min') ||
+        grid.slice(1).some((slot) => slot.some((cell) => cell.readings.length > 0))
+    const used = quarterHourly ? [0, 1, 2, 3] : [0]
+    const rows = HOURS.map((hour) => {
+        const cells = used.map((slot) => grid[slot][hour])
+        const filled = cells.filter((cell) => cell.total !== null)
+        return { hour, cells, total: filled.length ? filled.reduce((sum, cell) => sum + (cell.total ?? 0), 0) : null }
+    })
+    return { slots: used.map((slot) => SLOT_MINUTES[slot]), rows }
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+/** One interval: its value and quality markers, as a button that opens its readings. */
+function ReadingCell({
+    cell,
+    time,
+    open,
+    detailId,
+    onToggle,
 }: {
-    readings: RawMeteringReading[]
-    direction: 'in' | 'out'
-    caption?: string
+    cell: GridCell
+    time: string
+    open: boolean
+    detailId: string
+    onToggle: () => void
 }) {
     const { t } = useTranslation()
+    if (cell.readings.length === 0) return <td>–</td>
+    // Highlight a negative cell total; the day banner counts individual negative readings.
+    return (
+        <td className={cell.total !== null && cell.total < 0 ? 'raw-metering-negative' : undefined}>
+            <button
+                type="button"
+                className="raw-metering-cell-button"
+                aria-expanded={open}
+                aria-controls={open ? detailId : undefined}
+                aria-label={t('pages.meteringData.rawTable.cellAria', {
+                    time,
+                    value: kwh(cell.total),
+                    quality: [...new Set(cell.readings.map((reading) => conditionLabel(reading.condition, t)))].join(', '),
+                    count: cell.readings.length,
+                })}
+                onClick={onToggle}
+            >
+                {kwh(cell.total)}
+                {cell.readings.some((reading) => reading.condition === '56') && (
+                    <span className="raw-metering-quality-marker" aria-hidden>
+                        ≈
+                    </span>
+                )}
+                {cell.readings.length > 1 && (
+                    <span className="raw-metering-cell-count" aria-hidden>
+                        ·{cell.readings.length}
+                    </span>
+                )}
+            </button>
+        </td>
+    )
+}
+
+/** Hours 00–23 as rows, split 00–11 and 12–23 side by side (stacked when narrow). */
+function HourTable({ readings, direction }: { readings: RawMeteringReading[]; direction: 'in' | 'out' }) {
+    const { t } = useTranslation()
     const { settings } = useAppSettings()
-    const grid = buildHourGrid(readings, direction)
-    const [selected, setSelected] = useState<{ slot: number; hour: number } | null>(null)
-    const selectedCell = selected ? grid[selected.slot][selected.hour] : null
+    const detailId = useId()
+    const { slots, rows } = buildHourTable(readings, direction)
+    const [selected, setSelected] = useState<{ hour: number; slot: number } | null>(null)
+    const selectedCell = selected ? rows[selected.hour].cells[selected.slot] : null
+    const allCells = rows.flatMap((row) => row.cells)
+    // Name the resolution when the day has no quarter-hours to show.
+    const hourly = readings.every((reading) => reading.direction !== direction || reading.resolution === 'hourly')
+    const legend = [
+        t(hourly ? 'pages.meteringData.rawTable.hourlyValuesInKwh' : 'pages.meteringData.rawTable.valuesInKwh'),
+        allCells.some((cell) => cell.readings.some((reading) => reading.condition === '56')) &&
+            t('pages.meteringData.rawTable.qualityEstimatedLegend'),
+        t('pages.meteringData.rawTable.qualityDetailLegend'),
+        allCells.some((cell) => cell.readings.length > 1) && t('pages.meteringData.rawTable.qualityAggregatedLegend'),
+    ].filter(Boolean).join(' · ')
 
     return (
-        <div className="raw-metering-grid-wrap">
-            {caption && <p className="raw-metering-grid-caption">{caption}</p>}
-            <div className="raw-metering-grid-scroll">
-                <table className="raw-metering-grid">
-                    <thead>
-                        <tr>
-                            <th className="raw-metering-grid-corner" aria-hidden />
-                            {HOURS.map((h) => (
-                                <th key={h}>{String(h).padStart(2, '0')}</th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {SLOT_MINUTES.map((minute, slot) => (
-                            <tr key={minute}>
-                                <th scope="row">:{String(minute).padStart(2, '0')}</th>
-                                {HOURS.map((h) => {
-                                    const cell = grid[slot][h]
-                                    // A negative reading is corrupt data, not just unusual —
-                                    // flagged in place rather than requiring the viewer to
-                                    // eyeball every cell (#652).
-                                    const isNegative = cell.total !== null && cell.total < 0
-                                    const isSelected = selected?.slot === slot && selected?.hour === h
-                                    const estimated = cell.readings.some((reading) => reading.condition === '56')
-                                    return (
-                                        <td
-                                            key={h}
-                                            style={isNegative ? { color: 'var(--danger-700)', fontWeight: 700 } : undefined}
-                                        >
-                                            {cell.readings.length === 0 ? (
-                                                '–'
-                                            ) : (
-                                                <button
-                                                    type="button"
-                                                    className="raw-metering-cell-button"
-                                                    aria-expanded={isSelected}
-                                                    aria-label={t('pages.meteringData.rawTable.cellAria', {
-                                                        time: `${String(h).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
-                                                        value: kwh(cell.total),
-                                                        quality: [...new Set(cell.readings.map((reading) => conditionLabel(reading.condition, t)))].join(', '),
-                                                        count: cell.readings.length,
-                                                    })}
-                                                    onClick={() =>
-                                                        setSelected(isSelected ? null : { slot, hour: h })
-                                                    }
-                                                >
-                                                    {kwh(cell.total)}
-                                                    {estimated && (
-                                                        <span className="raw-metering-quality-marker" aria-hidden>
-                                                            ≈
-                                                        </span>
-                                                    )}
-                                                    {cell.readings.length > 1 && (
-                                                        <span className="raw-metering-cell-count" aria-hidden>
-                                                            ·{cell.readings.length}
-                                                        </span>
-                                                    )}
-                                                </button>
-                                            )}
-                                        </td>
-                                    )
-                                })}
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+        <>
+            <div className="raw-metering-halves">
+                {[0, 12].map((start) => (
+                    <div className="raw-metering-grid-scroll" key={start}>
+                        <table className="raw-metering-grid">
+                            <thead>
+                                <tr>
+                                    <th scope="col">{t('pages.meteringData.rawTable.hour')}</th>
+                                    {slots.map((minute) => (
+                                        <th key={minute} scope="col">{slots.length === 1 ? 'kWh' : `:${pad2(minute)}`}</th>
+                                    ))}
+                                    {slots.length > 1 && (
+                                        <th scope="col" title={t('pages.meteringData.rawTable.hourTotal')} aria-label={t('pages.meteringData.rawTable.hourTotal')}>Σ</th>
+                                    )}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {rows.slice(start, start + 12).map((row) => (
+                                    <tr key={row.hour}>
+                                        <th scope="row">{pad2(row.hour)}</th>
+                                        {row.cells.map((cell, slot) => {
+                                            const open = selected?.slot === slot && selected?.hour === row.hour
+                                            return (
+                                                <ReadingCell
+                                                    key={slots[slot]}
+                                                    cell={cell}
+                                                    time={`${pad2(row.hour)}:${pad2(slots[slot])}`}
+                                                    open={open}
+                                                    detailId={detailId}
+                                                    onToggle={() => setSelected(open ? null : { hour: row.hour, slot })}
+                                                />
+                                            )
+                                        })}
+                                        {slots.length > 1 && (
+                                            <td className={`raw-metering-hour-total${row.total !== null && row.total < 0 ? ' raw-metering-negative' : ''}`}>{kwh(row.total)}</td>
+                                        )}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ))}
             </div>
-            {selectedCell && selected && (
+            <p className="raw-metering-quality-legend">{legend}</p>
+            {selectedCell && (
                 <div
+                    id={detailId}
                     className="raw-metering-cell-detail"
                     role="region"
                     aria-label={t('pages.meteringData.rawTable.cellDetailTitle')}
@@ -259,7 +323,7 @@ function HourGrid({
                     </ul>
                 </div>
             )}
-        </div>
+        </>
     )
 }
 
@@ -287,40 +351,31 @@ function SparkTooltip({
     )
 }
 
-/** Compact intraday curve of a day's 15-minute values; complements the exact-value grid below. */
+/** Compact intraday curve of a day's values; complements the exact-value table below. */
 function DaySparkline({
     intervals,
     hasIn,
     hasOut,
-    meterType,
+    labels,
 }: {
     intervals: IntervalRow[]
     hasIn: boolean
     hasOut: boolean
-    meterType: MeteringPoint['meter_type'] | undefined
+    labels: Record<'in' | 'out', string>
 }) {
-    const { t } = useTranslation()
+    // A category axis can only label times present in the data.
+    const ticks = ['00:00', '06:00', '12:00', '18:00'].filter((time) => intervals.some((interval) => interval.time === time))
     return (
         <div className="raw-metering-sparkline">
             <ResponsiveContainer width="100%" height={120}>
-                <AreaChart data={intervals} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
-                    <defs>
-                        <linearGradient id="rawSparkIn" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={CONS_COLORS[0]} stopOpacity={0.28} />
-                            <stop offset="100%" stopColor={CONS_COLORS[0]} stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="rawSparkOut" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={CHART_LOCAL} stopOpacity={0.28} />
-                            <stop offset="100%" stopColor={CHART_LOCAL} stopOpacity={0} />
-                        </linearGradient>
-                    </defs>
+                <AreaChart data={intervals} margin={{ top: 8, right: 20, left: 20, bottom: 0 }}>
                     <XAxis
                         dataKey="time"
                         tick={CHART_AXIS_TICK}
                         tickLine={false}
                         axisLine={false}
-                        interval={15}
-                        minTickGap={16}
+                        ticks={ticks}
+                        interval={0}
                     />
                     <YAxis hide domain={[0, 'auto']} />
                     <Tooltip content={<SparkTooltip />} />
@@ -328,10 +383,11 @@ function DaySparkline({
                         <Area
                             type="monotone"
                             dataKey="in"
-                            name={t('pages.meteringData.series.consumption')}
+                            name={labels.in}
                             stroke={CONS_COLORS[0]}
                             strokeWidth={1.5}
-                            fill="url(#rawSparkIn)"
+                            fill={CONS_COLORS[0]}
+                            fillOpacity={0.12}
                             dot={false}
                             isAnimationActive={false}
                         />
@@ -340,10 +396,11 @@ function DaySparkline({
                         <Area
                             type="monotone"
                             dataKey="out"
-                            name={t(outReadingLabelKey(meterType, 'pages.meteringData.series.production', 'pages.meteringData.series.feedIn'))}
+                            name={labels.out}
                             stroke={CHART_LOCAL}
                             strokeWidth={1.5}
-                            fill="url(#rawSparkOut)"
+                            fill={CHART_LOCAL}
+                            fillOpacity={0.12}
                             dot={false}
                             isAnimationActive={false}
                         />
@@ -357,11 +414,13 @@ function DaySparkline({
 // ── Expanded day detail (lazy-loaded) ──────────────────────────────────────────
 
 function RawDayDetail({
+    id,
     meteringPointId,
     date,
     colSpan,
     meterType,
 }: {
+    id: string
     meteringPointId: string
     date: string
     colSpan: number
@@ -374,15 +433,9 @@ function RawDayDetail({
     })
 
     const readings = query.data ?? []
-    const intervals = pivotByInterval(readings)
-    const dayHasIn = readings.some((r) => r.direction === 'in')
-    const dayHasOut = readings.some((r) => r.direction === 'out')
-    // Only label the grids when both directions are present; otherwise it's unambiguous.
-    const showCaptions = dayHasIn && dayHasOut
-    const { negativeCount, duplicateCount } = readingAnomalies(readings)
 
     return (
-        <tr className="raw-metering-detail-row">
+        <tr id={id}>
             <td colSpan={colSpan} className="raw-metering-detail-cell">
                 {query.isLoading ? (
                     <div className="raw-metering-detail-status muted">{t('pages.meteringData.loadingRawTable')}</div>
@@ -391,47 +444,92 @@ function RawDayDetail({
                 ) : readings.length === 0 ? (
                     <div className="raw-metering-detail-status muted">{t('pages.meteringData.noRawReadings')}</div>
                 ) : (
-                    <div className="raw-metering-detail-body">
-                        {negativeCount > 0 && (
-                            <div className="raw-metering-anomaly raw-metering-anomaly-danger">
-                                {t('pages.meteringData.rawTable.negativeReadingsWarning', { count: negativeCount })}
-                            </div>
-                        )}
-                        {duplicateCount > 0 && (
-                            <div className="raw-metering-anomaly">
-                                {t('pages.meteringData.rawTable.duplicateReadingsWarning', { count: duplicateCount })}
-                            </div>
-                        )}
-                        <DaySparkline intervals={intervals} hasIn={dayHasIn} hasOut={dayHasOut} meterType={meterType} />
-                        <p className="raw-metering-quality-legend">
-                            {t('pages.meteringData.rawTable.qualityEstimatedLegend')}
-                            {' · '}
-                            {t('pages.meteringData.rawTable.qualityDetailLegend')}
-                            {' · '}
-                            {t('pages.meteringData.rawTable.qualityAggregatedLegend')}
-                        </p>
-                        {dayHasIn && (
-                            <HourGrid
-                                readings={readings}
-                                direction="in"
-                                caption={showCaptions ? t('pages.meteringData.rawTable.inKwh') : undefined}
-                            />
-                        )}
-                        {dayHasOut && (
-                            <HourGrid
-                                readings={readings}
-                                direction="out"
-                                caption={showCaptions ? t(outReadingLabelKey(meterType, 'pages.meteringData.rawTable.productionKwh', 'pages.meteringData.rawTable.outKwh')) : undefined}
-                            />
-                        )}
-                    </div>
+                    <RawDayBody readings={readings} meterType={meterType} />
                 )}
             </td>
         </tr>
     )
 }
 
+function RawDayBody({
+    readings,
+    meterType,
+}: {
+    readings: RawMeteringReading[]
+    meterType: MeteringPoint['meter_type'] | undefined
+}) {
+    const { t } = useTranslation()
+    const intervals = pivotByInterval(readings)
+    const dayHasIn = readings.some((r) => r.direction === 'in')
+    const dayHasOut = readings.some((r) => r.direction === 'out')
+    const both = dayHasIn && dayHasOut
+    const [direction, setDirection] = useState<'in' | 'out'>(
+        !dayHasIn || (dayHasOut && meterType === 'production') ? 'out' : 'in',
+    )
+    const { negativeCount, duplicateCount } = readingAnomalies(readings)
+    const labels = {
+        in: t('pages.meteringData.series.consumption'),
+        out: t(outReadingLabelKey(meterType, 'pages.meteringData.series.production', 'pages.meteringData.series.feedIn')),
+    }
+    const totalOf = (dir: 'in' | 'out') =>
+        readings.filter((r) => r.direction === dir).reduce((sum, r) => sum + r.energy_kwh, 0)
+
+    return (
+        <div className="raw-metering-detail-body">
+            {negativeCount > 0 && (
+                <div className="raw-metering-anomaly raw-metering-anomaly-danger">
+                    {t('pages.meteringData.rawTable.negativeReadingsWarning', { count: negativeCount })}
+                </div>
+            )}
+            {duplicateCount > 0 && (
+                <div className="raw-metering-anomaly">
+                    {t('pages.meteringData.rawTable.duplicateReadingsWarning', { count: duplicateCount })}
+                </div>
+            )}
+            {both && (
+                <p className="raw-metering-detail-totals">
+                    {(['in', 'out'] as const).map((dir) => (
+                        <span key={dir}>
+                            {labels[dir]}: <strong>{kwh(totalOf(dir))}</strong> kWh
+                        </span>
+                    ))}
+                </p>
+            )}
+            <DaySparkline intervals={intervals} hasIn={dayHasIn} hasOut={dayHasOut} labels={labels} />
+            {both && (
+                <div className="actions-row raw-metering-direction" role="group" aria-label={t('pages.meteringData.rawTable.direction')}>
+                    {(['in', 'out'] as const).map((dir) => (
+                        <button
+                            key={dir}
+                            type="button"
+                            className={`button button-compact ${direction === dir ? 'button-primary' : 'button-secondary'}`}
+                            aria-pressed={direction === dir}
+                            onClick={() => setDirection(dir)}
+                        >
+                            {labels[dir]}
+                        </button>
+                    ))}
+                </div>
+            )}
+            <HourTable key={direction} readings={readings} direction={direction} />
+        </div>
+    )
+}
+
 // ── Raw-data section ────────────────────────────────────────────────────────────
+
+function BarCell({ value, percent }: { value: number; percent: number }) {
+    return (
+        <td className="raw-metering-num">
+            <div className="raw-metering-bar-cell">
+                <span className="raw-metering-bar" aria-hidden>
+                    <span style={{ width: `${percent}%` }} />
+                </span>
+                <span className="raw-metering-value">{kwh(value)}</span>
+            </div>
+        </td>
+    )
+}
 
 export function RawMeteringTable({
     meteringPointId,
@@ -454,7 +552,13 @@ export function RawMeteringTable({
 }) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
-    const [expanded, setExpanded] = useState<string | null>(null)
+    const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
+    const toggleDay = (date: string) =>
+        setExpanded((prev) => {
+            const next = new Set(prev)
+            if (!next.delete(date)) next.add(date)
+            return next
+        })
     const [page, setPage] = useState(0)
 
     const summaryQuery = useQuery({
@@ -473,11 +577,17 @@ export function RawMeteringTable({
     })
     const assignments = canReadAssignments ? assignmentsQuery.data ?? [] : []
 
-    // Back to page 1 whenever the meter or period changes, rather than
-    // stranding the viewer on e.g. page 4 of a now much-shorter list (#641).
-    useEffect(() => {
+    // A new meter or period starts on page 1 with every day closed, rather than
+    // stranding the viewer on e.g. page 4 of a now much-shorter list (#641) or
+    // reopening the same dates for another meter. Reset while rendering, so a
+    // stale day never mounts (and fetches) first.
+    const selection = `${meteringPointId}|${dateFrom}|${dateTo}`
+    const [shownSelection, setShownSelection] = useState(selection)
+    if (shownSelection !== selection) {
+        setShownSelection(selection)
         setPage(0)
-    }, [meteringPointId, dateFrom, dateTo])
+        setExpanded(new Set())
+    }
 
     const days = summaryQuery.data ?? []
     // Date + In + Reading count, plus Feed-in when the meter exports.
@@ -510,6 +620,12 @@ export function RawMeteringTable({
                 <div className="raw-metering-detail-status muted">{t('pages.meteringData.noRawReadings')}</div>
             ) : (
                 <table className="raw-metering-days">
+                    <colgroup>
+                        <col />
+                        <col className="raw-metering-col-num" />
+                        {hasOut && <col className="raw-metering-col-num" />}
+                        <col />
+                    </colgroup>
                     <thead>
                         <tr>
                             <SortableHeader {...sorting.header('day')}>{t('pages.meteringData.rawTable.day')}</SortableHeader>
@@ -520,61 +636,46 @@ export function RawMeteringTable({
                     </thead>
                     <tbody>
                         {visibleDays.map((day) => {
-                            const isOpen = expanded === day.date
+                            const isOpen = expanded.has(day.date)
+                            const detailId = `raw-metering-detail-${meteringPointId}-${day.date}`
                             const flags = dayAnomalyFlags(day, assignments)
-                            const inBarPct = dataBarPercent(day.in_kwh, maxIn)
-                            const outBarPct = dataBarPercent(day.out_kwh, maxOut)
                             return (
                                 <Fragment key={day.date}>
-                                    <tr
-                                        className="raw-metering-day"
-                                        role="button"
-                                        tabIndex={0}
-                                        aria-expanded={isOpen}
-                                        onClick={() => setExpanded(isOpen ? null : day.date)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
-                                                e.preventDefault()
-                                                setExpanded(isOpen ? null : day.date)
-                                            }
-                                        }}
-                                    >
-                                        <td className="raw-metering-day-label">
-                                            <span className="raw-metering-caret" data-open={isOpen || undefined} aria-hidden>
-                                                ▸
-                                            </span>
-                                            {formatShortDate(day.date, settings)}
-                                            {flags.negativeTotal && (
-                                                <span className="badge badge-danger badge-quiet raw-metering-day-flag">
-                                                    {t('pages.meteringData.rawTable.negativeTotalFlag')}
-                                                </span>
-                                            )}
-                                            {flags.zeroConsumptionWithHolder && (
-                                                <span className="badge badge-warning badge-quiet raw-metering-day-flag">
-                                                    {t('pages.meteringData.rawTable.zeroConsumptionFlag')}
-                                                </span>
-                                            )}
+                                    <tr className={`raw-metering-day${isOpen ? ' is-open' : ''}`}>
+                                        <td>
+                                            <div className="raw-metering-day-label">
+                                                <button
+                                                    type="button"
+                                                    className="raw-metering-day-toggle disclosure-toggle"
+                                                    aria-expanded={isOpen}
+                                                    aria-controls={isOpen ? detailId : undefined}
+                                                    onClick={() => toggleDay(day.date)}
+                                                >
+                                                    <FontAwesomeIcon icon={faChevronDown} className="disclosure-toggle-icon" fixedWidth />
+                                                    {formatShortDate(day.date, settings)}
+                                                </button>
+                                                {flags.negativeTotal && (
+                                                    <span className="badge badge-danger badge-quiet raw-metering-day-flag">
+                                                        {t('pages.meteringData.rawTable.negativeTotalFlag')}
+                                                    </span>
+                                                )}
+                                                {/* A production meter is not expected to consume. */}
+                                                {flags.zeroConsumptionWithHolder && meterType !== 'production' && (
+                                                    <span className="badge badge-warning badge-quiet raw-metering-day-flag">
+                                                        {t('pages.meteringData.rawTable.zeroConsumptionFlag')}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
-                                        {/* A data-bar backdrop scaled to the period's max makes an
-                                            outlier day visible without reading every row (#641). */}
-                                        <td
-                                            className="raw-metering-num"
-                                            style={{ background: `linear-gradient(to right, var(--brand-pale) ${inBarPct}%, transparent ${inBarPct}%)` }}
-                                        >
-                                            {kwh(day.in_kwh)}
-                                        </td>
-                                        {hasOut && (
-                                            <td
-                                                className="raw-metering-num"
-                                                style={{ background: `linear-gradient(to right, var(--brand-pale) ${outBarPct}%, transparent ${outBarPct}%)` }}
-                                            >
-                                                {kwh(day.out_kwh)}
-                                            </td>
-                                        )}
+                                        {/* A slim bar scaled to the period's max makes an outlier
+                                            day visible without reading every row (#641). */}
+                                        <BarCell value={day.in_kwh} percent={dataBarPercent(day.in_kwh, maxIn)} />
+                                        {hasOut && <BarCell value={day.out_kwh} percent={dataBarPercent(day.out_kwh, maxOut)} />}
                                         <td className="raw-metering-num">{day.readings_count}</td>
                                     </tr>
                                     {isOpen && (
                                         <RawDayDetail
+                                            id={detailId}
                                             meteringPointId={meteringPointId}
                                             date={day.date}
                                             colSpan={colSpan}
