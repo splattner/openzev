@@ -41,31 +41,45 @@ vi.mock('../src/lib/api/zev', () => ({
 const unmounts: Array<() => void> = []
 const heldKey = queryKeys.metering.heldReadings('mp1', '2026-01-01', '2026-12-31', '', 1)
 
-async function renderTable(day: string, overrides: { canReadHeld?: boolean; client?: QueryClient } = {}) {
+type TableProps = Parameters<typeof RawMeteringTable>[0]
+/** Re-render the last table with changed props, as the page does on a meter or period change. */
+let rerenderTable: (props: Partial<TableProps>) => Promise<void> = async () => {}
+
+async function renderTable(
+    day: string,
+    overrides: { canReadHeld?: boolean; client?: QueryClient; props?: Partial<TableProps> } = {},
+) {
     const client = overrides.client ?? new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const container = document.createElement('div')
     document.body.appendChild(container)
     const root = createRoot(container)
-    await act(async () => {
-        root.render(
+    const tree = (props: Partial<TableProps>) =>
+        createElement(
+            MantineProvider,
+            null,
             createElement(
-                MantineProvider,
-                null,
-                createElement(
-                    QueryClientProvider,
-                    { client },
-                    createElement(I18nextProvider, { i18n }, createElement(RawMeteringTable, {
-                        meteringPointId: 'mp1',
-                        dateFrom: '2026-01-01',
-                        dateTo: '2026-12-31',
-                        hasOut: false,
-                        canReadAssignments: false,
-                        canReadHeld: overrides.canReadHeld ?? true,
-                    })),
-                ),
+                QueryClientProvider,
+                { client },
+                createElement(I18nextProvider, { i18n }, createElement(RawMeteringTable, {
+                    meteringPointId: 'mp1',
+                    dateFrom: '2026-01-01',
+                    dateTo: '2026-12-31',
+                    hasOut: false,
+                    canReadAssignments: false,
+                    canReadHeld: overrides.canReadHeld ?? true,
+                    ...overrides.props,
+                    ...props,
+                })),
             ),
         )
+    await act(async () => {
+        root.render(tree({}))
     })
+    rerenderTable = async (props) => {
+        await act(async () => {
+            root.render(tree(props))
+        })
+    }
     await vi.waitFor(() => expect(container.textContent).toContain(day))
     unmounts.push(() => {
         act(() => root.unmount())
@@ -74,11 +88,11 @@ async function renderTable(day: string, overrides: { canReadHeld?: boolean; clie
     return container
 }
 
-/** Expand the day row. */
+/** Expand the day via its toggle button. */
 async function openDay(container: HTMLElement) {
-    const row = container.querySelector<HTMLTableRowElement>('tr.raw-metering-day')
+    const toggle = container.querySelector<HTMLButtonElement>('button.raw-metering-day-toggle')
     await act(async () => {
-        row?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        toggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 }
 
@@ -308,4 +322,71 @@ describe('raw metering reading quality', () => {
         expect(api.fetchHeldMeteringReadings).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 }))
     })
 
+})
+
+describe('raw metering day detail', () => {
+    const noHeld = { count: 0, page_size: 50, next: null, previous: null, results: [] }
+
+    it('switches direction, starting with production on a production meter', async () => {
+        api.fetchRawMeteringData.mockResolvedValue([
+            { date: '2026-01-02', in_kwh: 1, out_kwh: 2, readings_count: 2 },
+        ])
+        // Hourly production and quarter-hourly consumption: the switch changes the columns.
+        api.fetchRawMeteringDay.mockResolvedValue([
+            reading({ timestamp: '2026-01-02T11:00:00Z', direction: 'out', energy_kwh: 2, resolution: 'hourly' }),
+            reading({ timestamp: '2026-01-02T11:15:00Z', energy_kwh: 1 }),
+        ])
+        api.fetchHeldMeteringReadings.mockResolvedValue(noHeld)
+        const container = await renderTable('2026-01-02', { props: { hasOut: true, meterType: 'production' } })
+        await openDay(container)
+
+        const pressed = () => container.querySelector('.raw-metering-direction [aria-pressed="true"]')?.textContent
+        const headers = () => Array.from(container.querySelectorAll('.raw-metering-grid')[0].querySelectorAll('thead th'), (th) => th.textContent)
+        await vi.waitFor(() => expect(pressed()).toBe('Production (OUT)'))
+        expect(container.querySelector('.raw-metering-detail-totals')?.textContent).toContain('2.0000')
+        expect(headers()).toEqual(['Hour', 'kWh'])
+        expect(container.querySelector('.raw-metering-quality-legend')?.textContent).toContain('Hourly values in kWh')
+
+        // The open interval detail belongs to the shown direction.
+        const cell = container.querySelector<HTMLButtonElement>('.raw-metering-cell-button')
+        await act(async () => cell?.click())
+        const detail = container.querySelector('.raw-metering-cell-detail')
+        expect(detail).not.toBeNull()
+        expect(cell?.getAttribute('aria-controls')).toBe(detail?.id)
+
+        const consumption = Array.from(container.querySelectorAll<HTMLButtonElement>('.raw-metering-direction button'))
+            .find((button) => button.textContent === 'Consumption (IN)')
+        await act(async () => consumption?.click())
+        expect(pressed()).toBe('Consumption (IN)')
+        expect(headers()).toEqual(['Hour', ':00', ':15', ':30', ':45', 'Σ'])
+        expect(container.querySelector('.raw-metering-quality-legend')?.textContent).toMatch(/^Values in kWh/)
+        expect(container.querySelector('.raw-metering-cell-detail')).toBeNull()
+        expect(container.querySelector('.raw-metering-cell-button')?.getAttribute('aria-label')).toContain('12:15, 1.0000 kWh')
+    })
+
+    it('opens several days at once and closes them when the meter changes', async () => {
+        const days = [
+            { date: '2026-01-02', in_kwh: 1, out_kwh: 0, readings_count: 1 },
+            { date: '2026-01-03', in_kwh: 1, out_kwh: 0, readings_count: 1 },
+        ]
+        api.fetchRawMeteringData.mockResolvedValue(days)
+        api.fetchRawMeteringDay.mockImplementation(({ date }: { date: string }) =>
+            Promise.resolve([reading({ timestamp: `${date}T11:00:00Z` })]),
+        )
+        api.fetchHeldMeteringReadings.mockResolvedValue(noHeld)
+        // The other meter's days are cached, so they render at once with the same dates.
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        client.setQueryData(queryKeys.metering.rawData('mp2', '2026-01-01', '2026-12-31'), days)
+        const container = await renderTable('2026-01-02', { client })
+        const toggles = () => Array.from(container.querySelectorAll<HTMLButtonElement>('button.raw-metering-day-toggle'))
+        await act(async () => toggles().forEach((toggle) => toggle.click()))
+
+        await vi.waitFor(() => expect(container.querySelectorAll('.raw-metering-cell-button')).toHaveLength(2))
+        expect(toggles().map((toggle) => toggle.getAttribute('aria-expanded'))).toEqual(['true', 'true'])
+
+        await rerenderTable({ meteringPointId: 'mp2' })
+        await vi.waitFor(() => expect(toggles()).toHaveLength(2))
+        expect(toggles().map((toggle) => toggle.getAttribute('aria-expanded'))).toEqual(['false', 'false'])
+        expect(api.fetchRawMeteringDay).not.toHaveBeenCalledWith(expect.objectContaining({ meteringPoint: 'mp2' }))
+    })
 })

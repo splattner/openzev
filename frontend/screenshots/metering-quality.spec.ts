@@ -42,7 +42,7 @@ for (const width of [1440, 400]) {
     })
     await page.goto(`/metering/chart?${period}&metering_point=mp42`)
     const raw = page.locator('.raw-metering')
-    await raw.locator('tr.raw-metering-day').click()
+    await raw.locator('.raw-metering-day-toggle').click()
     await raw.getByRole('button', { name: /02:00, 2.0000 kWh/ }).click()
     await expect(raw.getByRole('region', { name: 'Interval detail' })).toContainText('25.10.2026 02:00 GMT+02:00')
     await expect(raw.getByRole('region', { name: 'Interval detail' })).toContainText('25.10.2026 02:00 GMT+01:00')
@@ -112,3 +112,58 @@ test('a held-only period remains inspectable without an accepted day', async ({ 
   await expect(page.locator('.held-readings')).toContainText('No accepted reading')
   expect(errors).toEqual([])
 })
+
+/** A day of quarter-hours in both directions, with totals large enough to need their room. */
+const twoDirectionDay = (date: string) => Array.from({ length: 96 }, (_, index) => {
+  const timestamp = new Date(Date.parse(`${date}T00:00:00+02:00`) + index * 900_000).toISOString()
+  return [
+    { timestamp, direction: 'in', energy_kwh: 12.8601, resolution: '15min', import_source: 'sdatch', condition: '' },
+    { timestamp, direction: 'out', energy_kwh: 24.4341, resolution: '15min', import_source: 'sdatch', condition: '' },
+  ]
+}).flat()
+
+// 360 and 500 sit either side of the phone breakpoint; at 900 the sidebar leaves a narrow sheet.
+for (const width of [360, 500, 600, 900, 1440]) {
+  test(`opening two-direction days does not widen the sheet at ${width}px`, async ({ page }, testInfo) => {
+    const errors = await mockApi(page, { role: 'viewer', populated: true })
+    await page.setViewportSize({ width, height: 900 })
+    await page.route('**/metering/readings/chart-data/**', route => route.fulfill({ json: [
+      { bucket: '2026-10-24', in_kwh: 1234.5678, out_kwh: 2345.6789 },
+    ] }))
+    await page.route('**/metering/readings/raw-data/**', route => {
+      const date = new URL(route.request().url()).searchParams.get('date')
+      return route.fulfill({ json: date ? twoDirectionDay(date) : [
+        { date: '2026-10-24', in_kwh: 1234.5678, out_kwh: 2345.6789, readings_count: 192 },
+        { date: '2026-10-25', in_kwh: 1234.5678, out_kwh: 2345.6789, readings_count: 200 },
+      ] })
+    })
+    await page.route('**/metering/held-readings/**', route => route.fulfill({ json: { count: 0, page_size: 50, next: null, previous: null, results: [] } }))
+    await page.goto(`/metering/chart?${period}&metering_point=mp42`)
+    const raw = page.locator('.raw-metering')
+    const toggles = raw.locator('.raw-metering-day-toggle')
+    await expect(toggles).toHaveCount(2)
+    for (const toggle of await toggles.all()) await toggle.click()
+    await expect(raw.locator('.raw-metering-direction')).toHaveCount(2)
+    const layout = await page.evaluate(() => {
+      const card = document.querySelector<HTMLElement>('.raw-metering')!
+      const cardBox = card.getBoundingClientRect()
+      const inside = (element: Element, box: DOMRect) => {
+        const own = element.getBoundingClientRect()
+        return own.left >= box.left - 1 && own.right <= box.right + 1
+      }
+      const ids = Array.from(card.querySelectorAll('[id]'), element => element.id)
+      return {
+        page: document.documentElement.scrollWidth <= innerWidth,
+        card: card.scrollWidth <= card.clientWidth,
+        cells: Array.from(card.querySelectorAll('.raw-metering-day-toggle, .raw-metering-value'))
+          .every(element => inside(element, element.closest('td')!.getBoundingClientRect())),
+        controls: Array.from(card.querySelectorAll('.raw-metering-direction button'))
+          .every(element => inside(element, cardBox)),
+        uniqueIds: new Set(ids).size === ids.length,
+      }
+    })
+    expect(layout).toEqual({ page: true, card: true, cells: true, controls: true, uniqueIds: true })
+    await page.screenshot({ path: testInfo.outputPath(`two-direction-${width}.png`), fullPage: true })
+    expect(errors).toEqual([])
+  })
+}

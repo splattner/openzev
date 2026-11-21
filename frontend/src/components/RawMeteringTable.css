@@ -1,40 +1,70 @@
-/* ── Raw metering data (drill-down day → hour × 15-minute grid) ──────────────── */
+/* ── Raw metering data (drill-down day → hour × quarter-hour table) ──────────── */
 
-/* Shrink to content (the `pages` layer beats `.page-stack table { width: 100% }`)
-   so the few numeric columns stay grouped instead of being stretched across the page. */
+/* Columns size to their content; the totals ask for room for their bars. An
+   open day's content is size-contained below, so it does not widen the table. */
 
 .raw-metering-days {
-  width: auto;
-  min-width: min(100%, 34rem);
   border-collapse: collapse;
   font-variant-numeric: tabular-nums;
 }
 
-/* Numeric columns: right-align (out-specifying `.page-stack td { text-align: left }`)
-   with room to breathe now that the table hugs its content. */
+.raw-metering-col-num {
+  width: 30%;
+}
+
+.raw-metering-days th,
+.raw-metering-days .raw-metering-day > td {
+  padding-block: 0.5rem;
+}
+
+/* Numeric columns: right-align (out-specifying `.page-stack td { text-align: left }`). */
 
 .raw-metering-days .raw-metering-num {
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  padding-left: 3rem;
 }
 
-/* Day summary rows — compact and clickable */
-
-.raw-metering-days tbody th {
-  font-size: 0.8rem;
-  color: var(--text-body);
-  background: var(--surface);
-  padding: 0.5rem 0.75rem;
+.raw-metering-days thead .raw-metering-num {
+  white-space: normal;
 }
 
-.raw-metering-day {
-  cursor: pointer;
+/* A long header word must not set a column's minimum width on a narrow sheet. */
+.raw-metering-days thead th {
+  hyphens: auto;
+  overflow-wrap: anywhere;
 }
+
+/* A slim bar track with the value beside it: the column reads like a small bar chart. */
+
+.raw-metering-bar-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.raw-metering-bar {
+  flex: 1;
+  min-width: 0;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--border-subtle);
+  overflow: hidden;
+}
+
+.raw-metering-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--interactive);
+}
+
+.raw-metering-value {
+  flex: none;
+}
+
+/* Day summary rows */
 
 .raw-metering-day > td {
-  padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--border-default);
   vertical-align: middle;
 }
@@ -43,35 +73,34 @@
   background: var(--surface);
 }
 
-.raw-metering-day:focus-visible {
-  outline: 2px solid var(--interactive);
-  outline-offset: -2px;
-}
-
-.raw-metering-day[aria-expanded='true'] > td {
+.raw-metering-day.is-open > td {
   background: var(--brand-pale);
   font-weight: 600;
 }
 
-.raw-metering-day[aria-expanded='true']:hover > td {
-  background: var(--surface);
-}
-
 .raw-metering-day-label {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.25rem 0.5rem;
 }
 
-.raw-metering-caret {
-  display: inline-block;
+.raw-metering-day-toggle {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.raw-metering-day-toggle:focus-visible {
+  outline: 2px solid var(--interactive);
+  outline-offset: 2px;
+}
+
+.raw-metering-day-toggle .disclosure-toggle-icon {
   color: var(--muted);
-  font-size: 0.8rem;
-  transition: transform 0.15s ease;
-}
-
-.raw-metering-caret[data-open] {
-  transform: rotate(90deg);
 }
 
 /* Anomaly flags (#652) — inline badge or expanded-day banner. */
@@ -93,22 +122,39 @@
   color: var(--danger-700);
 }
 
-/* Expanded interval detail */
+/* Expanded day detail: an inset panel nested under its (marked) day row. */
 
 .raw-metering-detail-cell {
-  padding: 0 !important;
-  background: var(--surface);
+  padding: 0.5rem 0 0.75rem 0.75rem;
   border-bottom: 1px solid var(--border-default);
 }
 
+/* `contain: inline-size` keeps the hour tables and chart out of the column sizing. */
+.raw-metering-detail-body,
 .raw-metering-detail-status {
-  padding: 0.9rem 1rem;
+  contain: inline-size;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid var(--brand-pale);
+  border-radius: 0 6px 6px 0;
+  background: var(--surface);
+}
+
+.raw-metering-detail-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0 0 0.25rem;
+  font-size: 0.8rem;
+}
+
+.raw-metering-direction {
+  margin: 0.25rem 0 0.5rem;
 }
 
 /* Intraday sparkline above the value table */
 
 .raw-metering-sparkline {
-  padding: 0.5rem 1rem 0.7rem;
+  padding: 0.25rem 0 0.5rem;
 }
 
 .raw-metering-spark-tooltip {
@@ -121,45 +167,46 @@
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
 }
 
-/* Hour × 15-minute grid — one column per hour, one row per slot */
+/* Hour table — hours as rows, two halves side by side (one column on a phone) */
 
-.raw-metering-grid-wrap {
-  padding: 0 1rem 0.4rem;
-}
-
-.raw-metering-grid-caption {
-  margin: 0.3rem 0 0.2rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-body);
+.raw-metering-halves {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 0.75rem 1.5rem;
 }
 
 .raw-metering-grid-scroll {
+  min-width: 0;
   overflow-x: auto;
 }
 
 .raw-metering .raw-metering-grid {
-  width: auto;
+  width: 100%;
   border-collapse: collapse;
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
 }
 
-.raw-metering-grid th,
-.raw-metering-grid td {
+.raw-metering .raw-metering-grid th,
+.raw-metering .raw-metering-grid td {
   padding: 0.2rem 0.45rem;
   border: 1px solid var(--border-subtle);
   text-align: right;
   white-space: nowrap;
 }
 
-/* Hour headers (top) and slot labels (left) */
+/* Column headers (top) and hour labels (left) */
 
-.raw-metering-grid thead th {
+.raw-metering .raw-metering-grid thead th {
+  position: static;
+  height: auto;
   color: var(--muted);
   background: var(--surface);
   font-weight: 600;
-  text-align: center;
+  text-align: right;
+  /* Units (kWh) must keep their case. */
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .raw-metering-grid thead th::before {
@@ -171,16 +218,27 @@
   background: var(--surface);
   font-weight: 600;
   text-align: left;
-  position: sticky;
-  left: 0;
-}
-
-.raw-metering-grid-corner {
-  background: var(--surface);
 }
 
 .raw-metering-grid tbody tr:nth-child(even) td {
   background: rgba(148, 163, 184, 0.06);
+}
+
+.raw-metering .raw-metering-grid tr {
+  height: auto;
+}
+
+.raw-metering .raw-metering-grid th:first-child {
+  width: 3.5rem;
+}
+
+.raw-metering-hour-total {
+  font-weight: 600;
+}
+
+.raw-metering-grid td.raw-metering-negative {
+  color: var(--danger-700);
+  font-weight: 700;
 }
 
 /* Reading quality: the marker never relies on colour alone. */
@@ -214,7 +272,7 @@
 }
 
 .raw-metering-quality-legend {
-  margin: 0.3rem 1rem 0.1rem;
+  margin: 0.5rem 0 0.1rem;
   font-size: 0.75rem;
   color: var(--muted);
 }
@@ -240,4 +298,63 @@
 .raw-metering-cell-detail-time {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+}
+
+/* Phones: tighter cells, wrapping headers, no decorative bars. */
+
+@media (max-width: 30rem) {
+  .raw-metering-days {
+    font-size: 0.8rem;
+  }
+
+  .raw-metering-days thead th {
+    font-size: 0.62rem;
+    letter-spacing: 0;
+  }
+
+  .raw-metering-days th,
+  .raw-metering-days .raw-metering-day > td {
+    padding-block: 0.4rem;
+  }
+
+  /* Tight inner edges; the outer edges keep the sheet's inset. */
+  .raw-metering-days th:not(:first-child),
+  .raw-metering-days .raw-metering-day > td:not(:first-child) {
+    padding-left: 0.3rem;
+  }
+
+  .raw-metering-days th:not(:last-child),
+  .raw-metering-days .raw-metering-day > td:not(:last-child) {
+    padding-right: 0.3rem;
+  }
+
+  .raw-metering .raw-metering-grid {
+    font-size: 0.7rem;
+  }
+
+  .raw-metering .raw-metering-grid th,
+  .raw-metering .raw-metering-grid td {
+    padding-inline: 0.2rem;
+  }
+
+  .raw-metering .raw-metering-grid th:first-child {
+    width: 2rem;
+  }
+
+  .raw-metering-bar {
+    display: none;
+  }
+
+  .raw-metering-bar-cell {
+    justify-content: flex-end;
+  }
+
+  .raw-metering-detail-cell {
+    padding-left: 0.3rem;
+  }
+
+  .raw-metering-detail-body,
+  .raw-metering-detail-status {
+    padding: 0.6rem 0.5rem;
+  }
 }

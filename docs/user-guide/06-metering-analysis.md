@@ -87,9 +87,9 @@ The chart shows:
 Below the chart (single meter only — not shown for a whole-ZEV total), the
 **Raw Data by Day** table shows one row per day in the selected period — day,
 consumption total, feed-in/production total (when the meter exports), and the
-number of readings. A day's consumption/feed-in cell is shaded proportionally
-to its size relative to the largest day in the period, so an outlier stands
-out without reading every value. Long periods are paginated a month
+number of readings. Bars show each day's total relative to the largest total
+for that direction in the selected period, so an outlier stands out without
+reading every value. Long periods are paginated a month
 (31 days) at a time.
 
 Two flags can appear next to a day's date:
@@ -101,14 +101,21 @@ Two flags can appear next to a day's date:
 - **Negative total** — the day's consumption or feed-in total is below zero,
   which should not happen for a normal reading.
 
-Opening a day expands it into a compact intraday chart plus an hour ×
-15-minute grid of the exact values, so you can spot an individual anomalous
-reading the aggregated chart may hide. The expanded detail also flags
-negative individual readings and duplicate (timestamp, direction) readings,
-if any. Readings are grouped by their Swiss calendar day, the same day used
-for billing periods and tariffs. The day on which clocks go forward has 92
-quarter-hours and the day they go back has 100; in the grid, that day's two
-02:00 hours add up in one cell.
+Click a date to open that day; several days can be open at once. An open day
+shows an intraday chart and a readings table with one row per hour. For
+15-minute data the table has one column per quarter-hour plus the hour's total
+(Σ); an empty cell means no reading. The table lets you spot an individual
+anomalous reading the aggregated chart may hide. If the meter records both
+consumption and production/feed-in, the day's total for each is shown at the
+top, and two buttons above the table choose which of them it lists. The open
+day also flags negative individual readings and duplicate (timestamp,
+direction) readings, if any.
+
+Readings are grouped by their Swiss calendar day, the same day used for billing
+periods and tariffs. The day on which clocks go forward has 92 quarter-hours
+and an empty 02 row. The day they go back has 100, and each repeated time from
+02:00 to 02:45 shares a cell; open the cell to see both readings with their
+UTC offsets.
 
 ### Reading Quality
 
@@ -119,7 +126,7 @@ Estimated intervals are marked individually, including within mixed-quality hour
 | --- | --- |
 | *(no ≈ marker)* | No estimated-value marker; inspect interval detail for the stored quality |
 | **≈** | The reading is an estimated replacement value (SDAT-CH condition `56`); it still counts toward billing |
-| **·2** | The cell holds more than one reading for that Swiss hour — on the day the clocks go back, the repeated 02:00 hour — and shows their sum |
+| **·2** | The cell holds more than one reading for the same Swiss time — such as 02:00–02:45 on the day the clocks go back — and shows their sum |
 
 Click a cell to open its **interval detail**. It lists every constituent
 reading with its Swiss timestamp and UTC offset, value, translated quality
