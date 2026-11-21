@@ -909,11 +909,32 @@ the raw value instead of being dropped.
 ]
 ```
 
-`RawMeteringTable` expands a day into a quarter-hour/hour grid. `≈` marks
-condition `56`; `·N` identifies combined readings, including repeated autumn
-intervals. A cell button exposes its constituent count and expanded state;
-its detail lists each reading's value, quality/code and Swiss timestamp with
-UTC offset. Unflagged values are not labelled measured or validated.
+`RawMeteringTable` lists one row per day. Opening a day must not widen the
+sheet: columns size to their content, the open day's content uses
+`contain: inline-size`, and day-table headers may hyphenate or wrap. The date
+cell holds a button with `aria-expanded` (and `aria-controls` while open), the
+row-expansion pattern of SPEC-2026-10-ui-patterns §6.3. Days open
+independently; a new meter or period closes them and returns to page 1. Each
+total pairs a slim bar, scaled per direction to the period's largest magnitude
+(`dataBarPercent`), with the right-aligned value; bars are hidden on phones.
+The zero-consumption day flag is not shown for `meter_type === 'production'`.
+
+An open day shows the anomaly banners, an intraday sparkline labelled at
+00:00/06:00/12:00/18:00 where those intervals exist, and, for a day with both
+directions, each direction's day total and a `role="group"` of `aria-pressed`
+buttons choosing the direction the table shows (production/feed-in first on a
+production meter, otherwise consumption). The value table (`buildHourTable`)
+has one row per Swiss hour, split 00–11 and 12–23 side by side when there is
+room. It has four quarter-hour columns plus an hour total (Σ) when any of the
+direction's readings is 15-minute or off the full hour, otherwise one `kWh`
+column; a missing quarter-hour is an empty cell (`–`), not a missing column.
+
+`≈` marks condition `56`; `·N` counts readings combined in one cell, such as
+the repeated autumn quarter-hours. The legend states the unit (as hourly
+values when all of the direction's readings are `hourly`) and lists only the
+markers that occur. A cell button controls (`aria-controls`) a detail
+listing each reading's value, quality/code and Swiss timestamp with UTC
+offset. Unflagged values are not labelled measured or validated.
 
 ### 5.3.1 Held observations (read-only)
 
@@ -1950,13 +1971,24 @@ both streams stay locked until the transaction commits.
   §5.3–§5.3.1): `raw-metering-quality.test.ts` covers estimated/unknown quality,
   distinct DST timestamps, zero versus missing accepted values, and retry/reset
   after failed or invalid later pages, plus ranges on a short final page with a
-  non-default server page size. `metering-labels.test.ts` checks actual
+  non-default server page size, the direction switch (production first, column
+  change, open interval closed), and several open days closing on a meter
+  change even when that meter's days are cached.
+  `raw-metering-table-anomalies.test.ts` also covers `buildHourTable` (hourly
+  day one column; 15-minute day four, with a quarter missing all day; off-hour
+  readings; direction filter; spring's missing and autumn's repeated
+  quarter-hours).
+  `metering-labels.test.ts` checks actual
   translated quality codes; `import-protocol-sdat.test.ts` checks batch scoping,
   meter identity and delivery/document provenance.
   `screenshots/metering-quality.spec.ts` exercises desktop/400px interaction,
   keyboard scrolling, pagination, held-only periods and remaining-row empty
-  states with mocked APIs. It captures screenshots for manual inspection and
-  checks console errors; it runs via `test:browser`, outside CI.
+  states with mocked APIs, and opens two two-direction days with four-digit
+  totals at 360/500/600/900/1440px (900 leaves a narrow sheet beside the
+  sidebar), requiring that neither page nor card widens, dates and values stay
+  inside their cells, the direction buttons inside the card, and IDs unique.
+  It captures screenshots for manual inspection and checks console errors; it
+  runs via `test:browser`, outside CI.
 - Types: `frontend/src/types/api.ts:ImportPreviewResult.missing_meter_ids: string[]` and preview `zevId` required payload in `frontend/src/lib/api/metering.ts:previewCsvImport`.
 - Wizard step 2 (CSV) is grouped into `form-section` blocks with the shared `form-section-header` style: **File format** (row format, delimiter, date/time format, header-row checkbox), **Column mapping** (meter ID, date/timestamp, energy column or first-interval column, then intervals per row and minutes per interval for daily profiles, and the optional direction column last so its long hint cannot stretch a row; it spans two columns in the standard layout via `.grid-span-2`, which only applies above 640 px), **Options** (overwrite, with a hint that it cannot be undone) and **Preview**. The target ZEV is a read-only line, not a disabled input. Locale keys: `pages.imports.wizard.targetZev`, `sections.*`, `overwriteExistingHint`.
 - Settings detection (frontend side of §4.3.1): entering step 2 of a CSV import calls `detectCsvSettings` (`frontend/src/lib/api/metering.ts`) for the first selected file — once per selection, tracked by a signature of the selection, so moving back and forth never overwrites manual edits; SDAT-CH skips it. A detected result is applied through `settingsFromDetection` (`importUtils.ts`): header, delimiter (a tab shown as the `\t` escape the field accepts), profile, timestamp format, interval, values count and the column map, where a field the backend left `null` keeps the default for the detected layout (direction and the unused energy field become empty) and the previews are cleared. `DetectionState` drives a notice above the settings: loading (Load Preview disabled), done (info; warning naming `undetected` fields via the existing field labels), or failed (defaults kept, preview not blocked), each with a **Detect again** button that re-runs and overwrites edits; with several files the notice says the settings apply to all of them. Locale keys: `pages.imports.detection.*`. Covered by `imports-wizard.test.ts` (`ImportsPage settings detection`) and `api-metering.test.ts`.
