@@ -9,7 +9,7 @@ import { FormModal } from '../../components/FormModal'
 import { StatCard } from '../../components/StatCard'
 import { fetchDynamicPriceHistory } from '../../lib/api/tariffs'
 import { formatDateTime, formatShortDate, useAppSettings } from '../../lib/appSettings'
-import { AXIS_COLOR, CHART_GRIDLINE, CONS_COLORS, NEGATIVE_COLOR } from '../../lib/chartTokens'
+import { AXIS_COLOR, CHART_CONSUMPTION, CHART_GRIDLINE, NEGATIVE_COLOR } from '../../lib/chartTokens'
 import { CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
 import { businessDayStartMs, daysInPeriod, formatBusinessIsoDate, formatIsoDate, todayBusinessIso } from '../../lib/dates'
 import { queryKeys } from '../../lib/api/queryKeys'
@@ -358,7 +358,7 @@ export const DynamicPriceHistoryPanel = memo(function DynamicPriceHistoryPanel({
               <Line
                 dataKey="price"
                 type="stepAfter"
-                stroke={CONS_COLORS[0]}
+                stroke={CHART_CONSUMPTION}
                 dot={false}
                 connectNulls={false}
                 activeDot={{ r: 4 }}

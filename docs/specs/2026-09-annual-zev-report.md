@@ -267,7 +267,7 @@ aborts/disposes old document state and generates only the active document.
 - `AnnualTrendCard`: Recharts `LineChart`, x = month short name
   (`Intl.DateTimeFormat(i18n.language, {month: 'short'})`), y = 0–100 %.
   Current-year lines are `CHART_LOCAL` (self-consumption) and
-  `FLOW_LOCAL_CONS` (self-sufficiency). Previous-year lines appear only when
+  `CHART_CONSUMPTION` (self-sufficiency). Previous-year lines appear only when
   `previous_totals` is set: same colours, `strokeDasharray="5 4"`, opacity
   0.6, no dots. Null months leave gaps.
 - `ParticipantSavingsCard`: a `table.participant-table.participant-table--static`

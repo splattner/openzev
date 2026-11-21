@@ -20,7 +20,6 @@ from .generated_chart_tokens import (  # used by this module internally
     _CHART_LOCAL,
     _CHART_MUTED,
     _FLOW_GRID_EXP,
-    _FLOW_LOCAL_CONS,
     _OTHERS_COLOR,
     CONS_COLORS,
     PROD_COLORS,
@@ -95,7 +94,7 @@ def _build_energy_flow_svg(
     # ── Node definitions ───────────────────────────────────────────────────
     OTHERS_COLOR = _OTHERS_COLOR
     TOTAL_PROD_C = _CHART_LOCAL
-    LOCAL_CONS_C = _FLOW_LOCAL_CONS
+    LOCAL_CONS_C = _CHART_LOCAL  # same energy as the "used locally" bars
     GRID_IMP_C = _CHART_GRID
     GRID_EXP_C = _FLOW_GRID_EXP
 
@@ -324,7 +323,7 @@ def _build_energy_flow_svg(
                 if n.pct:
                     svg.append(
                         f'<text x="{x + BAR_W / 2}" y="{n.y + n.h + 31:.1f}" text-anchor="middle" '
-                        f'font-size="7.5" font-weight="700" fill="{n.color}">{n.pct}</text>')
+                        f'font-size="7.5" font-weight="700" fill="{_CHART_INK}">{n.pct}</text>')
 
     svg.append("</svg>")
     return "\n".join(svg)
@@ -426,7 +425,7 @@ def _build_energy_chart_svg(invoice, tr: dict) -> str | None:
         wg = s(grid)
         total_w = wl + wg
 
-        # Left segment: local ZEV (brand green)
+        # Left segment: local ZEV
         xl = ML
         svg.append(
             f'<rect x="{xl:.1f}" y="{by:.1f}" width="{max(wl, 0):.1f}"'
@@ -436,11 +435,11 @@ def _build_energy_chart_svg(invoice, tr: dict) -> str | None:
         if wl > 16:
             svg.append(
                 f'<text x="{xl + wl / 2:.1f}" y="{by + bar_h / 2 + 3:.1f}"'
-                f' text-anchor="middle" font-size="6.5" fill="{_CHART_LABEL_ON_FILL}" font-weight="600">'
+                f' text-anchor="middle" font-size="6.5" fill="{_CHART_INK}" font-weight="600">'
                 f'{local:.1f}</text>'
             )
 
-        # Right segment: grid (warm amber), rounded right corners
+        # Right segment: grid, rounded right corners
         xg = ML + wl
         svg.append(
             f'<rect x="{xg:.1f}" y="{by:.1f}" width="{max(wg, 0):.1f}"'
@@ -698,7 +697,7 @@ def _build_hourly_profile_chart_svg(
         hg = s(grid)
         total_h = hl + hg
 
-        # Local segment (brand green, bottom)
+        # Local segment (bottom)
         yl = MT + ch - hl
         if hl > 0:
             svg.append(
@@ -706,14 +705,14 @@ def _build_hourly_profile_chart_svg(
                 f' height="{hl:.1f}" fill="{_CHART_LOCAL}" data-hour="{hour}"/>'
             )
 
-        # Grid segment (warm amber, top), rounded top corners
+        # Grid segment (top), rounded top corners
         yg = MT + ch - total_h
         if hg > 0:
             svg.append(
                 f'<rect x="{bx:.1f}" y="{yg:.1f}" width="{bar_w:.1f}"'
                 f' height="{hg:.1f}" fill="{_CHART_GRID}" rx="2" ry="2" data-hour="{hour}"/>'
             )
-            # Square off bottom corners of amber segment
+            # Square off bottom corners of grid segment
             overlap = min(3.0, hg)
             svg.append(
                 f'<rect x="{bx:.1f}" y="{yg + hg - overlap:.1f}" width="{bar_w:.1f}"'

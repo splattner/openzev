@@ -42,6 +42,7 @@ export function HourlyProfileCard({ data, hourlyKwhTick, hourlyKwhTooltipValue, 
                             type="monotone"
                             dataKey="own_system_consumption_kwh"
                             name={t('pages.dashboard.chart.ownSystemConsumption')}
+                            className="chart-line-halo"
                             stroke={FLOW_LOCAL_CONS}
                             strokeWidth={2}
                             strokeDasharray="5 4"

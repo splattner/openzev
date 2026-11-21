@@ -165,44 +165,44 @@ All five are pure derivations; hand-editing them is a lint/test error.
 
 ### 4.3 Chart token parity
 
-`design/tokens.json:charts` is the PDF palette source — the generator emits it as `backend/invoices/generated_chart_tokens.py`, from which `pdf_charts.py` imports the constants (values below):
+`design/tokens.json:charts` defines the chart palette. `scripts/generate-tokens.mjs` emits it as resolved literals to `frontend/src/lib/chartTokens.ts` (Recharts props) and `backend/invoices/generated_chart_tokens.py` (PDF SVG), both of which take literal colour values; `--check` fails on drift. `frontend/src/lib/chartTheme.tsx` holds the shared Recharts config shapes (axis ticks, tooltip card, legend swatch) and no colours. Current values (Python names; TS uses the same names without the leading underscore, plus the screen-only `CHART_RATIO` and `CHART_CONSUMPTION`):
 
 ```python
-_CHART_LOCAL = "#1f5c3a"   # = --brand-mid
-_CHART_GRID  = "#c9891a"
-_CHART_INK   = "#0f172a"   # = --ink
+_CHART_LOCAL = "#a58640"   # --gold darkened to 3:1 on white: local energy and production
+_CHART_GRID  = "#164557"   # slate-blue: grid
+_CHART_INK   = "#0f172a"   # = --ink; also CHART_RATIO (percentage lines)
 _CHART_MUTED = "#64748b"   # = --muted
 _CHART_GRIDLINE = "#e8edeb"
 _CHART_AXIS  = "#94a3b8"
 _CHART_BG    = "#fbfcfb"   # = --chart-surface
 _CHART_LABEL = "#334155"   # = --ink-soft
-_FLOW_LOCAL_CONS = "#0e7490"   # teal: local consumption
-_FLOW_GRID_EXP   = "#6f9f82"   # sage: feed-in
-PROD_COLORS  = ["#1f5c3a", "#2f7a4d", "#3d8b5c", "#4d9b6a", "#15803d", "#5aa877"]
-CONS_COLORS  = ["#64748b", "#475569", "#7b8794", "#334155", "#8a96a8", "#56657a"]
+_FLOW_LOCAL_CONS = "#5c4718"   # dark gold: own-use lines over local bars (screen only)
+_FLOW_GRID_EXP   = "#132b1a"   # deep forest: feed-in
+PROD_COLORS  = ["#a58640", "#7d6229", "#b0893a", "#8c6f2f", "#957637", "#5f4a1d"]   # each ≥3.2:1 on white
+CONS_COLORS  = ["#a4553a", "#6a5a8c", "#8c4f6b", "#2f8a83", "#3b5b92", "#2e6f8e"]   # bluish hues last, away from grid
+_OTHERS_COLOR = "#64776d"   # energy-flow "Others" node
 _DIVERGING_POSITIVE = "#1f5c3a"   # positive half of the forest/red diverging pair
-_CHART_LABEL_ON_FILL = "#fff"   # = charts.labelOnFill — on-bar white labels
+_CHART_LABEL_ON_FILL = "#fff"   # white labels on grid bars
+# CHART_CONSUMPTION = "#1f5c3a" (TS only): metering IN series, price lines, self-sufficiency
 ```
 
-**One energy palette, from the brand (ADR 0032).** Every chart, on
-screen and in the PDFs, encodes the same meanings: forest (`local`,
-`prodColors`) is production and energy from the community; amber (`grid`) is
-the grid; sage (`flowGridExp`, ≥3:1 on white, lighter than forest) is feed-in
-— "your solar, sent out"; teal (`flowLocalCons`) is the community's local
-consumption node and the NT band, and the own-use and self-consumption lines.
-It stays off the forest ramp because it is drawn beside the producer nodes in
-the energy-flow chart and over `local` bars, where a second forest green does
-not read as a different series; slate (`consColors`, `[0]` =
-consumption) is demand — metering IN series, consumer nodes, price lines and
-self-sufficiency; dark ink (`ratio` #24352c, screen-only `CHART_RATIO`) draws
-percentage lines over bars. The earlier violet (`#7c3aed`)
-and blue/indigo consumer ramp are gone; the feasibility charts' positive half
-is forest, and the cash-flow legend swatch now uses the bars' own colour
-(`DIVERGING_POSITIVE`).
+Roles, the same on screen and in the PDFs (ADR 0032):
 
-`design/tokens.json:charts` mirrors this 1:1 (same hexes, same role names) and is the SSOT: the generator emits `backend/invoices/generated_chart_tokens.py`, and `pdf_charts.py` imports its constants from it — no duplicated color literals remain in Python, and drift between `pdf_charts.py` and `tokens.json` becomes a `--check`/idempotence failure. `frontend/src/lib/chartTokens.ts` currently holds only `AXIS_COLOR / ANNOTATION_COLOR`; after generation it re-exports the full map as **resolved literal strings** (`export const CHART_LOCAL = "#1f5c3a"` — Recharts props and SVG `fill="…"` do not resolve `var(…)`), so recharts and the PDF SVG share one map. Hand-written companion `frontend/src/lib/chartTheme.tsx` centralizes the recharts config *shapes* shared by the feasibility charts (axis tick typography, bottom-axis/CHF y-axis labels, tooltip card, legend swatch) on top of those literals — it is not generated and holds no colors of its own.
+| Role | Token |
+|---|---|
+| Local energy and production; HT band | `local`, `prodColors` (producers) |
+| Grid; NT band | `grid` |
+| Consumption | `consumption` |
+| One identity colour per consumer node in the energy flow | `consColors`, plain modulo |
+| Feed-in | `flowGridExp` |
+| Own-use lines drawn over `local` bars | `flowLocalCons` |
+| Percentage lines | `ratio` |
 
-The annual-statement SVG chart and two `pdf_charts.py` accents previously carried pre-redesign literals (`#4caf50`, `#90a4ae`, `#888`, `#eee`, `#666`, `#fff`, `#eef5f0`). Nothing is in production, so they were remapped onto the shared palette instead of being frozen: ZEV/grid bar portions use `_CHART_LOCAL`/`_CHART_GRID` (the same local/grid pair as every other PDF chart), y-axis ticks `_CHART_MUTED`, month/legend labels `_CHART_LABEL`, gridlines and the metering daylight band `_CHART_GRIDLINE`, and on-bar white labels the `charts.labelOnFill` entry (`#fff`, emitted to the Python module; the screen-side TS emitter omits it — no screen chart currently paints on-bar labels). The legacy HTML templates were swept in the same pass: `annual_statement_pdf.html` and `financial_summary_pdf.html` now include `pdf/_tokens.css` and reference `var(--…)` — their `#2c5f2e` chrome became `--brand-mid` accents on `--brand-deep` dark table headers (white header text, matching the invoice's line-items treatment), the grey ladder collapsed onto `--ink`/`--ink-soft`/`--muted`/`--line`/`--line-subtle`, and `#f0f9f0` highlight washes became `--brand-pale`; the invoice/contract white fills use `var(--white)`. No pre-redesign colour value is retained anywhere outside `design/tokens.json` and its five generated outputs. The one sanctioned exception: neutral alpha scrims/shadows (white/black/slate `rgba()` fades in `frontend/src/styles/`, the overlay modals, and the invoice/contract dark headers) stay raw, allowlisted per file via `"path@alpha"` entries in `scripts/hex-migration-allowlist.json` — the sweep still rejects hex and opaque `rgb()`/`hsl()` in those files (see §5.1 enforcement).
+The energy flow's local-consumption node and links use `local`, like the "used locally" bars. The metering charts colour IN (Bezug) `consumption` and OUT (feed-in or production) `local`, with the legend in series order. The metering data-quality bar is `DIVERGING_POSITIVE` / `local` / `NEGATIVE_COLOR`, and the feasibility fair-price band is a `muted` wash.
+
+Readability rules. Every series colour is at least 3:1 on white (`local` 3.45:1; raw `--gold` would be 2.50:1, so charts never use it). `local` is 3.01:1 against `grid` and 4.38:1 against `flowGridExp`, so the stacked local/grid and local/feed-in segments, and the HT/NT lines, separate by colour alone. `grid` and `flowGridExp` are both dark and differ in hue and lightness. Lines that cross bars (`ratio`, `flowLocalCons`) carry a surface-coloured halo (`.chart-line-halo` in `charts.css`). Invoice bar labels use ink on local gold and white (`labelOnFill`) on grid blue. Text never takes a series colour (§5.2): tooltip items and legend text use `--text-body` (`charts.css`); energy-flow percentages and the feasibility tooltip use ink beside a swatch.
+
+The annual-statement SVG chart and two `pdf_charts.py` accents previously carried pre-redesign literals (`#4caf50`, `#90a4ae`, `#888`, `#eee`, `#666`, `#fff`, `#eef5f0`). Nothing is in production, so they were remapped onto the shared palette instead of being frozen: ZEV/grid bar portions use `_CHART_LOCAL`/`_CHART_GRID` (the same local/grid pair as every other PDF chart), y-axis ticks `_CHART_MUTED`, month/legend labels `_CHART_LABEL`, gridlines and the metering daylight band `_CHART_GRIDLINE`, and on-bar labels on grid segments the `charts.labelOnFill` entry (`#fff`, emitted to the Python module; the screen-side TS emitter omits it — no screen chart currently paints on-bar labels). The legacy HTML templates were swept in the same pass: `annual_statement_pdf.html` and `financial_summary_pdf.html` now include `pdf/_tokens.css` and reference `var(--…)` — their `#2c5f2e` chrome became `--brand-mid` accents on `--brand-deep` dark table headers (white header text, matching the invoice's line-items treatment), the grey ladder collapsed onto `--ink`/`--ink-soft`/`--muted`/`--line`/`--line-subtle`, and `#f0f9f0` highlight washes became `--brand-pale`; the invoice/contract white fills use `var(--white)`. No pre-redesign colour value is retained anywhere outside `design/tokens.json` and its five generated outputs. The one sanctioned exception: neutral alpha scrims/shadows (white/black/slate `rgba()` fades in `frontend/src/styles/`, the overlay modals, and the invoice/contract dark headers) stay raw, allowlisted per file via `"path@alpha"` entries in `scripts/hex-migration-allowlist.json` — the sweep still rejects hex and opaque `rgb()`/`hsl()` in those files (see §5.1 enforcement).
 
 ### 4.4 `frontend/src/styles/` contracts retained
 

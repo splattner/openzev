@@ -11,16 +11,14 @@ import {
     YAxis,
 } from 'recharts'
 import type { FeasibilityFairPriceRange, FeasibilityPriceSensitivityPoint } from '../../types/api'
-import { ANNOTATION_COLOR, AXIS_COLOR, CHART_GRID, CHART_GRIDLINE, CONS_COLORS, PROD_COLORS } from '../../lib/chartTokens'
+import { ANNOTATION_COLOR, AXIS_COLOR, CHART_CONSUMPTION, CHART_GRIDLINE, CHART_MUTED, PROD_COLORS } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE, CHF_Y_AXIS_LABEL, ChartLegendSwatch, chartAxisLabel } from '../../lib/chartTheme'
 import { formatChf, formatNumber, formatPercent } from '../../lib/numbers'
 
 // Categorical pair (two distinct parties, not a polarity).
-// Forest means "producer/local energy" throughout the app and the PDFs; slate
-// means consumption. The fair price range is a warm band behind both lines.
 const PRODUCER_COLOR = PROD_COLORS[0]
-const CONSUMER_COLOR = CONS_COLORS[0]
-const FAIR_RANGE_FILL = CHART_GRID
+const CONSUMER_COLOR = CHART_CONSUMPTION
+const FAIR_RANGE_FILL = CHART_MUTED  // neutral context, not a third series
 
 type Props = {
     priceSensitivity: FeasibilityPriceSensitivityPoint[]
@@ -44,8 +42,8 @@ function CustomTooltip({
             <p style={{ margin: 0, fontWeight: 600 }}>
                 {formatPercent(point.pricePct, { maxDecimals: 0 })} ({formatNumber(point.priceChf, { minDecimals: 3, maxDecimals: 3 })} CHF/kWh)
             </p>
-            <p style={{ margin: 0, color: PRODUCER_COLOR }}>{t('pages.feasibility.chart.producerGain')}: {formatChf(point.producerGain)}</p>
-            <p style={{ margin: 0, color: CONSUMER_COLOR }}>{t('pages.feasibility.chart.consumerSavingsShort')}: {formatChf(point.consumerSavings)}</p>
+            <p style={{ margin: 0 }}><ChartLegendSwatch color={PRODUCER_COLOR} />{t('pages.feasibility.chart.producerGain')}: {formatChf(point.producerGain)}</p>
+            <p style={{ margin: 0 }}><ChartLegendSwatch color={CONSUMER_COLOR} />{t('pages.feasibility.chart.consumerSavingsShort')}: {formatChf(point.consumerSavings)}</p>
         </div>
     )
 }

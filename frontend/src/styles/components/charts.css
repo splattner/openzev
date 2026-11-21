@@ -10,11 +10,22 @@
   color: var(--text-body) !important;
 }
 
+.recharts-tooltip-item {
+  color: var(--text-body) !important;
+}
+
 .recharts-default-tooltip {
   border: 1px solid var(--border-default) !important;
   border-radius: var(--radius-md) !important;
   box-shadow: var(--shadow-raised);
   font-size: 0.8125rem;
+}
+
+.chart-line-halo .recharts-line-curve {
+  /* A surface-coloured halo keeps a line readable where it crosses bars
+     of a similar lightness. */
+  filter: drop-shadow(0 0 0.5px var(--surface-card)) drop-shadow(0 0 0.5px var(--surface-card))
+    drop-shadow(0 0 0.5px var(--surface-card));
 }
 
 .chart-card-description {
