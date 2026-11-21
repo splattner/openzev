@@ -1,5 +1,44 @@
 # Changelog
 
+## [1.32.0](https://github.com/splattner/openzev/compare/v1.31.0...v1.32.0) (2026-11-21)
+
+
+### Features
+
+* **invoices:** inspect corrections and resolve invoices ([#1211](https://github.com/splattner/openzev/issues/1211)) ([c92f438](https://github.com/splattner/openzev/commit/c92f438c5b12dde47dfa6960705eb50f019c6c23))
+* **ui:** make record tables sortable ([#1258](https://github.com/splattner/openzev/issues/1258)) ([b1a7448](https://github.com/splattner/openzev/commit/b1a7448955b5f3e93314f96ee9a3b21323a17384))
+
+
+### Bug Fixes
+
+* **deps:** update frontend-npm (major) ([#478](https://github.com/splattner/openzev/issues/478)) ([9a417b5](https://github.com/splattner/openzev/commit/9a417b5d79abe350399a688036a4ca6a03a1791a))
+* **frontend:** disable the current community switch target ([#1286](https://github.com/splattner/openzev/issues/1286)) ([1da7b17](https://github.com/splattner/openzev/commit/1da7b17e132ec3cda6062c635dea2ef1a1e568f5))
+* **frontend:** distinguish invoice warning severity on overview cards ([#1277](https://github.com/splattner/openzev/issues/1277)) ([4386b5e](https://github.com/splattner/openzev/commit/4386b5ed8103b38ba3ad58d6fd8d6ac9f0786289))
+* **frontend:** fix table gaps and responsive card layouts ([#1282](https://github.com/splattner/openzev/issues/1282)) ([5b7174e](https://github.com/splattner/openzev/commit/5b7174e1ba0e0f80b0449a475cf565b6abc942c5))
+* **frontend:** give inline links an indicator before hover ([#1285](https://github.com/splattner/openzev/issues/1285)) ([1c33250](https://github.com/splattner/openzev/commit/1c33250407b5abc3b14c1d013eb9a98de28feae0))
+* **frontend:** remove bullets from single-item response lists ([#1292](https://github.com/splattner/openzev/issues/1292)) ([1dda334](https://github.com/splattner/openzev/commit/1dda334f963be4bc72741421fc1220a747baac44))
+* **frontend:** remove pointer cursors from energy flow charts ([#1262](https://github.com/splattner/openzev/issues/1262)) ([9880703](https://github.com/splattner/openzev/commit/9880703fb0c35b76a8cec2e1e061ce603b2da451))
+* **frontend:** separate completed billing checks from open work ([#1278](https://github.com/splattner/openzev/issues/1278)) ([cd3c2be](https://github.com/splattner/openzev/commit/cd3c2be7291bafa1fbf0a998137dd25325a5d86f))
+* **frontend:** show impersonation above the whole app shell ([#1274](https://github.com/splattner/openzev/issues/1274)) ([cbd2593](https://github.com/splattner/openzev/commit/cbd2593512936662048b583463bb6ffb86637bc0))
+* **frontend:** show single overflow actions as buttons ([#1288](https://github.com/splattner/openzev/issues/1288)) ([9b73b77](https://github.com/splattner/openzev/commit/9b73b779c6a969f5d0ef0ba187403b0e0a731296))
+* **frontend:** unify status pills and inactive-row styling ([#1273](https://github.com/splattner/openzev/issues/1273)) ([5210f6c](https://github.com/splattner/openzev/commit/5210f6cad36000d33b4d9fb8632041d134d282bf))
+* **frontend:** use icon-only buttons for familiar actions ([#1283](https://github.com/splattner/openzev/issues/1283)) ([bbbe57c](https://github.com/splattner/openzev/commit/bbbe57c5a15b5c3fa7982903db30780659c26c66))
+* **frontend:** work through the UI review of the My energy page ([#1263](https://github.com/splattner/openzev/issues/1263)) ([a1d7125](https://github.com/splattner/openzev/commit/a1d7125e1197ced53e64c71969919c964c8fce2e))
+* **invoices:** align detail status colours and co-locate styles ([#1253](https://github.com/splattner/openzev/issues/1253)) ([256c030](https://github.com/splattner/openzev/commit/256c0304d5b4814a58936fb772386f731f655206))
+* **metering:** hide empty held observations disclosure ([#1268](https://github.com/splattner/openzev/issues/1268)) ([42f25fb](https://github.com/splattner/openzev/commit/42f25fb9d47de6e74ba149e310c52ac50ca8a0a7))
+* **tariffs:** keep category headers aligned in card layouts ([#1269](https://github.com/splattner/openzev/issues/1269)) ([bc38014](https://github.com/splattner/openzev/commit/bc3801492fa02c62e681f3432b892e32ef196c9f))
+* **tariffs:** reduce dynamic price chart rendering lag ([#1291](https://github.com/splattner/openzev/issues/1291)) ([e5fe071](https://github.com/splattner/openzev/commit/e5fe0713a4b69764735b61e5ad167a50bd8c1cd1))
+* **tariffs:** use tabs for components and price progression ([#1281](https://github.com/splattner/openzev/issues/1281)) ([2519858](https://github.com/splattner/openzev/commit/25198583b10b5898113c574b9bf03df0ee1fb948))
+* **templates:** stabilize responsive editors and PDF previews ([#1265](https://github.com/splattner/openzev/issues/1265)) ([d705e5c](https://github.com/splattner/openzev/commit/d705e5c1f71342ebb0ea2f2361f5457267332906))
+* **zev-settings:** audit log tab — localised events, card rows, one filter row ([#1228](https://github.com/splattner/openzev/issues/1228)) ([#1235](https://github.com/splattner/openzev/issues/1235)) ([4a937d3](https://github.com/splattner/openzev/commit/4a937d3615ca9744afb8156a33086d8eacb5352c))
+* **zev-settings:** billing tab — three sections, no nested box, issuer link, shorter helpers ([#1225](https://github.com/splattner/openzev/issues/1225)) ([#1236](https://github.com/splattner/openzev/issues/1236)) ([4121513](https://github.com/splattner/openzev/commit/41215131ee30053347d97d987dbe6533a550e124))
+* **zev-settings:** documents tab — invoice e-mail default in the invoice language, grouped sections ([#1226](https://github.com/splattner/openzev/issues/1226)) ([#1237](https://github.com/splattner/openzev/issues/1237)) ([9cb6d79](https://github.com/splattner/openzev/commit/9cb6d79d2081a53e26c50da46c69699c85c68d06))
+* **zev-settings:** energy data tab — link to My metering points, plainer connect dialog, names settled ([#1227](https://github.com/splattner/openzev/issues/1227)) ([#1238](https://github.com/splattner/openzev/issues/1238)) ([52f5970](https://github.com/splattner/openzev/commit/52f5970e8cf00c0a951226b36f090880300f4c92))
+* **zev-settings:** export tab — one truthful reactivation text, quiet deactivate, clearer card ([#1229](https://github.com/splattner/openzev/issues/1229)) ([#1234](https://github.com/splattner/openzev/issues/1234)) ([e576e0a](https://github.com/splattner/openzev/commit/e576e0a7173d20cf694abf2c6646111721da3313))
+* **zev-settings:** general tab — one row for the identity fields, no clear on the start date, link to the tariff import ([#1223](https://github.com/splattner/openzev/issues/1223)) ([#1239](https://github.com/splattner/openzev/issues/1239)) ([04fdbd0](https://github.com/splattner/openzev/commit/04fdbd0fde3767f924ef44b3d2b4cba28e97a73b))
+* **zev-settings:** hub shell — tab titles, save bar, scrolling tabs, forced colours, read-only fields ([#1222](https://github.com/splattner/openzev/issues/1222)) ([#1233](https://github.com/splattner/openzev/issues/1233)) ([835cebc](https://github.com/splattner/openzev/commit/835cebc2a43c2ed6018b1295bfce17572cf12391))
+* **zev-settings:** people tab — field errors, stale text, list design aligned with the app ([#1224](https://github.com/splattner/openzev/issues/1224)) ([#1230](https://github.com/splattner/openzev/issues/1230)) ([f3ce908](https://github.com/splattner/openzev/commit/f3ce908681d2b37b37b3c6a1b65ea8174436700e))
+
 ## [1.31.0](https://github.com/splattner/openzev/compare/v1.30.0...v1.31.0) (2026-11-06)
 
 
