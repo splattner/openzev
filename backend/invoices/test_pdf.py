@@ -27,7 +27,14 @@ from .pdf import (
     _render_template,
     generate_pdf,
 )
-from .generated_chart_tokens import _CHART_BG, _CHART_INK, _CHART_LABEL, _CHART_MUTED
+from .generated_chart_tokens import (
+    _CHART_BG,
+    _CHART_INK,
+    _CHART_LABEL,
+    _CHART_LABEL_ON_FILL,
+    _CHART_LOCAL,
+    _CHART_MUTED,
+)
 from .pdf_charts import (
     _build_energy_chart_svg,
     _build_energy_flow_svg,
@@ -272,7 +279,9 @@ class InvoicePdfQrTests(TestCase):
         self.assertIsNotNone(chart)
         self.assertTrue(chart.startswith("<svg"))
         self.assertIn("<rect", chart)  # bars exist
-        self.assertIn("<text", chart)  # labels exist
+        # White on gold is below 4.5:1 for text, so the local label is ink; grid keeps white.
+        self.assertIn(f'fill="{_CHART_INK}" font-weight="600">10.0</text>', chart)
+        self.assertIn(f'fill="{_CHART_LABEL_ON_FILL}" font-weight="600">20.0</text>', chart)
 
     def test_energy_comparison_is_rendered_when_a_prior_period_exists(self):
         Invoice.objects.create(
@@ -511,10 +520,9 @@ class InvoicePdfQrTests(TestCase):
         self.assertIsNotNone(chart)
         # Only the post-assignment reading contributes: exactly one bar at
         # hour 10 (local), and no grid bar — the pre-assignment 5 kWh would
-        # otherwise produce a second, orange (grid) bar there.
-        self.assertIn('data-hour="10"', chart)
-        self.assertEqual(chart.count('data-hour="10"'), 1)
-        self.assertNotIn('fill="#c9891a" data-hour', chart)
+        # otherwise produce a second, grid bar there.
+        hour_10 = re.findall(r'fill="([^"]+)"[^>]*data-hour="10"', chart)
+        self.assertEqual(hour_10, [_CHART_LOCAL])
 
     def test_hourly_profile_reaches_a_community_only_participant(self):
         """A participant with no personally-held meter — their only stake in

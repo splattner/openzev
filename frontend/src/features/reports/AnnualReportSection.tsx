@@ -5,7 +5,7 @@ import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, X
 import { fetchAnnualReport } from '../../lib/api/invoices'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { useCommunityAccess } from '../../lib/communityAccess'
-import { AXIS_COLOR, CHART_GRIDLINE, CHART_LOCAL, CONS_COLORS } from '../../lib/chartTokens'
+import { AXIS_COLOR, CHART_CONSUMPTION, CHART_GRIDLINE, CHART_LOCAL } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
 import { formatMonthName } from '../../lib/dates'
 import { formatChf, formatChfAmount, formatKwh, formatPercent, formatPercentFigure } from '../../lib/numbers'
@@ -159,7 +159,7 @@ function AnnualTrendCard({ report }: { report: AnnualReport }) {
                         type="monotone"
                         dataKey="self_sufficiency_rate"
                         name={t('pages.reports.annualReport.trend.selfSufficiency', { year: current })}
-                        stroke={CONS_COLORS[0]}
+                        stroke={CHART_CONSUMPTION}
                         strokeWidth={2}
                     />
                     {hasPrevious && (
@@ -178,7 +178,7 @@ function AnnualTrendCard({ report }: { report: AnnualReport }) {
                             type="monotone"
                             dataKey="previous_self_sufficiency_rate"
                             name={t('pages.reports.annualReport.trend.selfSufficiency', { year: previous })}
-                            stroke={CONS_COLORS[0]}
+                            stroke={CHART_CONSUMPTION}
                             strokeDasharray="5 4"
                             strokeOpacity={0.6}
                             dot={false}

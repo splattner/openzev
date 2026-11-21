@@ -19,8 +19,8 @@ import { formatNumber } from '../../../lib/numbers'
 import type { AppSettings, TariffProgression } from '../../../types/api'
 import { dayMs, type ProgressionChartData } from './progression'
 
-/** Distinct hues, each also given its own dash pattern so colour is never the only cue. */
-const LINE_COLORS = [FLOW_LOCAL_CONS, CHART_GRID, CHART_LOCAL, CHART_INK, FLOW_GRID_EXP, CHART_MUTED]
+/** Dash patterns tell the series apart; colour is never the only cue. */
+const LINE_COLORS = [CHART_GRID, CHART_LOCAL, FLOW_GRID_EXP, FLOW_LOCAL_CONS, CHART_INK, CHART_MUTED]
 const LINE_DASHES = [undefined, '6 3', '2 3', '8 3 2 3', '1 3', '10 4']
 
 type Props = {

@@ -268,7 +268,7 @@ aborts/disposes old document state and generates only the active document.
   (`behindMeter.zevNote`) renders below the KPI row.
 - `AnnualTrendCard`: Recharts `LineChart`, x = abbreviated month names in the app locale, y = 0–100 %.
   Current-year lines are `CHART_LOCAL` (self-consumption) and
-  `FLOW_LOCAL_CONS` (self-sufficiency). Previous-year lines appear only when
+  `CHART_CONSUMPTION` (self-sufficiency). Previous-year lines appear only when
   `previous_totals` is set: same colours, `strokeDasharray="5 4"`, opacity
   0.6, no dots. Null months leave gaps.
 - `ParticipantSavingsCard`: a `table.participant-table.participant-table--static`
