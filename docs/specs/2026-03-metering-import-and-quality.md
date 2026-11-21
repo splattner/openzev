@@ -917,6 +917,7 @@ row-expansion pattern of SPEC-2026-10-ui-patterns §6.3. Days open
 independently; a new meter or period closes them and returns to page 1. Each
 total pairs a slim bar, scaled per direction to the period's largest magnitude
 (`dataBarPercent`), with the right-aligned value; bars are hidden on phones.
+The zero-consumption day flag is not shown for `meter_type === 'production'`.
 
 An open day shows the anomaly banners, an intraday sparkline labelled at
 00:00/06:00/12:00/18:00 where those intervals exist, and, for a day with both

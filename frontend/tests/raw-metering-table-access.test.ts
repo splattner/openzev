@@ -32,7 +32,7 @@ vi.mock('../src/lib/api/zev', () => ({
 
 const unmounts: Array<() => void> = []
 
-async function renderTable(canReadAssignments: boolean) {
+async function renderTable(canReadAssignments: boolean, meterType?: 'consumption' | 'production') {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     // Assignments cached earlier, e.g. while the account still had management access.
     client.setQueryData(queryKeys.metering.pointAssignments('mp1'), [
@@ -43,7 +43,7 @@ async function renderTable(canReadAssignments: boolean) {
     const root = createRoot(container)
     await act(async () => {
         root.render(createElement(MantineProvider, null, createElement(QueryClientProvider, { client },
-            createElement(RawMeteringTable, { meteringPointId: 'mp1', dateFrom: '2026-01-01', dateTo: '2026-01-31', hasOut: false, canReadAssignments, canReadHeld: false }))))
+            createElement(RawMeteringTable, { meteringPointId: 'mp1', dateFrom: '2026-01-01', dateTo: '2026-01-31', hasOut: false, meterType, canReadAssignments, canReadHeld: false }))))
     })
     await vi.waitFor(() => expect(container.textContent).toContain('2026-01-02'))
     unmounts.push(() => { act(() => root.unmount()); container.remove() })
@@ -65,5 +65,10 @@ describe('raw metering table assignment access', () => {
     it('flags a zero-consumption day with a holder for management readers', async () => {
         const container = await renderTable(true)
         expect(container.textContent).toContain('pages.meteringData.rawTable.zeroConsumptionFlag')
+    })
+
+    it('does not flag zero consumption on a production meter', async () => {
+        const container = await renderTable(true, 'production')
+        expect(container.textContent).not.toContain('pages.meteringData.rawTable.zeroConsumptionFlag')
     })
 })

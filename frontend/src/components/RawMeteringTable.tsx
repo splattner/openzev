@@ -659,7 +659,8 @@ export function RawMeteringTable({
                                                         {t('pages.meteringData.rawTable.negativeTotalFlag')}
                                                     </span>
                                                 )}
-                                                {flags.zeroConsumptionWithHolder && (
+                                                {/* A production meter is not expected to consume. */}
+                                                {flags.zeroConsumptionWithHolder && meterType !== 'production' && (
                                                     <span className="badge badge-warning badge-quiet raw-metering-day-flag">
                                                         {t('pages.meteringData.rawTable.zeroConsumptionFlag')}
                                                     </span>
