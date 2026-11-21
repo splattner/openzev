@@ -15,6 +15,8 @@ export type EmptyStateAction = {
 
 export type EmptyStateProps = {
     titleKey: string
+    /** i18next interpolation values for `titleKey`. */
+    titleOptions?: Record<string, unknown>
     descriptionKey: string
     /** i18next interpolation values for `descriptionKey`, e.g. a date range known only at render time. */
     descriptionOptions?: Record<string, unknown>
@@ -23,14 +25,14 @@ export type EmptyStateProps = {
     actions?: EmptyStateAction[]
 }
 
-export function EmptyState({ titleKey, descriptionKey, descriptionOptions, note, actions }: EmptyStateProps) {
+export function EmptyState({ titleKey, titleOptions, descriptionKey, descriptionOptions, note, actions }: EmptyStateProps) {
     const { t } = useTranslation()
     const titleId = useId()
     const descId = useId()
 
     return (
         <section className="card empty-state" aria-labelledby={titleId} aria-describedby={descId}>
-            <h3 id={titleId}>{t(titleKey)}</h3>
+            <h3 id={titleId}>{titleOptions ? t(titleKey, titleOptions) : t(titleKey)}</h3>
             <p id={descId} className="muted">{descriptionOptions ? t(descriptionKey, descriptionOptions) : t(descriptionKey)}</p>
             {note && <p className="muted">{note}</p>}
             {actions?.length ? (

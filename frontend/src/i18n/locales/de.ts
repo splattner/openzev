@@ -569,7 +569,8 @@ export const de = {
         linkAccount: '{{provider}} verknüpfen',
         unlinkAccount: 'Verknüpfung aufheben',
         linkedSince: 'Verknüpft seit {{date}}',
-        noProviders: 'Keine OAuth-Anbieter konfiguriert.',
+        noProviders: 'Keine OAuth-Anbieter konfiguriert. Ein Administrator kann einen einrichten.',
+        providersLoadError: 'Die OAuth-Anbieter konnten nicht geladen werden.',
         linkEmailNotVerified: 'Der Anbieter muss die E-Mail-Adresse dieses Kontos bestätigen, bevor er verknüpft werden kann.',
         linkSuccess: 'Konto erfolgreich verknüpft.',
         unlinkConfirmTitle: 'Verknüpfung aufheben?',
@@ -884,6 +885,7 @@ export const de = {
             empty: {
                 title: 'Noch nichts zugestellt',
                 description: 'Rechnungen erscheinen hier, sobald sie gesendet sind. Sie können auch eine Mitteilung hochladen oder Jahresabrechnungen ausstellen.',
+                descriptionReadOnly: 'Rechnungen erscheinen hier, sobald sie gesendet sind.',
             },
             col: {
                 document: 'Dokument',
@@ -4174,7 +4176,9 @@ export const de = {
             annualReport: {
                 title: 'Jahresbericht {{year}}',
                 error: 'Der Jahresbericht konnte nicht geladen werden.',
-                noData: 'Für {{year}} liegen keine Messdaten vor.',
+                noData: 'Keine Messdaten für {{year}}',
+                noDataHint: 'Der Jahresbericht entsteht aus den importierten Messwerten.',
+                importAction: 'Messdaten importieren',
                 stats: {
                     selfConsumptionRate: 'Eigenverbrauchsquote',
                     selfSufficiencyRate: 'Autarkiegrad',
@@ -5201,7 +5205,8 @@ export const de = {
     adminInvoices: {
         loading: 'Rechnungen werden geladen…',
         loadError: 'Fehler beim Laden der Rechnungen.',
-        empty: 'Keine Rechnungen gefunden.',
+        empty: 'Noch keine Rechnungen',
+        emptyDescription: 'Rechnungen erscheinen hier, sobald eine Gemeinschaft sie erstellt.',
         number: 'Nummer',
         zev: 'ZEV',
         participant: 'Teilnehmer',

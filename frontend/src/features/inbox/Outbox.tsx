@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { ActionMenu } from '../../components/ActionMenu'
 import { ConfirmDialog, useConfirmDialog } from '../../components/ConfirmDialog'
 import { Disclosure } from '../../components/Disclosure'
+import { EmptyState } from '../../components/EmptyState'
 import { Notice } from '../../components/Notice'
 import { PageSkeleton } from '../../components/PageSkeleton'
 import { Toolbar } from '../../components/Toolbar'
@@ -222,10 +223,16 @@ export function Outbox() {
       ) : documentsQuery.isError ? (
         <Notice tone="error" onRetry={() => void documentsQuery.refetch()} isRetrying={documentsQuery.isFetching}>{t('inbox.failed')}</Notice>
       ) : documents.length === 0 ? (
-        <div className="card">
-          <h3 className="mt-0">{filtered ? t('inbox.outbox.noMatch') : t('inbox.outbox.empty.title')}</h3>
-          {!filtered && <p className="muted">{t('inbox.outbox.empty.description')}</p>}
-        </div>
+        filtered ? (
+          <div className="card">
+            <h3 className="mt-0">{t('inbox.outbox.noMatch')}</h3>
+          </div>
+        ) : (
+          <EmptyState
+            titleKey="inbox.outbox.empty.title"
+            descriptionKey={canWriteSelectedCommunity ? 'inbox.outbox.empty.description' : 'inbox.outbox.empty.descriptionReadOnly'}
+          />
+        )
       ) : (
         <section className="table-card">
           <div className="table-scroll doc-wide">

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import type { ColumnDef, ColumnFiltersState } from '../components/DataTable'
 import { ConfirmDialog, consumeReportedError, useConfirmDialog } from '../components/ConfirmDialog'
 import { DataTable } from '../components/DataTable'
+import { EmptyState } from '../components/EmptyState'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { deleteInvoice, fetchInvoices } from '../lib/api/invoices'
 import { formatApiError } from '../lib/api/errors'
@@ -144,14 +145,15 @@ export function AdminInvoicesContent() {
         [t, settings, handleDelete, deleteMutation.isPending],
     )
 
+    if (invoicesQuery.isSuccess && invoices.length === 0) {
+        return <EmptyState titleKey="adminInvoices.empty" descriptionKey="adminInvoices.emptyDescription" />
+    }
+
     return (
         <div className="page-stack">
             <section className="card">
                 {invoicesQuery.isLoading && <p>{t('adminInvoices.loading')}</p>}
                 {invoicesQuery.isError && <p className="text-error">{t('adminInvoices.loadError')}</p>}
-                {invoicesQuery.isSuccess && invoices.length === 0 && (
-                    <p className="muted">{t('adminInvoices.empty')}</p>
-                )}
                 {invoices.length > 0 && (
                     <div className="page-stack sheet-table-body" style={{ width: '100%' }}>
                         <div className="actions-row" style={{ flexWrap: 'wrap' }}>

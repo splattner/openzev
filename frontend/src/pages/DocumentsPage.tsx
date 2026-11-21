@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { EmptyState } from '../components/EmptyState'
 import { FilterTabs } from '../components/FilterTabs'
 import { Notice } from '../components/Notice'
 import { PageHeader } from '../components/PageHeader'
@@ -64,10 +65,7 @@ export function DocumentsPage() {
       ) : query.isError && !query.data ? (
         <Notice tone="error" onRetry={() => void query.refetch()} isRetrying={query.isFetching}>{t('inbox.failed')}</Notice>
       ) : documents.length === 0 ? (
-        <div className="card">
-          <h3 className="mt-0">{t('inbox.empty.title')}</h3>
-          <p className="muted">{t('inbox.empty.description')}</p>
-        </div>
+        <EmptyState titleKey="inbox.empty.title" descriptionKey="inbox.empty.description" />
       ) : (
         <>
           <div className="actions-row actions-row-wrap">
