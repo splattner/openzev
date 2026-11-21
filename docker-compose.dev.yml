@@ -30,7 +30,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    command: celery -A config worker -l info
+    command: celery -A config worker -l info --concurrency=4
     env_file:
       - backend/.env.example
     environment:
