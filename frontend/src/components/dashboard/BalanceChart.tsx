@@ -43,40 +43,6 @@ export function BalanceChart({
                 <div className="balance-chart-grid">
                     <div>
                         <p className="balance-chart-label" style={{ color: CHART_LABEL }}>
-                            {t('pages.dashboard.consumption')}
-                        </p>
-                        <ResponsiveContainer width="100%" height={300}>
-                            <ComposedChart data={data} margin={{ top: 4, right: 50, bottom: 4, left: 0 }}>
-                                <CartesianGrid stroke={CHART_GRIDLINE} strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="bucket" tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} tickFormatter={formatBucketLabel} />
-                                <YAxis yAxisId="kwh" tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} unit=" kWh" width={60} tickFormatter={kwhTick} />
-                                <YAxis yAxisId="pct" orientation="right" tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} unit="%" width={44} domain={[0, 100]} />
-                                <Tooltip
-                                    contentStyle={CHART_TOOLTIP_STYLE}
-                                    labelFormatter={formatBucketTooltipLabel}
-                                    formatter={(v, name, props) =>
-                                        formatConsumptionMixTooltip(v, String(name), props?.dataKey, t('pages.dashboard.chart.fromZevPct'))
-                                    }
-                                />
-                                <Legend />
-                                <Bar yAxisId="kwh" dataKey="locally_consumed" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill={CHART_LOCAL} />
-                                <Bar yAxisId="kwh" dataKey="imported_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill={CHART_GRID} radius={[3, 3, 0, 0]} />
-                                <Line
-                                    yAxisId="pct"
-                                    type="monotone"
-                                    dataKey="from_zev_rate"
-                                    name={t('pages.dashboard.chart.fromZevPct')}
-                                    className="chart-line-halo"
-                                    stroke={CHART_RATIO}
-                                    dot={false}
-                                    strokeWidth={2}
-                                    connectNulls
-                                />
-                            </ComposedChart>
-                        </ResponsiveContainer>
-                    </div>
-                    <div>
-                        <p className="balance-chart-label" style={{ color: CHART_LABEL }}>
                             {t('pages.dashboard.production')}
                         </p>
                         <ResponsiveContainer width="100%" height={300}>
@@ -100,6 +66,40 @@ export function BalanceChart({
                                     type="monotone"
                                     dataKey="self_consumption_rate"
                                     name={t('pages.dashboard.chart.selfConsumedPct')}
+                                    className="chart-line-halo"
+                                    stroke={CHART_RATIO}
+                                    dot={false}
+                                    strokeWidth={2}
+                                    connectNulls
+                                />
+                            </ComposedChart>
+                        </ResponsiveContainer>
+                    </div>
+                    <div>
+                        <p className="balance-chart-label" style={{ color: CHART_LABEL }}>
+                            {t('pages.dashboard.consumption')}
+                        </p>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <ComposedChart data={data} margin={{ top: 4, right: 50, bottom: 4, left: 0 }}>
+                                <CartesianGrid stroke={CHART_GRIDLINE} strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="bucket" tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} tickFormatter={formatBucketLabel} />
+                                <YAxis yAxisId="kwh" tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} unit=" kWh" width={60} tickFormatter={kwhTick} />
+                                <YAxis yAxisId="pct" orientation="right" tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} unit="%" width={44} domain={[0, 100]} />
+                                <Tooltip
+                                    contentStyle={CHART_TOOLTIP_STYLE}
+                                    labelFormatter={formatBucketTooltipLabel}
+                                    formatter={(v, name, props) =>
+                                        formatConsumptionMixTooltip(v, String(name), props?.dataKey, t('pages.dashboard.chart.fromZevPct'))
+                                    }
+                                />
+                                <Legend />
+                                <Bar yAxisId="kwh" dataKey="locally_consumed" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill={CHART_LOCAL} />
+                                <Bar yAxisId="kwh" dataKey="imported_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill={CHART_GRID} radius={[3, 3, 0, 0]} />
+                                <Line
+                                    yAxisId="pct"
+                                    type="monotone"
+                                    dataKey="from_zev_rate"
+                                    name={t('pages.dashboard.chart.fromZevPct')}
                                     className="chart-line-halo"
                                     stroke={CHART_RATIO}
                                     dot={false}

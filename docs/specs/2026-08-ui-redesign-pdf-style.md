@@ -470,12 +470,13 @@ live on Reports; participant invoice PDF actions remain on the dashboard.
      generation.
   2. `EnergyFlowCard` (when there are participant stats), highlighting the
      selected participant.
-  3. `BalanceChart`, on the filtered timeline. The consumption chart stacks
-     from-ZEV (consumed − imported) over from-grid kWh, with a right-hand
-     0–100 % axis carrying the `from_zev_rate` line (locally consumed ÷
-     consumed; empty when the selected participant has behind-meter
-     generation). The production chart stacks used-locally over exported, with
-     the self-consumption-rate line on the same kind of axis.
+  3. `BalanceChart`, on the filtered timeline: production first, then
+     consumption, in the energy flow's left-to-right order. The production
+     chart stacks used-locally over exported, with the self-consumption-rate
+     line on a right-hand 0–100 % axis. The consumption chart stacks from-ZEV
+     (consumed − imported) over from-grid kWh, with the same kind of axis
+     carrying the `from_zev_rate` line (locally consumed ÷ consumed; empty
+     when the selected participant has behind-meter generation).
   4. `ParticipantTableCard` (sortable raw-value headers, with row selection retained): consumption, production/export, from ZEV, from
      grid and from-ZEV % per participant (reported gross-energy rates for
      behind-meter participants, or — when withheld). A
