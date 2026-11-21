@@ -50,6 +50,7 @@ export function ConsumptionSplitCard({
                             type="monotone"
                             dataKey="from_zev_rate"
                             name={t('pages.dashboard.chart.fromZevPct')}
+                            className="chart-line-halo"
                             stroke={CHART_RATIO}
                             dot={false}
                             strokeWidth={2}

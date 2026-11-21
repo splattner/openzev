@@ -532,7 +532,7 @@ def _build_monthly_chart_svg(monthly_data: list[dict], tr: dict) -> str | None:
     for i, (zev_val, grid_val) in enumerate(values):
         x = margin_l + i * (bar_w + gap) + gap / 2
 
-        # ZEV portion (bottom, green)
+        # ZEV portion (bottom)
         zev_h = (zev_val / max_val) * bar_area_h if max_val > 0 else 0
         zev_y = margin_t + bar_area_h - zev_h
         if zev_h > 0:
@@ -541,7 +541,7 @@ def _build_monthly_chart_svg(monthly_data: list[dict], tr: dict) -> str | None:
                 f'fill="{_CHART_LOCAL}" rx="1"/>'
             )
 
-        # Grid portion (top, amber)
+        # Grid portion (top)
         grid_h = (grid_val / max_val) * bar_area_h if max_val > 0 else 0
         grid_y = zev_y - grid_h
         if grid_h > 0:

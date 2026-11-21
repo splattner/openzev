@@ -61,6 +61,11 @@ read as relatives rather than as one product:
      forest for production and energy from the community, amber for the grid,
      sage for feed-in, slate for consumption, dark ink for percentage lines
      (no teal, violet or blue ramps).
+     *Amended 2026-11:* energy charts use gold for local energy and
+     production (the local-consumption node included: it is the same
+     energy), slate-blue for the grid, green for demand and feed-in, and
+     distinct hues only for individual consumers; see the UI redesign
+     spec §4.3.
    - The annual statement and the tax overview move onto
      `pdf/shared_pdf_base.html`, which now also holds the summary band
      (recipient + facts), figure tiles, sections, dark-header

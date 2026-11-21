@@ -15,20 +15,18 @@ import { formatShortDate } from '../../lib/appSettings'
 import { formatUtcIsoDate, todayBusinessIso } from '../../lib/dates'
 import type { AppSettings, TariffSeries } from '../../types/api'
 import { buildPriceHistory, type BandKey, type PriceUnit } from './priceHistory'
-import { AXIS_COLOR, CHART_GRID, CHART_GRIDLINE, CONS_COLORS, FLOW_LOCAL_CONS, NEGATIVE_COLOR } from '../../lib/chartTokens'
+import { AXIS_COLOR, CHART_CONSUMPTION, CHART_GRID, CHART_GRIDLINE, CHART_LOCAL, CONS_COLORS, NEGATIVE_COLOR } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
 import { formatNumber } from '../../lib/numbers'
 
-// Blue (consumer series) and amber (chart grid accent) are the colourblind-safe
-// pair from the shared palette and carry the two bands that actually co-occur
-// (HT and NT). Flat never shares a version with HT/NT in practice, so its blue
-// can be reused without an ambiguous adjacency.
+// Flat never shares a version with HT/NT in practice, so it reuses the
+// consumption green.
 const NAMED_BAND_COLOR: Partial<Record<BandKey, string>> = {
-    flat: CONS_COLORS[0],
-    high: CHART_GRID,
-    low: FLOW_LOCAL_CONS,
-    amount: CONS_COLORS[0],
-    effective: CONS_COLORS[0],
+    flat: CHART_CONSUMPTION,
+    high: CHART_LOCAL,
+    low: CHART_GRID,
+    amount: CHART_CONSUMPTION,
+    effective: CHART_CONSUMPTION,
 }
 
 /** Unnamed bands cycle the consumer ramp, which is ordered for adjacency. */

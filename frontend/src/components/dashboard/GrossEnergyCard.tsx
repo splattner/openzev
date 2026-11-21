@@ -112,6 +112,7 @@ export function GrossEnergyCard({ gross, whose, participantName, formatBucketLab
                             type="monotone"
                             dataKey="self_consumption_kwh"
                             name={t('supplementary.gross.selfConsumption')}
+                            className="chart-line-halo"
                             stroke={FLOW_LOCAL_CONS}
                             dot={false}
                             strokeWidth={2}
