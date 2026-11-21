@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Area, Bar, CartesianGrid, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { AXIS_COLOR, CHART_LOCAL, CHART_GRIDLINE } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
+import { formatBusinessWeekday } from '../../lib/dates'
 import { forecastRows, nextPeakWindow, peakDayKind, peakRange } from '../../lib/forecast'
 import { formatClockMinutes } from '../../lib/live'
 import type { ProductionForecast } from '../../types/api'
@@ -11,13 +12,11 @@ import {
     FORECAST_TOOLTIP_CURSOR, ForecastHourBars, forecastTooltipLabel, HOUR_MS, kwTooltipText, noBarShape,
 } from './forecastChartParts'
 
-const dayFormatter = new Intl.DateTimeFormat(undefined, { timeZone: 'Europe/Zurich', weekday: 'short', day: 'numeric', month: 'numeric' })
-
 const localHour = (ts: number) => Number(formatClockMinutes(ts).slice(0, 2))
 
-/** `Mon 3.11.` for a day's start; a tick at midnight names the day, the others the time. */
+/** A tick at midnight names the day (weekday and date), the others the time. */
 function tickLabel(ts: number, namesDays: boolean): string {
-    return namesDays && localHour(ts) === 0 ? dayFormatter.format(new Date(ts)) : formatClockMinutes(ts)
+    return namesDays && localHour(ts) === 0 ? formatBusinessWeekday(new Date(ts)) : formatClockMinutes(ts)
 }
 
 /**
@@ -50,7 +49,7 @@ export function ProductionForecastChart({ forecast, title }: { forecast: Product
             {next && (
                 <p>
                     <strong>
-                        {t(`forecast.peak.${peakDayKind(next, now)}`, { range: peakRange(next), date: dayFormatter.format(new Date(next.from)) })}
+                        {t(`forecast.peak.${peakDayKind(next, now)}`, { range: peakRange(next), date: formatBusinessWeekday(new Date(next.from)) })}
                     </strong>
                 </p>
             )}

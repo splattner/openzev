@@ -1,14 +1,13 @@
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MemoryRouter } from 'react-router-dom'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { BillingPeriodCard } from '../src/components/BillingPeriodCard'
 import { groupPeriodCards, primaryPeriodStep } from '../src/features/overview/periodCards'
 import type { AttentionItem, ReadinessPeriod, ReadinessStep } from '../src/types/api'
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({
     t: (key: string, values?: { count?: number }) => `${key}${values?.count === undefined ? '' : `:${values.count}`}`,
-    i18n: { resolvedLanguage: 'de' },
 }) }))
 vi.mock('../src/lib/appSettings', () => ({
     useAppSettings: () => ({ settings: {} }), formatShortDate: (value: string) => value,
@@ -23,7 +22,15 @@ function alert(type: AttentionItem['type'], id = type): AttentionItem {
         link: '/billing/invoices?period_start=2026-06-01&period_end=2026-06-30' }
 }
 const cleanup: (() => void)[] = []
-afterEach(() => cleanup.splice(0).forEach((fn) => fn()))
+let savedLang = ''
+beforeEach(() => {
+    savedLang = document.documentElement.lang
+    document.documentElement.lang = 'de-CH'
+})
+afterEach(() => {
+    cleanup.splice(0).forEach((fn) => fn())
+    document.documentElement.lang = savedLang
+})
 function render(entry: Parameters<typeof BillingPeriodCard>[0]['entry']) {
     const container = document.createElement('div')
     document.body.append(container)

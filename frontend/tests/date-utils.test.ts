@@ -1,10 +1,11 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { formatDateByPattern, formatDateTime } from '../src/lib/appSettings'
 import {
   BUSINESS_TIME_ZONE,
   businessDayStartMs,
   daysInPeriod,
   formatBusinessIsoDate,
+  formatBusinessWeekday,
   formatIsoDate,
   formatUtcIsoDate,
   nextIsoDate,
@@ -95,6 +96,10 @@ describe('daysInPeriod', () => {
 })
 
 describe('display date formatting', () => {
+  let savedLang = ''
+  beforeEach(() => { savedLang = document.documentElement.lang })
+  afterEach(() => { document.documentElement.lang = savedLang })
+
   it('skips month-name formatters for numeric patterns', () => {
     const dateTimeFormat = vi.spyOn(Intl, 'DateTimeFormat')
     try {
@@ -109,8 +114,26 @@ describe('display date formatting', () => {
   })
 
   it('uses the month in Europe/Zurich when the timestamp crosses midnight at month end', () => {
-    const instant = '2026-07-31T22:15:00Z'
-    const month = new Intl.DateTimeFormat(undefined, { month: 'long', timeZone: BUSINESS_TIME_ZONE }).format(new Date(instant))
-    expect(formatDateByPattern(instant, 'd MMMM yyyy')).toBe(`1 ${month} 2026`)
+    document.documentElement.lang = 'en-CH'
+    expect(formatDateByPattern('2026-07-31T22:15:00Z', 'd MMMM yyyy')).toBe('1 August 2026')
+  })
+
+  it('names months and weekdays in the app locale on <html lang>', () => {
+    document.documentElement.lang = 'de-CH'
+    expect(formatDateByPattern('2026-07-15', 'd. MMMM yyyy')).toBe('15. Juli 2026')
+    expect(formatBusinessWeekday(new Date('2026-11-03T12:00:00Z'))).toBe('Di., 3.11.')
+  })
+
+  it('keeps the Swiss day-before-month order in English', () => {
+    document.documentElement.lang = 'en-CH'
+    const label = formatBusinessWeekday(new Date('2026-11-03T12:00:00Z'))
+    expect(label).toMatch(/^Tue\b/)
+    expect(label).toMatch(/0?3\.11/)
+  })
+
+  it('reads an instant\'s weekday in Zurich, not the viewer\'s zone', () => {
+    // 23:30 UTC on Monday is already Tuesday in Zurich; this file runs in New York.
+    document.documentElement.lang = 'en-CH'
+    expect(formatBusinessWeekday(new Date('2026-11-02T23:30:00Z'))).toMatch(/^Tue\b/)
   })
 })

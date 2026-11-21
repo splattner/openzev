@@ -1,5 +1,4 @@
 import { SortableHeader, useTableSorting } from '../../components/tableSorting'
-import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -7,6 +6,7 @@ import { fetchAnnualReport } from '../../lib/api/invoices'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { AXIS_COLOR, CHART_GRIDLINE, CHART_LOCAL, CONS_COLORS } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
+import { formatMonthName } from '../../lib/dates'
 import { formatChf, formatChfAmount, formatKwh, formatPercent, formatPercentFigure } from '../../lib/numbers'
 import { behindMeterHintKey, grossRate } from '../../lib/supplementary'
 import { StatCard } from '../../components/StatCard'
@@ -118,12 +118,12 @@ function AnnualReportKpis({ report }: { report: AnnualReport }) {
 }
 
 function AnnualTrendCard({ report }: { report: AnnualReport }) {
-    const { t, i18n } = useTranslation()
+    const { t } = useTranslation()
     const hasPrevious = report.previous_totals !== null
-    const data = useMemo(() => {
-        const monthName = new Intl.DateTimeFormat(i18n.language, { month: 'short', timeZone: 'UTC' })
-        return report.months.map((m) => ({ ...m, label: monthName.format(new Date(Date.UTC(2000, m.month - 1, 15))) }))
-    }, [report.months, i18n.language])
+    const data = report.months.map((m) => ({
+        ...m,
+        label: formatMonthName(new Date(Date.UTC(2000, m.month - 1, 15)), { month: 'short', timeZone: 'UTC' }),
+    }))
 
     const current = String(report.year)
     const previous = String(report.year - 1)

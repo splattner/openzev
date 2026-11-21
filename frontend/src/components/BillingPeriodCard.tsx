@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
+import { formatMonthName } from '../lib/dates'
 import { Disclosure } from './Disclosure'
 import { groupInvoiceAlerts, isOpenStep, primaryPeriodStep, type PeriodCardEntry } from '../features/overview/periodCards'
 import { attentionText, stepDetailText } from '../features/overview/readinessPresentation'
@@ -16,7 +17,7 @@ function stepSeverityClass(step: ReadinessStep): string {
 }
 
 export function BillingPeriodCard({ entry }: { entry: PeriodCardEntry }) {
-    const { t, i18n } = useTranslation()
+    const { t } = useTranslation()
     const { settings } = useAppSettings()
     const { period, readiness, alerts } = entry
     const format = (date: string) => formatShortDate(date, settings)
@@ -41,9 +42,8 @@ export function BillingPeriodCard({ entry }: { entry: PeriodCardEntry }) {
     // Delivery failures have a single visible aggregate; don't repeat them in
     // the readiness sentence as well as the attention summary.
     const detail = primary ? stepDetailText({ ...primary, failed: 0 }, t) : null
-    const month = new Intl.DateTimeFormat(i18n?.resolvedLanguage || 'en', { month: 'long', timeZone: 'UTC' })
-    const startMonth = month.format(new Date(`${period.start}T00:00:00Z`))
-    const endMonth = month.format(new Date(`${period.end}T00:00:00Z`))
+    const startMonth = formatMonthName(new Date(`${period.start}T00:00:00Z`), { timeZone: 'UTC' })
+    const endMonth = formatMonthName(new Date(`${period.end}T00:00:00Z`), { timeZone: 'UTC' })
     const sameMonth = period.start.slice(0, 7) === period.end.slice(0, 7)
     const sameYear = period.start.slice(0, 4) === period.end.slice(0, 4)
     const year = sameYear ? period.start.slice(0, 4) : `${period.start.slice(0, 4)}–${period.end.slice(0, 4)}`

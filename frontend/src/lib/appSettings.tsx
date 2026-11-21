@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchAppSettings } from './api/auth'
 import { queryKeys } from './api/queryKeys'
 import { useAuth } from './auth'
-import { BUSINESS_TIME_ZONE, zonedParts } from './dates'
+import { BUSINESS_TIME_ZONE, formatMonthName, zonedParts } from './dates'
 import type { AppSettings, DateTimeFormat, LongDateFormat, ShortDateFormat } from '../types/api'
 
 const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -83,11 +83,8 @@ function formatDateParts({ date, dateOnly }: ParsedDateValue) {
     }
 }
 
-function formatMonthName({ date, dateOnly }: ParsedDateValue) {
-    return new Intl.DateTimeFormat(undefined, {
-        month: 'long',
-        timeZone: dateOnly ? undefined : BUSINESS_TIME_ZONE,
-    }).format(date)
+function monthName({ date, dateOnly }: ParsedDateValue) {
+    return formatMonthName(date, { timeZone: dateOnly ? undefined : BUSINESS_TIME_ZONE })
 }
 
 export function formatDateByPattern(value: string | null | undefined, pattern: ShortDateFormat | LongDateFormat): string {
@@ -108,11 +105,11 @@ export function formatDateByPattern(value: string | null | undefined, pattern: S
         case 'yyyy-MM-dd':
             return `${parts.year}-${parts.monthPadded}-${parts.dayPadded}`
         case 'd MMMM yyyy':
-            return `${parts.day} ${formatMonthName(parsed)} ${parts.year}`
+            return `${parts.day} ${monthName(parsed)} ${parts.year}`
         case 'd. MMMM yyyy':
-            return `${parts.day}. ${formatMonthName(parsed)} ${parts.year}`
+            return `${parts.day}. ${monthName(parsed)} ${parts.year}`
         case 'MMMM d, yyyy':
-            return `${formatMonthName(parsed)} ${parts.day}, ${parts.year}`
+            return `${monthName(parsed)} ${parts.day}, ${parts.year}`
         default:
             return value
     }

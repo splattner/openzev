@@ -264,8 +264,7 @@ aborts/disposes old document state and generates only the active document.
   `hints.previousYear` (`{{year}}: {{rate}}`) when `previous_totals` has that
   rate. When `report.has_behind_meter_generation` is true, a muted note
   (`behindMeter.zevNote`) renders below the KPI row.
-- `AnnualTrendCard`: Recharts `LineChart`, x = month short name
-  (`Intl.DateTimeFormat(i18n.language, {month: 'short'})`), y = 0–100 %.
+- `AnnualTrendCard`: Recharts `LineChart`, x = abbreviated month names in the app locale, y = 0–100 %.
   Current-year lines are `CHART_LOCAL` (self-consumption) and
   `FLOW_LOCAL_CONS` (self-sufficiency). Previous-year lines appear only when
   `previous_totals` is set: same colours, `strokeDasharray="5 4"`, opacity
