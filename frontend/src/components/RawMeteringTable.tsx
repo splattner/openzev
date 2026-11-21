@@ -1,4 +1,5 @@
 import { SortableHeader, useTableSorting } from './tableSorting'
+import { Badge } from './Badge'
 import { useQuery } from '@tanstack/react-query'
 import { CHART_LOCAL, CONS_COLORS } from '../lib/chartTokens'
 import { CHART_AXIS_TICK } from '../lib/chartTheme'
@@ -545,14 +546,14 @@ export function RawMeteringTable({
                                             </span>
                                             {formatShortDate(day.date, settings)}
                                             {flags.negativeTotal && (
-                                                <span className="badge badge-danger badge-quiet raw-metering-day-flag">
+                                                <Badge tone="danger" quiet className="raw-metering-day-flag">
                                                     {t('pages.meteringData.rawTable.negativeTotalFlag')}
-                                                </span>
+                                                </Badge>
                                             )}
                                             {flags.zeroConsumptionWithHolder && (
-                                                <span className="badge badge-warning badge-quiet raw-metering-day-flag">
+                                                <Badge tone="warning" quiet className="raw-metering-day-flag">
                                                     {t('pages.meteringData.rawTable.zeroConsumptionFlag')}
-                                                </span>
+                                                </Badge>
                                             )}
                                         </td>
                                         {/* A data-bar backdrop scaled to the period's max makes an

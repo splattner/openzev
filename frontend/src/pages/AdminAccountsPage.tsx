@@ -29,6 +29,7 @@ import { createUser, deleteUser, fetchUsers, resetUserMfa, revokeUserSessions, u
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
 import { useTranslation } from 'react-i18next'
+import { Badge } from '../components/Badge'
 import { useAuth } from '../lib/auth'
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
 import { useToast } from '../lib/toast'
@@ -445,8 +446,8 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
                                                 <strong className="account-name">{accountDisplayName(account)}</strong>
-                                                <span className="badge badge-tag">{roleLabel(account.role)}</span>
-                                                {!account.is_active && <span className="badge badge-neutral">{t('pages.accounts.inactive')}</span>}
+                                                <Badge tone="tag">{roleLabel(account.role)}</Badge>
+                                                {!account.is_active && <Badge tone="neutral">{t('pages.accounts.inactive')}</Badge>}
                                             </div>
                                             <div className="muted">{account.username} · {account.email || '-'}</div>
                                         </td>
@@ -456,10 +457,10 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                                         <td>
                                             <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                                                 {account.mfa_methods.length === 0 && (
-                                                    <span className="badge badge-neutral">{t('pages.accounts.mfa.none')}</span>
+                                                    <Badge tone="neutral">{t('pages.accounts.mfa.none')}</Badge>
                                                 )}
                                                 {account.mfa_methods.map((method) => (
-                                                    <span key={method} className="badge badge-success">{t(`pages.accounts.mfa.${method}`)}</span>
+                                                    <Badge key={method} tone="success">{t(`pages.accounts.mfa.${method}`)}</Badge>
                                                 ))}
                                                 <AccountMfaComplianceBadge compliance={account.mfa_compliance} />
                                             </div>

@@ -1,6 +1,6 @@
 import type { ApiKey } from '../../types/api'
 
-type ApiKeyStatus = 'active' | 'expiring' | 'expired'
+export type ApiKeyStatus = 'active' | 'expiring' | 'expired'
 
 /**
  * Days before expiry at which a key starts being flagged.

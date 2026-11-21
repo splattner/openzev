@@ -2,6 +2,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
 import type { behindMeterHintKey } from '../lib/supplementary'
+import { Badge } from './Badge'
 
 type BehindMeterBadgeProps = {
     /**
@@ -18,19 +19,19 @@ type BehindMeterBadgeProps = {
  * generation behind the meter (surplus / net metering) — see
  * docs/specs/2026-09-behind-the-meter-generation.md §7.5.
  */
-export function BehindMeterBadge({ hintKey, className = 'badge badge-tag' }: BehindMeterBadgeProps) {
+export function BehindMeterBadge({ hintKey, className }: BehindMeterBadgeProps) {
     const { t } = useTranslation()
     const label = t('behindMeter.badge')
 
     if (!hintKey) {
-        return <span className={className}>{label}</span>
+        return <Badge tone="tag" className={className}>{label}</Badge>
     }
 
     const hint = t(hintKey)
     return (
-        <span className={className} title={hint} aria-label={`${label}: ${hint}`}>
+        <Badge tone="tag" className={className} title={hint} aria-label={`${label}: ${hint}`}>
             <FontAwesomeIcon icon={faCircleInfo} fixedWidth />
             {label}
-        </span>
+        </Badge>
     )
 }

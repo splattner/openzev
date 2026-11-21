@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { formatDateTime } from '../../lib/appSettings'
 import type { AppSettings, DynamicPriceHistory, DynamicTariffSource } from '../../types/api'
 import { Disclosure } from '../../components/Disclosure'
+import { Badge } from '../../components/Badge'
 import { missingPriceDates, missingRangeLabel } from './dynamicPriceGaps'
 
 /**
@@ -24,10 +25,10 @@ export function DynamicSourceSummary({ source, settings, canOperate, missing = [
         <div className="tariff-source-summary">
             <div className="actions-row actions-row-wrap">
                 <strong>{source.label}</strong>
-                {!source.enabled && <span className="badge badge-neutral">{t('pages.dynamicSources.status.disabled')}</span>}
-                <span className={`badge ${source.last_fetch_status === 'failed' ? 'badge-danger' : source.last_fetch_status === 'ok' ? 'badge-success' : 'badge-neutral'}`}>
+                {!source.enabled && <Badge status="disabled" domain="priceSource">{t('pages.dynamicSources.status.disabled')}</Badge>}
+                <Badge status={source.last_fetch_status} domain="priceSource">
                     {t(`pages.dynamicSources.status.${source.last_fetch_status}`)}
-                </span>
+                </Badge>
                 {canOperate && (
                     <Link to={`/admin/dynamic-sources?source=${encodeURIComponent(source.id)}`}>{t('pages.dynamicSources.manageSource')}</Link>
                 )}

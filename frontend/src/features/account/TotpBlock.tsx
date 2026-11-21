@@ -5,6 +5,7 @@ import { beginTotpEnrolment, confirmTotpEnrolment, removeTotp } from '../../lib/
 import { formatApiError } from '../../lib/api/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { useToast } from '../../lib/toast'
+import { Badge } from '../../components/Badge'
 import type { TotpDevice, TotpEnrolment } from '../../types/api'
 
 interface Props {
@@ -66,9 +67,9 @@ export function TotpBlock({ device, onRecoveryCodes, onRemove }: Props) {
 
             {isActive ? (
                 <div className="actions-row" style={{ alignItems: 'center' }}>
-                    <span className="badge badge-brand">
+                    <Badge tone="brand">
                         {t('account.mfa.enabledBadge')}
-                    </span>
+                    </Badge>
                     <button
                         type="button"
                         className="button button-danger button-compact"

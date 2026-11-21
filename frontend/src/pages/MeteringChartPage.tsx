@@ -7,6 +7,7 @@ import { PageSkeleton } from '../components/PageSkeleton'
 import { StatCard } from '../components/StatCard'
 import { ImportsContent } from './ImportsPage'
 import { useTranslation } from 'react-i18next'
+import { Badge } from '../components/Badge'
 import {
     Bar,
     BarChart,
@@ -491,9 +492,9 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
                 const mp = ctx.row.original
                 return (
                     <>
-                        <span className={`badge ${mp.severity === 'green' ? 'badge-success' : mp.severity === 'red' ? 'badge-danger' : 'badge-warning badge-quiet'}`}>
+                        <Badge status={mp.severity} domain="dataQuality">
                             {t(`meteringDataQuality.severity${mp.severity.charAt(0).toUpperCase() + mp.severity.slice(1)}`)}
-                        </span>
+                        </Badge>
                         {mp.assignment_overlap && (
                             <div className="metering-dq-warning">{t('meteringDataQuality.assignmentOverlapWarning')}</div>
                         )}

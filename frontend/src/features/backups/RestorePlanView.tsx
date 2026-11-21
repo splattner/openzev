@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
 import { formatNumber } from '../../lib/numbers'
+import { Badge } from '../../components/Badge'
 import type { RestorePlan } from '../../types/api'
 import { RESTORE_SECTION_ORDER } from './backupHelpers'
 
@@ -77,11 +78,11 @@ export function RestorePlanView({ plan }: { plan: RestorePlan }) {
                     {plan.conflicts.map((conflict, index) => (
                         <div key={`${conflict.kind}-${index}`} className={conflict.overridable ? 'warning-banner' : 'error-banner'}>
                             <div>
-                                <span className={`badge ${conflict.overridable ? 'badge-warning badge-quiet' : 'badge-danger badge-quiet'}`}>
+                                <Badge tone={conflict.overridable ? 'warning' : 'danger'} quiet>
                                     {conflict.overridable
                                         ? t('pages.backups.restore.plan.needsForce')
                                         : t('pages.backups.restore.plan.cannotOverride')}
-                                </span>{' '}
+                                </Badge>{' '}
                                 {t(`pages.backups.restore.conflict.${conflict.kind}`)}
                             </div>
                             <div style={{ overflowWrap: 'anywhere' }}>{conflict.detail}</div>

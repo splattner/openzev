@@ -14,10 +14,11 @@ import {
 import { formatApiError } from '../../lib/api/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
+import { Badge } from '../../components/Badge'
 import { DataTable, type ColumnDef } from '../../components/DataTable'
 import { formatNumber } from '../../lib/numbers'
 import { useToast } from '../../lib/toast'
-import type { BackupJobStatus, BackupStatus, RestoreJob } from '../../types/api'
+import type { BackupStatus, RestoreJob } from '../../types/api'
 import {
     BACKUP_JOB_STATUS_RANK,
     canStartRestore,
@@ -33,13 +34,6 @@ import {
 import { RestorePlanView } from './RestorePlanView'
 
 const POLL_MS = 3000
-
-const STATUS_BADGE: Record<BackupJobStatus, string> = {
-    queued: 'badge-neutral',
-    running: 'badge-info',
-    completed: 'badge-success',
-    failed: 'badge-danger badge-quiet',
-}
 
 /**
  * Restore one community from a backup: preview first, then confirm.
@@ -346,9 +340,9 @@ function RestoreHistory({ jobs, loading }: { jobs: RestoreJob[]; loading: boolea
                 <>
                     {row.original.dry_run ? t('pages.backups.restore.kindPreview') : t('pages.backups.restore.kindRestore')}
                     {row.original.force && (
-                        <span className="badge badge-warning badge-quiet" style={{ marginLeft: '0.4rem' }}>
+                        <Badge tone="warning" quiet style={{ marginLeft: '0.4rem' }}>
                             {t('pages.backups.restore.forced')}
-                        </span>
+                        </Badge>
                     )}
                 </>
             ),
@@ -360,9 +354,9 @@ function RestoreHistory({ jobs, loading }: { jobs: RestoreJob[]; loading: boolea
             header: t('pages.backups.jobs.columns.status'),
             cell: ({ row }) => (
                 <>
-                    <span className={`badge ${STATUS_BADGE[row.original.status]}`}>
+                    <Badge status={row.original.status} domain="backup">
                         {t(`pages.backups.jobs.status.${row.original.status}`)}
-                    </span>
+                    </Badge>
                     {row.original.status === 'failed' && row.original.error_message && (
                         <div className="muted" style={{ marginTop: '0.25rem', maxWidth: '28rem' }}>
                             {row.original.error_message}

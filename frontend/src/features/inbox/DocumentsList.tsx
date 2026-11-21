@@ -2,6 +2,7 @@ import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faDownload } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
+import { Badge } from '../../components/Badge'
 import { IssueText } from '../../components/IssueText'
 import { InvoicePaymentState, InvoiceTotal } from '../../components/InvoicePresentation'
 import { formatShortDate, useAppSettings } from '../../lib/appSettings'
@@ -10,7 +11,6 @@ import { downloadInboxDocument } from '../../lib/api/inbox'
 import { downloadBlob } from '../../lib/downloadBlob'
 import { useToast } from '../../lib/toast'
 import type { DeliveredDocument } from '../../types/api'
-import { CREDIT_STATUS_BADGE } from '../invoices/invoiceCredits'
 import { documentStanding, documentYear, formatFileSize, KIND_ICON } from './documentPresentation'
 import './DocumentCards.css'
 
@@ -19,9 +19,9 @@ export function StandingBadge({ document }: { document: DeliveredDocument }) {
   const standing = documentStanding(document)
   if (!standing) return null
   return (
-    <span className={`badge ${standing === 'superseded' ? 'badge-neutral' : 'badge-warning badge-quiet'}`}>
+    <Badge status={standing} domain="documentStanding">
       {t(`inbox.standing.${standing}`)}
-    </span>
+    </Badge>
   )
 }
 
@@ -76,9 +76,9 @@ function StatusCell({ document }: { document: DeliveredDocument }) {
   if (credit) {
     return (
       <>
-        <span className={CREDIT_STATUS_BADGE[credit.status]}>
+        <Badge status={credit.status} domain="credit">
           {t(`pages.invoiceDetail.credits.status.${credit.status}`)}
-        </span>
+        </Badge>
         {credit.applied_to.map((application) => (
           <small key={application.invoice_number} className="muted doc-note">
             {t('pages.invoiceDetail.credits.appliedTo', {

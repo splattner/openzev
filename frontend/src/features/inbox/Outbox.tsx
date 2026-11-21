@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ActionMenu } from '../../components/ActionMenu'
+import { Badge } from '../../components/Badge'
 import { ConfirmDialog, useConfirmDialog } from '../../components/ConfirmDialog'
 import { Disclosure } from '../../components/Disclosure'
 import { Notice } from '../../components/Notice'
@@ -145,9 +146,9 @@ export function Outbox() {
       <>
         {status.standing && <StandingBadge document={entry.documents[0]} />}
         {status.withoutAccount > 0 && (
-          <span className="badge badge-neutral">
+          <Badge tone="neutral">
             {isGroup(entry) ? t('inbox.outbox.noAccountCount', { count: status.withoutAccount }) : t('inbox.outbox.noAccount')}
-          </span>
+          </Badge>
         )}
       </>
     )

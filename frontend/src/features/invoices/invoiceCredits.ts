@@ -1,4 +1,4 @@
-import type { Credit, CreditStatus, Invoice } from '../../types/api'
+import type { Credit, Invoice } from '../../types/api'
 
 /** What was received in cash for the invoice and not yet credited, in CHF (never negative). */
 export function creditableChf(invoice: Pick<Invoice, 'paid_chf' | 'credits'>): number {
@@ -73,10 +73,4 @@ export function hasCreditApplied(
 /** A manager can pay out what remains of an open credit. */
 export function canRefundCredit(credit: Pick<Credit, 'status'>, canManage: boolean): boolean {
     return canManage && credit.status === 'open'
-}
-
-export const CREDIT_STATUS_BADGE: Record<CreditStatus, string> = {
-    open: 'badge badge-info',
-    used: 'badge badge-neutral',
-    refunded: 'badge badge-success',
 }

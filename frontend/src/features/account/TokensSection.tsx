@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
+import { Badge } from '../../components/Badge'
 import { FilterTabs } from '../../components/FilterTabs'
 import { SecretReveal } from '../../components/SecretReveal'
 import { PushTokenPanel } from '../supplementary/PushTokenPanel'
@@ -237,16 +238,16 @@ export function TokensSection({ onRevoke, onRotate }: Props) {
                         >
                             <div style={{ minWidth: 0, flex: '1 1 16rem' }}>
                                 <strong>{credential.name}</strong>
-                                <span className="badge" style={{ marginLeft: '0.5rem' }}>
+                                <Badge tone="tag" style={{ marginLeft: '0.5rem' }}>
                                     {t(`account.tokens.kind.${credential.kind}`)}
-                                </span>
-                                <span className="badge" style={{ marginLeft: '0.5rem' }}>
+                                </Badge>
+                                <Badge tone="tag" style={{ marginLeft: '0.5rem' }}>
                                     {t(`account.tokens.access.${credential.access}`)}
-                                </span>
+                                </Badge>
                                 {status !== 'active' && (
-                                    <span className="badge badge-warning badge-quiet" style={{ marginLeft: '0.5rem' }}>
+                                    <Badge status={status} domain="credential" style={{ marginLeft: '0.5rem' }}>
                                         {t(status === 'expired' ? 'account.apiKeys.expiredBadge' : 'account.apiKeys.expiringBadge')}
-                                    </span>
+                                    </Badge>
                                 )}
                                 {scope && <small className="muted" style={{ display: 'block' }}>{scope}</small>}
                                 <small className="muted" style={{ display: 'block' }}>
