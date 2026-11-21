@@ -370,7 +370,7 @@ export function AdminSystemSettingsPage() {
 
                     {featureFlagsQuery.isLoading && <p className="muted">{t('features.loading')}</p>}
                     {featureFlagsQuery.isError && <p className="error-banner">{t('features.loadError')}</p>}
-                    {!featureFlagsQuery.isLoading && flags.length === 0 && <p className="muted">{t('features.empty')}</p>}
+                    {!featureFlagsQuery.isLoading && !featureFlagsQuery.isError && flags.length === 0 && <p className="muted">{t('features.empty')}</p>}
 
                     {flags.length > 0 && (
                         <div className="table-scroll">
@@ -435,7 +435,7 @@ export function AdminSystemSettingsPage() {
                         </div>
                     )}
                     {oauthProvidersQuery.isError && <p className="error-banner">{t('adminSystemSettings.oauth.loadError')}</p>}
-                    {!oauthProvidersQuery.isLoading && providers.length === 0 && <p className="muted">{t('adminOAuth.noProviders')}</p>}
+                    {!oauthProvidersQuery.isLoading && !oauthProvidersQuery.isError && providers.length === 0 && <p className="muted">{t('adminOAuth.noProviders')}</p>}
 
                     {providers.length > 0 && (
                         <div className="table-scroll">

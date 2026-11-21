@@ -578,7 +578,8 @@ export const en = {
         linkAccount: 'Link {{provider}}',
         unlinkAccount: 'Unlink',
         linkedSince: 'Linked since {{date}}',
-        noProviders: 'No OAuth providers are configured.',
+        noProviders: 'No OAuth providers are configured. An administrator can set one up.',
+        providersLoadError: 'The OAuth providers could not be loaded.',
         linkEmailNotVerified: 'The provider must verify the email address on this account before it can be linked.',
         linkSuccess: 'Account linked successfully.',
         unlinkConfirmTitle: 'Unlink account?',
@@ -893,6 +894,7 @@ export const en = {
             empty: {
                 title: 'Nothing has been delivered yet',
                 description: 'Invoices appear here once they are sent. You can also upload a notice or issue annual statements.',
+                descriptionReadOnly: 'Invoices appear here once they are sent.',
             },
             col: {
                 document: 'Document',
@@ -4171,7 +4173,9 @@ export const en = {
             annualReport: {
                 title: 'Annual report {{year}}',
                 error: 'The annual report could not be loaded.',
-                noData: 'There is no metering data for {{year}}.',
+                noData: 'No metering data for {{year}}',
+                noDataHint: 'The annual report is built from the imported readings.',
+                importAction: 'Import metering data',
                 stats: {
                     selfConsumptionRate: 'Self-consumption rate',
                     selfSufficiencyRate: 'Self-sufficiency rate',
@@ -5198,7 +5202,8 @@ export const en = {
     adminInvoices: {
         loading: 'Loading invoices…',
         loadError: 'Failed to load invoices.',
-        empty: 'No invoices found.',
+        empty: 'No invoices yet',
+        emptyDescription: 'Invoices appear here once a community generates them.',
         number: 'Number',
         zev: 'ZEV',
         participant: 'Participant',

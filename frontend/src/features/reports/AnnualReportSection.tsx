@@ -5,10 +5,12 @@ import { useQuery } from '@tanstack/react-query'
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { fetchAnnualReport } from '../../lib/api/invoices'
 import { queryKeys } from '../../lib/api/queryKeys'
+import { useCommunityAccess } from '../../lib/communityAccess'
 import { AXIS_COLOR, CHART_GRIDLINE, CHART_LOCAL, CONS_COLORS } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
 import { formatChf, formatChfAmount, formatKwh, formatPercent, formatPercentFigure } from '../../lib/numbers'
 import { behindMeterHintKey, grossRate } from '../../lib/supplementary'
+import { EmptyState } from '../../components/EmptyState'
 import { StatCard } from '../../components/StatCard'
 import { PageSkeleton } from '../../components/PageSkeleton'
 import { BehindMeterBadge } from '../../components/BehindMeterBadge'
@@ -32,6 +34,7 @@ type AnnualReportSectionProps = {
  */
 export function AnnualReportSection({ zevId, year }: AnnualReportSectionProps) {
     const { t } = useTranslation()
+    const { canWriteSelectedCommunity } = useCommunityAccess()
     const reportQuery = useQuery({
         queryKey: queryKeys.invoices.annualReport(zevId, year),
         queryFn: () => fetchAnnualReport({ zev_id: zevId, year }),
@@ -49,10 +52,14 @@ export function AnnualReportSection({ zevId, year }: AnnualReportSectionProps) {
     const report = reportQuery.data
     if (!report.has_data) {
         return (
-            <section className="card">
-                <h3 className="mt-0">{t('pages.reports.annualReport.title', { year })}</h3>
-                <p className="muted m-0">{t('pages.reports.annualReport.noData', { year })}</p>
-            </section>
+            <EmptyState
+                titleKey="pages.reports.annualReport.noData"
+                titleOptions={{ year }}
+                descriptionKey="pages.reports.annualReport.noDataHint"
+                actions={canWriteSelectedCommunity ? [
+                    { labelKey: 'pages.reports.annualReport.importAction', variant: 'primary', to: '/metering/imports' },
+                ] : undefined}
+            />
         )
     }
 

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Skeleton } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
 import { useTranslation } from 'react-i18next'
+import { Notice } from '../../components/Notice'
 import { deleteSocialAccount, fetchOAuthProviders, fetchSocialAccounts, oauthLinkInitiate } from '../../lib/api/auth'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { useToast } from '../../lib/toast'
@@ -55,7 +56,13 @@ export function LinkedAccountsCard({ onUnlink }: Props) {
                 </div>
             )}
 
-            {!oauthProvidersQuery.isLoading && (oauthProvidersQuery.data ?? []).length === 0 && (
+            {oauthProvidersQuery.isError && (
+                <Notice tone="error" onRetry={() => void oauthProvidersQuery.refetch()} isRetrying={oauthProvidersQuery.isFetching}>
+                    {t('account.providersLoadError')}
+                </Notice>
+            )}
+
+            {oauthProvidersQuery.isSuccess && oauthProvidersQuery.data.length === 0 && (
                 <p className="muted">{t('account.noProviders')}</p>
             )}
 

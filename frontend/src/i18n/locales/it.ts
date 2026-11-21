@@ -569,7 +569,8 @@ export const it = {
         linkAccount: 'Collega {{provider}}',
         unlinkAccount: 'Scollega',
         linkedSince: 'Collegato dal {{date}}',
-        noProviders: 'Nessun provider OAuth configurato.',
+        noProviders: 'Nessun provider OAuth configurato. Un amministratore può configurarne uno.',
+        providersLoadError: 'Non è stato possibile caricare i provider OAuth.',
         linkEmailNotVerified: 'Il provider deve verificare l’indirizzo e-mail di questo account prima di poter essere collegato.',
         linkSuccess: 'Account collegato con successo.',
         unlinkConfirmTitle: 'Scollegare l\'account?',
@@ -884,6 +885,7 @@ export const it = {
             empty: {
                 title: 'Non è ancora stato consegnato nulla',
                 description: 'Le fatture compaiono qui una volta inviate. Puoi anche caricare un avviso o emettere conteggi annuali.',
+                descriptionReadOnly: 'Le fatture compaiono qui una volta inviate.',
             },
             col: {
                 document: 'Documento',
@@ -4160,7 +4162,9 @@ export const it = {
             annualReport: {
                 title: 'Rapporto annuale {{year}}',
                 error: 'Impossibile caricare il rapporto annuale.',
-                noData: 'Nessun dato di misura per il {{year}}.',
+                noData: 'Nessun dato di misura per il {{year}}',
+                noDataHint: 'Il rapporto annuale si basa sulle letture importate.',
+                importAction: 'Importa dati di misura',
                 stats: {
                     selfConsumptionRate: 'Tasso di autoconsumo',
                     selfSufficiencyRate: 'Grado di autarchia',
@@ -5187,7 +5191,8 @@ export const it = {
     adminInvoices: {
         loading: 'Caricamento fatture…',
         loadError: 'Errore durante il caricamento delle fatture.',
-        empty: 'Nessuna fattura trovata.',
+        empty: 'Ancora nessuna fattura',
+        emptyDescription: 'Le fatture appaiono qui non appena una comunità le genera.',
         number: 'Numero',
         zev: 'RCP',
         participant: 'Partecipante',

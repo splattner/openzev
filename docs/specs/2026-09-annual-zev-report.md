@@ -256,8 +256,10 @@ aborts/disposes old document state and generates only the active document.
 - Query: `useQuery({ queryKey: queryKeys.invoices.annualReport(zevId, year), queryFn: () => fetchAnnualReport({ zev_id: zevId, year }) })`
 - Pending: `PageSkeleton variant="cardList"`. Error: card with
   `role="alert"` and `pages.reports.annualReport.error`. `has_data === false`:
-  card with the title and `annualReport.noData` (the document cards below stay
-  usable).
+  `EmptyState` with `annualReport.noData` (`{ year }`) as title and
+  `annualReport.noDataHint`, plus a link to `/metering/imports`
+  (`annualReport.importAction`) when `canWriteSelectedCommunity`; the document
+  cards below stay usable.
 - `AnnualReportKpis`: a `.kpi-row` of five `StatCard`s. The accent card is
   self-consumption rate, then self-sufficiency rate, production, consumption,
   and savings (`formatChf`, hint `hints.savings`). The two rate cards take
@@ -366,7 +368,7 @@ Query key: `queryKeys.invoices.annualReport(zevId, year)` →
 ### i18n
 
 All four locales, under `pages.reports`: `documentsTitle`, and
-`annualReport.{title, error, noData}`,
+`annualReport.{title, error, noData, noDataHint, importAction}`,
 `annualReport.stats.{selfConsumptionRate, selfSufficiencyRate, produced, consumed, savings}`,
 `annualReport.hints.{previousYear, savings}`,
 `annualReport.trend.{title, description, selfConsumption, selfSufficiency}`,
@@ -440,7 +442,8 @@ selected-producer exports, mixed personal/community energy and separate ZEV pool
   documents heading, and both document cards. The `ReportsPage annual
   report` block covers the request parameters; rates, previous-year
   hint, savings, table rows, `—` for rows without savings, and the footer
-  total; the no-data notice with documents still available; the error
+  total; the no-data empty state with documents still available, its
+  import link for a writer and none for a viewer; the error
   alert; and (SPEC-2026-behind-the-meter-generation) a net-metered
   participant's row rendering `—` plus the `behindMeter.badge`, and the
   `behindMeter.zevNote` note under the KPI row when the top-level flag is set.

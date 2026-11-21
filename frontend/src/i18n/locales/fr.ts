@@ -569,7 +569,8 @@ export const fr = {
         linkAccount: 'Lier {{provider}}',
         unlinkAccount: 'Délier',
         linkedSince: 'Lié depuis le {{date}}',
-        noProviders: 'Aucun fournisseur OAuth configuré.',
+        noProviders: 'Aucun fournisseur OAuth configuré. Un administrateur peut en configurer un.',
+        providersLoadError: 'Les fournisseurs OAuth n’ont pas pu être chargés.',
         linkEmailNotVerified: 'Le fournisseur doit vérifier l’adresse e-mail de ce compte avant de pouvoir être associé.',
         linkSuccess: 'Compte lié avec succès.',
         unlinkConfirmTitle: 'Délier le compte ?',
@@ -884,6 +885,7 @@ export const fr = {
             empty: {
                 title: 'Rien n\'a encore été remis',
                 description: 'Les factures apparaissent ici une fois envoyées. Vous pouvez aussi téléverser un avis ou établir des décomptes annuels.',
+                descriptionReadOnly: 'Les factures apparaissent ici une fois envoyées.',
             },
             col: {
                 document: 'Document',
@@ -4160,7 +4162,9 @@ export const fr = {
             annualReport: {
                 title: 'Rapport annuel {{year}}',
                 error: 'Le rapport annuel n\'a pas pu être chargé.',
-                noData: 'Aucune donnée de mesure pour {{year}}.',
+                noData: 'Aucune donnée de mesure pour {{year}}',
+                noDataHint: 'Le rapport annuel est établi à partir des relevés importés.',
+                importAction: 'Importer des données de mesure',
                 stats: {
                     selfConsumptionRate: 'Taux d\'autoconsommation',
                     selfSufficiencyRate: 'Taux d\'autarcie',
@@ -5187,7 +5191,8 @@ export const fr = {
     adminInvoices: {
         loading: 'Chargement des factures…',
         loadError: 'Erreur lors du chargement des factures.',
-        empty: 'Aucune facture trouvée.',
+        empty: 'Pas encore de factures',
+        emptyDescription: 'Les factures apparaissent ici dès qu’une communauté les génère.',
         number: 'Numéro',
         zev: 'RCP',
         participant: 'Participant',

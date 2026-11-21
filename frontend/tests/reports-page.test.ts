@@ -431,9 +431,33 @@ describe('ReportsPage annual report', () => {
         await flush()
         await flush()
         expect(container.textContent).toContain('pages.reports.annualReport.noData')
+        expect(container.textContent).toContain('pages.reports.annualReport.noDataHint')
         expect(container.querySelector('.kpi-row')).toBeNull()
+        // Who can write is pointed at the import that fills the report.
+        expect(container.querySelector('a[href="/metering/imports"]')?.textContent).toBe('pages.reports.annualReport.importAction')
         // The yearly documents stay available regardless.
         expect(findButton(container, 'pages.reports.financialSummary.download')).toBeTruthy()
+        unmount()
+    })
+
+    it('offers a viewer no import link when the year has no metering data', async () => {
+        vi.mocked(invoicesApi.fetchAnnualReport).mockResolvedValue(makeReport({ has_data: false }))
+        mockAuth.mockReturnValue({ user: { id: 2, role: 'user' } })
+        mockManagedZev.mockReturnValue({
+            selectedZevId: 'zev-1',
+            selectedZev: { id: 'zev-1', name: 'Demo' },
+            managedZevs: [{ id: 'zev-1' }],
+            relation: 'viewer',
+            isLoading: false,
+            isError: false,
+            refetch: vi.fn(),
+        })
+
+        const { container, unmount } = renderReportsPage()
+        await flush()
+        await flush()
+        expect(container.textContent).toContain('pages.reports.annualReport.noData')
+        expect(container.querySelector('a[href="/metering/imports"]')).toBeNull()
         unmount()
     })
 

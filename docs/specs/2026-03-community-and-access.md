@@ -1771,6 +1771,11 @@ shows the result on the Security tab, and removes callback query parameters.
 Unverified mailbox refusals have a specific message; revoked authorization uses
 the generic OAuth error (`account-oauth-feedback.test.ts`, 3 cases).
 
+The Security tab's `LinkedAccountsCard` shows a failed provider load as an
+error `Notice` with retry (`account.providersLoadError`), and
+`account.noProviders` (which says an administrator can set one up) only after
+an empty response (`linked-accounts-card.test.ts`, 3 cases).
+
 Legacy admin routes `/admin/settings/regional`, `/admin/settings/vat`,
 `/admin/features`, and `/admin/oauth` redirect into tabs on
 `/admin/system-settings` and remain admin-only.
