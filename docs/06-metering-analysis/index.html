@@ -2031,27 +2031,34 @@ hourly chart over e.g. a full year would be thousands of bars.</p>
 <p>Below the chart (single meter only — not shown for a whole-ZEV total), the
 <strong>Raw Data by Day</strong> table shows one row per day in the selected period — day,
 consumption total, feed-in/production total (when the meter exports), and the
-number of readings. A day's consumption/feed-in cell is shaded proportionally
-to its size relative to the largest day in the period, so an outlier stands
-out without reading every value. Long periods are paginated a month
+number of readings. Bars show each day's total relative to the largest total
+for that direction in the selected period, so an outlier stands out without
+reading every value. Long periods are paginated a month
 (31 days) at a time.</p>
 <p>Two flags can appear next to a day's date:</p>
 <ul>
 <li><strong>Zero consumption</strong> — the day has an assignment holder but recorded no
   energy at all, which usually means a meter or import problem rather than
   genuinely nothing used. Only admins, managers and viewers see this flag:
-  assignment holders are not shown to participants.</li>
+  assignment holders are not shown to participants. Production meters never
+  show it.</li>
 <li><strong>Negative total</strong> — the day's consumption or feed-in total is below zero,
   which should not happen for a normal reading.</li>
 </ul>
-<p>Opening a day expands it into a compact intraday chart plus an hour ×
-15-minute grid of the exact values, so you can spot an individual anomalous
-reading the aggregated chart may hide. The expanded detail also flags
-negative individual readings and duplicate (timestamp, direction) readings,
-if any. Readings are grouped by their Swiss calendar day, the same day used
-for billing periods and tariffs. The day on which clocks go forward has 92
-quarter-hours and the day they go back has 100; in the grid, that day's two
-02:00 hours add up in one cell.</p>
+<p>Click a date to open that day; several days can be open at once. An open day
+shows an intraday chart and a readings table with one row per hour. For
+15-minute data the table has one column per quarter-hour plus the hour's total
+(Σ); an empty cell means no reading. The table lets you spot an individual
+anomalous reading the aggregated chart may hide. If the meter records both
+consumption and production/feed-in, the day's total for each is shown at the
+top, and two buttons above the table choose which of them it lists. The open
+day also flags negative individual readings and duplicate (timestamp,
+direction) readings, if any.</p>
+<p>Readings are grouped by their Swiss calendar day, the same day used for billing
+periods and tariffs. The day on which clocks go forward has 92 quarter-hours
+and an empty 02 row. The day they go back has 100, and each repeated time from
+02:00 to 02:45 shares a cell; open the cell to see both readings with their
+UTC offsets.</p>
 <h3 id="reading-quality">Reading Quality<a class="headerlink" href="#reading-quality" title="Permanent link">&para;</a></h3>
 <p>Each quarter-hour cell exposes its stored quality in interval detail.
 Estimated intervals are marked individually, including within mixed-quality hours:</p>
@@ -2073,7 +2080,7 @@ Estimated intervals are marked individually, including within mixed-quality hour
 </tr>
 <tr>
 <td><strong>·2</strong></td>
-<td>The cell holds more than one reading for that Swiss hour — on the day the clocks go back, the repeated 02:00 hour — and shows their sum</td>
+<td>The cell holds more than one reading for the same Swiss time — such as 02:00–02:45 on the day the clocks go back — and shows their sum</td>
 </tr>
 </tbody>
 </table>
