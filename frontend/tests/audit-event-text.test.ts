@@ -64,7 +64,7 @@ describe('audit event names', () => {
 
     it('names an event in the reader\'s language, not in the stored English sentence', async () => {
         const event = { action_type: 'invoice.approve', summary: 'Participant tried to approve an invoice.' }
-        expect(auditActionLabel(await translator('de'), event)).toBe('Rechnung genehmigen')
+        expect(auditActionLabel(await translator('de'), event)).toBe('Rechnung freigeben')
         expect(auditActionLabel(await translator('fr'), event)).toBe('Approuver une facture')
     })
 

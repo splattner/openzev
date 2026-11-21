@@ -8,11 +8,11 @@
 
   "hero_eyebrow": "Open Source · ZEV &amp; vZEV Schweiz · <span class=\"nowrap\">selbst gehostet</span> · AGPL-3.0",
   "hero_title": "Vom Lastgang zur <em>bezahlten Rechnung</em>.",
-  "hero_lede": "Lastgänge importieren, den Solarstrom pro 15-Minuten-Intervall auf die Teilnehmenden aufteilen, mit Ihren Tarifen bewerten und eine QR-Rechnung versenden. Ich habe es geschrieben, um meinen eigenen ZEV abzurechnen, und stelle es zur Verfügung, falls es für Ihren nützlich ist.",
+  "hero_lede": "Lastgänge importieren, Solarstrom pro Viertelstunde auf die Teilnehmenden aufteilen, mit Ihren Tarifen abrechnen und QR-Rechnungen versenden.",
   "cta_start": "Mit einem Befehl starten",
   "cta_source": "Quellcode auf GitHub",
   "selfhost_b": "Kein Cloud-Dienst.",
-  "selfhost_t": "Gebaut für den Eigengebrauch und für Selbst-Hoster, die gerne ihren eigenen Stack betreiben. Es gibt keine Anmeldung und kein Abo: Sie betreiben OpenZEV auf Ihrem eigenen Server, und Ihre Daten bleiben dort.",
+  "selfhost_t": "OpenZEV läuft auf Ihrem Server. Ihre Daten bleiben dort. Sie brauchen weder eine Anmeldung beim Projekt noch ein Abo.",
 
   "flow_eyebrow": "Energiebilanz · Demo-Gemeinschaft · Q3 2026",
   "flow_aria": "Energiefluss eines Quartals. Von 1’888.85 kWh Produktion vor Ort werden 625.8 kWh lokal verbraucht und 1’263.05 kWh ins Netz eingespeist. Weitere 738.9 kWh werden aus dem Netz bezogen. Der lokale Verbrauch beträgt damit 1’364.7 kWh, die Eigenverbrauchsquote 33.1 Prozent.",
@@ -37,7 +37,7 @@
 
   "features_eyebrow": "Was es kann",
   "features_title": "Messdaten, Tarife, Abrechnung, Dokumente",
-  "features_lede": "Einen ZEV für einen Monat abzurechnen ist einfach. Schwieriger wird es, wenn der Tarif des Vorjahres weiterhin existieren muss, wenn jemand, der im März ausgezogen ist, bis März abgerechnet werden muss, und wenn die Rechnung so sein soll, dass die Nachbarin sie akzeptiert, ohne die Tabelle dahinter zu verlangen.",
+  "features_lede": "Einen ZEV für einen Monat abzurechnen ist einfach. OpenZEV rechnet auch mit früheren Tarifen und unterjährigen Auszügen. Auf der Rechnung sehen Empfänger, wie der Betrag zustande kommt.",
 
   "f1_eyebrow": "Messdaten &amp; Import",
   "f1_title": "CSV, Excel und SDAT-CH",
@@ -57,15 +57,15 @@
 
   "f3_eyebrow": "Dokumente",
   "f3_title": "Rechnungen, Abrechnungen und Verträge",
-  "f3_text": "Rechnungen werden als PDF/A-3b mit QR-Zahlteil erzeugt und durchlaufen die Stati Entwurf, freigegeben, versendet, bezahlt. Eine Stornierung behält das Dokument und seine Nummer, statt die Zeile zu löschen. Jahresabrechnungen und Teilnahmeverträge entstehen im selben Renderer, und jede ausgestellte Version bleibt so erhalten, wie sie versendet wurde.",
+  "f3_text": "Rechnungen entstehen als PDF/A-3b mit QR-Zahlteil. Sie beginnen als Entwurf und werden dann freigegeben, versendet und bezahlt. Bei einer Stornierung bleiben Dokument und Rechnungsnummer erhalten. OpenZEV erstellt auch Jahresabrechnungen und Teilnahmeverträge und bewahrt ausgestellte Versionen auf.",
 
   "f4_eyebrow": "Gemeinschaft",
   "f4_title": "Rollen, Geltungsbereich und Umzugsdaten",
-  "f4_text": "Admins, ZEV-Eigentümer und Teilnehmende sehen jeweils ihre eigene Sicht auf dieselben Daten. Zuordnungen zwischen Teilnehmenden und Messpunkten tragen Gültigkeitsdaten: Wer am 15. März auszieht, wird bis zum 15. März abgerechnet.",
+  "f4_text": "Admins, ZEV-Eigentümer und Teilnehmende sehen je nach Rolle unterschiedliche Daten. Zuweisungen verbinden Messpunkte und Teilnehmende für einen bestimmten Zeitraum. Wer am 15. März auszieht, wird bis einschliesslich 15. März abgerechnet.",
 
   "f5_eyebrow": "Planung",
   "f5_title": "Machbarkeit, bevor Sie gründen",
-  "f5_text": "Schätzt Einsparungen, Amortisation, ROI und Kapitalwert für eine geplante Gemeinschaft. Betreiben Sie bereits eine, lässt sich der Rechner aus deren Teilnehmenden und dem gemessenen Eigenverbrauch vorbefüllen.",
+  "f5_text": "Schätzt Einsparungen, Amortisation, ROI und Kapitalwert für eine geplante Gemeinschaft. Betreiben Sie bereits eine, können Sie die Teilnehmenden und den gemessenen Eigenverbrauch übernehmen.",
 
   "f6_eyebrow": "Betrieb",
   "f6_title": "Gebaut, um von einer Person betrieben zu werden",
@@ -80,13 +80,13 @@
 
   "s1_eyebrow": "Übersicht",
   "s1_title": "Abrechnungsperioden, älteste zuerst",
-  "s1_text": "Jede Periode zeigt die Aktion, die sie braucht, sodass Sie direkt mit der Arbeit beginnen, statt sie zu suchen. Die Periode, die noch Daten sammelt, sagt das einfach.",
+  "s1_text": "Die Übersicht zeigt pro Abrechnungsperiode den nächsten Schritt. Solange eine Periode läuft, zeigt die Übersicht sie als offen an.",
   "s1_alt": "OpenZEV-Übersicht mit Abrechnungsperioden nach Status, jeweils mit der nächsten Aktion (Oberfläche auf Englisch)",
 
   "s2_eyebrow": "Energiebilanz",
   "s2_title": "Wohin der Solarstrom tatsächlich ging.",
-  "s2_text": "Produktion, Verbrauch, Eigenverbrauch und Netzaustausch für die gewählte Periode, mit einem Sankey-Diagramm, das jede kWh vom Produzenten bis zum Teilnehmenden verfolgt. Nach Teilnehmenden filtern oder die Auflösung bis auf das Intervall ändern.",
-  "s2_alt": "Energiebilanz mit Kennzahlen-Kacheln und einem Sankey-Diagramm des Energieflusses zwischen Produzent, Teilnehmenden und Netz (Oberfläche auf Englisch)",
+  "s2_text": "Produktion, Verbrauch, Eigenverbrauch und Netzaustausch für die gewählte Periode, mit einem Sankey-Diagramm, das jede kWh vom Produzenten bis zu den Teilnehmenden verfolgt. Nach Teilnehmenden filtern oder die Auflösung bis auf das Intervall ändern.",
+  "s2_alt": "Energiebilanz mit Kennzahlen-Kacheln und einem Sankey-Diagramm des Energieflusses zwischen Produktion, Teilnehmenden und Netz (Oberfläche auf Englisch)",
 
   "s3_eyebrow": "Abrechnung",
   "s3_title": "Eine Zeile pro Teilnehmende",
@@ -95,7 +95,7 @@
 
   "s4_eyebrow": "Tarife",
   "s4_title": "Jede Tarifänderung ist eine neue Version",
-  "s4_text": "Ein Tarif ist eine Reihe von Versionen, jede mit eigenen Tarifstufen und Gültigkeitszeitraum. Eine Rechnung vom letzten Jahr wird weiterhin zum Preis des letzten Jahres bewertet, und das Diagramm zeigt, wann jede Änderung in Kraft trat.",
+  "s4_text": "Ein Tarif ist eine Reihe von Versionen, jede mit eigenen Tarifperioden und einem Gültigkeitszeitraum. Eine Rechnung vom letzten Jahr wird weiterhin zum Preis des letzten Jahres bewertet, und das Diagramm zeigt, wann jede Änderung in Kraft trat.",
   "s4_alt": "Tarifdetails mit Versionsverlauf, Preisverlauf-Diagramm sowie Hoch- und Niedertarif (Oberfläche auf Englisch)",
 
   "qs_eyebrow": "Schnellstart",
@@ -104,7 +104,7 @@
 
   "p1_eyebrow": "Ausprobieren",
   "p1_title": "Demo-Gemeinschaft",
-  "p1_text": "Startet den Stack und legt eine vollständige Gemeinschaft an — Teilnehmende, Zähler, Tarife und Messwerte —, damit es etwas zu sehen gibt.",
+  "p1_text": "Startet den Stack mit einer Demo-Gemeinschaft aus Teilnehmenden, Messpunkten, Tarifen und Messwerten.",
   "p1_clone": "klonen, dann:",
   "p2_eyebrow": "Selbst hosten",
   "p2_title": "Docker Compose",
@@ -115,7 +115,6 @@
 
   "after1_b": "Images",
   "after2_b": "Signierte", "after2_t": "Release-Manifeste und SBOM-Attestierungen",
-  "after3_b": "Datenbanken", "after3_t": "PostgreSQL für den Produktivbetrieb; SQLite für Entwicklung und Tests",
 
   "stack_eyebrow": "Darunter",
   "stack_title": "Der Stack",
@@ -129,8 +128,8 @@
   "st7_dd": "ausführen, ändern, hosten. Wer eine geänderte Version anderen über ein Netzwerk anbietet, gibt auch den Quellcode weiter.",
 
   "note_title": "Bitte lesen, bevor Sie damit jemandem eine Rechnung stellen",
-  "note_p1": "Ich habe OpenZEV gebaut, um meinen eigenen ZEV zu betreiben, und teile es so, wie es ist, ohne Gewährleistung. Es passt zu Leuten, die gerne ihren eigenen Stack betreiben. Prüfen Sie Importe, Tarife und Rechnungen, bevor sie eine teilnehmende Person erreichen: Die Verantwortung für die Zahlen bleibt bei Ihnen.",
-  "note_p2": "Es entsteht ausserdem mit viel KI-Unterstützung, bis hin zu Spezifikationen, ADRs und Benutzerdokumentation. Manche Entscheidungen werden einem erfahrenen Team unkonventionell vorkommen. Das ist der Kompromiss, den ich gewählt habe: Das Projekt ist auf Lernen, Experimentieren und den Betrieb eines echten ZEV ausgelegt, nicht auf Unternehmensprozesse.",
+  "note_p1": "Ich habe OpenZEV für meinen eigenen ZEV gebaut und teile es ohne Gewährleistung. Prüfen Sie Importe, Tarife und Rechnungen vor dem Rechnungsversand.",
+  "note_p2": "KI unterstützt die Entwicklung, die Spezifikationen und die Dokumentation. Das Projekt dient dem Lernen, Experimentieren und dem Betrieb eines echten ZEV.",
 
   "foot_source": "Quellcode",
   "foot_guide": "Benutzerhandbuch",

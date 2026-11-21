@@ -35,9 +35,8 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
         "fee_shared_equal": "Gemeinschaftskosten, zu gleichen Teilen aufgeteilt",
         "fee_shared_weight": "Gemeinschaftskosten, nach Gewichtung aufgeteilt",
         "footnote_multiband_base": (
-            "Der gezeigte Basispreis ist der Tarif ausserhalb der Zeitband-"
-            "Einschränkungen. Der effektive Preis richtet sich nach dem im "
-            "Verbrauchszeitpunkt geltenden Band."
+            "Der gezeigte Basispreis gilt ausserhalb der eingeschränkten Tarifzeiten. "
+            "Der effektive Preis richtet sich nach der Tarifperiode zum Verbrauchszeitpunkt."
         ),
         "footnote_dynamic_average": (
             "Dieser Tarif wird über einen dynamischen Preis abgerechnet. Der "

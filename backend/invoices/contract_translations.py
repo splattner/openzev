@@ -20,7 +20,7 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "field_email": "E-Mail",
         "field_meter": "Messpunktnummer",
 
-        "meter_none": "Noch kein Messpunkt zugeordnet",
+        "meter_none": "Noch kein Messpunkt zugewiesen",
 
         "field_meter_pv": "Messpunktnummer (PV / Rückspeisung)",
         "subject_title": "Zweck und Geltungsbereich",

@@ -261,6 +261,9 @@ for the schema and concurrency guarantees.
 | `paid` | Payments cover the total; fully locked |
 | `cancelled` | Voided. Replaced by regeneration only if it was never approved; an issued one is kept with its number next to its replacement (ADR 0037) |
 
+German product copy calls the transition from draft to approved **Freigabe**.
+The action is **freigeben**, and the resulting status is **freigegeben**.
+
 Invoice numbers follow the per-ZEV [numbering contract](2026-03-admin-governance-and-settings.md#43-zev-governance-fields);
 failed invoice transactions return their allocation.
 

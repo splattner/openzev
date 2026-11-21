@@ -192,6 +192,9 @@ Only what this spec's own algorithm needs to know:
 
 ### 3.2 TariffPeriod (price bands within a tariff)
 
+German product copy calls each pricing rule within a tariff version a
+**Tarifperiode**. **Zeitband** names the specific `band` period type.
+
 | Field | Type | Description |
 |---|---|---|
 | `tariff` | FK → `Tariff` | Parent tariff |
