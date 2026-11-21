@@ -300,6 +300,19 @@ class TestPriceHistory:
 
 
 class TestOperations:
+    def test_source_list_exposes_saved_fetch_diagnostics(self, admin_client):
+        diagnostics = [{
+            "code": "host_unresolved", "params": {"host": "dynamic-tariffs.openzev.invalid"},
+        }]
+        source = make_source(last_fetch_status="failed", last_fetch_diagnostics=[
+            None, {"code": "future_code", "params": {}},
+            {**diagnostics[0], "message": "Old English", "path": "obsolete"},
+        ])
+        response = admin_client.get("/api/v1/tariffs/dynamic-sources/")
+        assert response.status_code == 200
+        row = next(row for row in response.json()["results"] if row["id"] == str(source.pk))
+        assert row["last_fetch_diagnostics"] == diagnostics
+
     def test_admin_can_queue_a_manual_fetch(self, admin_client):
         source = make_source()
         task = mock.Mock(id="task-123")
@@ -338,7 +351,9 @@ class TestOperations:
         assert clear_response.status_code == 403
 
     def test_admin_can_clear_unbilled_points(self, admin_client):
-        source = make_source()
+        source = make_source(last_fetch_error="Old failure", last_fetch_diagnostics=[{
+            "code": "download_failed", "params": {}, "message": "Old failure", "field": None, "path": [],
+        }])
         add_point(source)
 
         response = admin_client.delete(
@@ -353,6 +368,8 @@ class TestOperations:
         assert source.last_fetch_status == "pending"
         assert source.last_fetch_at is None
         assert source.last_success_at is None
+        assert source.last_fetch_error == ""
+        assert source.last_fetch_diagnostics == []
         assert AuditEvent.objects.get(action_type="tariff.dynamic_source_clear").reason
 
     def test_clearing_needs_only_the_label_typed_back(self, admin_client):

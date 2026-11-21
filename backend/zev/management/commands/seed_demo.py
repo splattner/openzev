@@ -2293,10 +2293,11 @@ class Command(BaseCommand):
         source.last_fetch_at = seeded_at
         source.last_success_at = seeded_at
         source.last_fetch_error = ""
+        source.last_fetch_diagnostics = []
         source.recovery_from = None
         source.save(update_fields=[
             "last_fetch_status", "last_fetch_at", "last_success_at",
-            "last_fetch_error", "recovery_from", "updated_at",
+            "last_fetch_error", "last_fetch_diagnostics", "recovery_from", "updated_at",
         ])
         # Rebuild rather than upsert, for the reasons given in _seed_tariffs: a
         # demo session may have added versions or switched it back to bands.

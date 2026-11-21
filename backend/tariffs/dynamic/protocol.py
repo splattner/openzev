@@ -106,8 +106,15 @@ def parse_tariff_response(payload: object, *, api_version: str, tariff_type: str
                 if isinstance(component, dict):
                     name = component.get("tariff_name")
                     if not isinstance(name, str) or not name.strip():
-                        raise DynamicTariffResponseError("The version 2 response omits the required product name; its product cannot be verified.")
+                        raise DynamicTariffResponseError(
+                            "The version 2 response omits the required product name; its product cannot be verified.",
+                            code="product_response_missing",
+                        )
                     if name != tariff_name:
-                        raise DynamicTariffResponseError("The endpoint returned a different product than the configured tariff name.")
+                        actual = name[:200]
+                        raise DynamicTariffResponseError(
+                            f"Expected product “{tariff_name}”, got “{actual}”. Check the source settings.",
+                            code="product_mismatch", params={"expected": tariff_name, "actual": actual},
+                        )
         return parse_v2(payload, tariff_type=tariff_type)
     raise DynamicTariffResponseError(f"Unsupported API version {api_version!r}.")

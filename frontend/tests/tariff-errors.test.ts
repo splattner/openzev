@@ -5,8 +5,9 @@ import { en } from '../src/i18n/locales/en'
 import { fr } from '../src/i18n/locales/fr'
 import { it as italian } from '../src/i18n/locales/it'
 import contract from './fixtures/tariff-validation-errors.json'
+import fetchContract from './fixtures/dynamic-fetch-diagnostics.json'
 import type { TariffValidationError } from '../src/types/api'
-import { formatTariffError, formatTariffErrorData, splitTariffBandErrors, tariffErrorKeys } from '../src/features/tariffs/errors'
+import { formatDynamicFetchError, formatTariffError, formatTariffErrorData, splitTariffBandErrors, tariffErrorKeys, fetchErrorCodes } from '../src/features/tariffs/errors'
 
 const translations = i18n.createInstance()
 beforeAll(async () => {
@@ -17,8 +18,60 @@ beforeAll(async () => {
   })
 })
 
+it.each(['de', 'en', 'fr', 'it'])('localizes stored background fetch errors in %s', language => {
+  const t = translations.getFixedT(language)
+  const host = 'dynamic-tariffs.openzev.invalid'
+  const source = { last_fetch_diagnostics: [coded('host_unresolved', null, { host })] }
+  expect(formatDynamicFetchError(source, t)).toBe(t('pages.tariffs.apiErrors.hostUnresolved', { host }))
+  expect(formatDynamicFetchError({ last_fetch_diagnostics: [
+    ...source.last_fetch_diagnostics, coded('http_status', null, { status: 410 }), ...source.last_fetch_diagnostics,
+  ] }, t)).toBe(`${t('pages.tariffs.apiErrors.hostUnresolved', { host })} ${t('pages.tariffs.apiErrors.httpStatus', { status: 410 })}`)
+  for (const [code, key] of [
+    ['invalid_dynamic_response', 'invalidDynamicResponse'],
+    ['billed_price_changed', 'billedPriceChanged'], ['price_series_conflict', 'priceSeriesConflict'],
+  ]) {
+    expect(formatDynamicFetchError({ last_fetch_diagnostics: [coded(code)] }, t))
+      .toBe(t(`pages.tariffs.apiErrors.${key}`))
+  }
+  for (const diagnostics of [undefined, [], [coded('future_code')], [coded('host_unresolved')]]) {
+    expect(formatDynamicFetchError({ last_fetch_diagnostics: diagnostics }, t)).toBe(t('pages.dynamicSources.fetchFailed'))
+  }
+  for (const [code, key, params] of [
+    ['timestamp_missing', 'timestampMissing', { field: 'prices[0].start_timestamp' }],
+    ['timestamp_invalid', 'timestampInvalid', { field: 'prices[0].start_timestamp', received: 'bad' }],
+    ['timestamp_offset_missing', 'timestampOffsetMissing', { field: 'prices[0].start_timestamp' }],
+    ['component_value_invalid', 'componentValueInvalid', { field: 'prices[0].grid[0].value', received: "'bad'" }],
+    ['product_mismatch', 'productMismatch', { expected: 'demo', actual: 'other' }],
+    ['product_response_missing', 'productResponseMissing', {}],
+    ['price_interval_invalid', 'priceIntervalInvalid', { start: '2026-01-01T00:15:00Z', end: '2026-01-01T00:00:00Z' }],
+    ['price_intervals_overlap', 'priceIntervalsOverlap', { start: '2026-01-01T00:00:00Z', end: '2026-01-01T00:15:00Z', other_start: '2026-01-01T00:00:00Z', other_end: '2026-01-01T00:30:00Z' }],
+  ] as const) {
+    expect(formatDynamicFetchError({ last_fetch_diagnostics: [coded(code, null, params)] }, t))
+      .toBe(t(`pages.tariffs.apiErrors.${key}`, params))
+  }
+  for (const entry of [
+    coded('timestamp_invalid', null, { field: 'prices[0].start_timestamp' }),
+    coded('product_mismatch', null, { expected: 'demo', actual: true }),
+    coded('price_interval_invalid', null, { start: null, end: '2026-01-01T00:00:00Z' }),
+  ]) {
+    expect(formatDynamicFetchError({ last_fetch_diagnostics: [entry] }, t))
+      .toBe(t('pages.dynamicSources.fetchFailed'))
+  }
+})
+
 const codedResponse = (entries: TariffValidationError[], legacy = 'Old server text') => ({
   isAxiosError: true, response: { data: { detail: legacy, validation_errors: entries } },
+})
+
+it.each([
+  null, {}, 'broken', [null], [{ code: 'http_status', params: [] }],
+  [{ code: 'host_unresolved', params: { host: null } }],
+
+])('uses translated guidance for malformed stored diagnostics: %j', diagnostics => {
+  const t = translations.getFixedT('de')
+  // Exercise values received from the wire, beyond the API's static type.
+  const source = JSON.parse(JSON.stringify({ last_fetch_diagnostics: diagnostics }))
+  expect(formatDynamicFetchError(source, t)).toBe(t('pages.dynamicSources.fetchFailed'))
 })
 
 const coded = (code: string, field: string | null = null, params: Record<string, unknown> = {}): TariffValidationError => ({
@@ -285,4 +338,18 @@ it.each(['de', 'en', 'fr', 'it'])('keeps source dependency counts and distinguis
   const clear = formatTariffError(codedResponse([coded('prices_in_use')]), 'fallback', t)
   expect(clear).toBe(t('pages.tariffs.apiErrors.pricesInUse'))
   expect(clear).not.toBe(t('pages.tariffs.apiErrors.sourceProtected'))
+})
+
+
+it.each(['de', 'en', 'fr', 'it'])('shares fetch codes and parameter rules with the backend in %s', language => {
+  const t = translations.getFixedT(language)
+  expect(fetchErrorCodes.toSorted()).toEqual(fetchContract.valid.map(entry => entry.code).toSorted())
+  for (const entry of fetchContract.valid) {
+    expect(formatDynamicFetchError({ last_fetch_diagnostics: [entry] }, t))
+      .toBe(t(`pages.tariffs.apiErrors.${tariffErrorKeys[entry.code]}`, entry.params))
+  }
+  const mixed = JSON.parse(JSON.stringify({ last_fetch_diagnostics: fetchContract.mixed }))
+  expect(formatDynamicFetchError(mixed, t))
+    .toBe(formatDynamicFetchError({ last_fetch_diagnostics: fetchContract.expected }, t))
+  expect(formatDynamicFetchError(mixed, t)).not.toContain(t('pages.dynamicSources.fetchFailed'))
 })

@@ -430,10 +430,13 @@ def _parse_flexible(text, *, dayfirst=False):
 
 def _parse_datetime_utc(raw_value):
     """Parse a timestamp that is UTC unless it says otherwise (transfer archives)."""
-    parsed = _parse_flexible(str(raw_value).strip())
-    if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+    try:
+        parsed = _parse_flexible(str(raw_value).strip())
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except (ValueError, TypeError, OverflowError) as exc:
+        raise ValueError(f"Invalid timestamp '{str(raw_value)[:100]}'.") from exc
 
 
 def _interpret_standard_row(row, *, resolved_cols, reader, meter_type, series_key=None):

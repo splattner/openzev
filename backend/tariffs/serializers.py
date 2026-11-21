@@ -1,7 +1,10 @@
 from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from drf_spectacular.utils import extend_schema_field
+from config.ui_notices import notice_data
 from .dynamic.adapters import DynamicApiVersion
+from .dynamic.diagnostics import normalize_fetch_diagnostics
 from .dynamic.models import DynamicTariffSource
 from .dynamic.services import tariff_has_dynamic_billing_evidence
 from .models import BillingMode, EnergyType, PeriodType, Tariff, TariffPeriod
@@ -445,6 +448,26 @@ class VseTariffPeriodPreviewSerializer(serializers.Serializer):
     months = serializers.CharField(allow_blank=True)
 
 
+class UiNoticeSerializer(serializers.Serializer):
+    code = serializers.CharField()
+    params = serializers.DictField()
+
+
+@extend_schema_field(UiNoticeSerializer(allow_null=True))
+class NoticeField(serializers.Field):
+    """The ``{code, params}`` a ``UiNotice`` in ``source`` carries; ``None`` for plain text."""
+
+    def __init__(self, **kwargs):
+        super().__init__(read_only=True, **kwargs)
+
+    def to_representation(self, value):
+        return notice_data(value)
+
+
+def notice_list(source, **kwargs):
+    return serializers.ListField(child=NoticeField(), source=source, read_only=True, **kwargs)
+
+
 class VseTariffCandidateSerializer(serializers.Serializer):
     key = serializers.CharField()
     name = serializers.CharField()
@@ -476,7 +499,9 @@ class VseTariffCandidateSerializer(serializers.Serializer):
     series_name = serializers.CharField()
     status = serializers.CharField()
     detail = serializers.CharField(allow_blank=True)
+    detail_diagnostic = NoticeField(source="detail")
     warnings = serializers.ListField(child=serializers.CharField())
+    warning_diagnostics = notice_list("warnings")
     recommended = serializers.BooleanField()
     effective_valid_to = serializers.DateField(allow_null=True)
 
@@ -484,6 +509,7 @@ class VseTariffCandidateSerializer(serializers.Serializer):
 class VseTariffImportErrorSerializer(serializers.Serializer):
     tariff = serializers.CharField()
     error = serializers.CharField()
+    error_diagnostic = NoticeField(source="error")
 
 
 class VseTariffImportPreviewSerializer(serializers.Serializer):
@@ -509,16 +535,19 @@ class VseTariffImportCreatedSerializer(serializers.Serializer):
     dynamic_source_warnings = serializers.ListField(
         child=serializers.CharField(), required=False, default=list
     )
+    dynamic_source_warning_diagnostics = notice_list("dynamic_source_warnings", default=list)
 
 
 class VseTariffImportSkippedSerializer(serializers.Serializer):
     name = serializers.CharField()
     reason = serializers.CharField()
+    reason_diagnostic = NoticeField(source="reason")
 
 
 class VseTariffImportAppliedErrorSerializer(serializers.Serializer):
     name = serializers.CharField()
     error = serializers.CharField()
+    error_diagnostic = NoticeField(source="error")
 
 
 class VseTariffImportResultSerializer(serializers.Serializer):
@@ -534,7 +563,12 @@ class DynamicTariffSourceSerializer(serializers.ModelSerializer):
     linked_tariff_count = serializers.IntegerField(read_only=True, default=0)
     linked_zev_count = serializers.IntegerField(read_only=True, default=0)
     supports_backfill = serializers.BooleanField(read_only=True)
+    last_fetch_diagnostics = serializers.SerializerMethodField()
     aggregated_tariff_types = serializers.SerializerMethodField()
+
+    @extend_schema_field(UiNoticeSerializer(many=True))
+    def get_last_fetch_diagnostics(self, obj):
+        return normalize_fetch_diagnostics(obj.last_fetch_diagnostics)
 
     def get_aggregated_tariff_types(self, obj):
         from .dynamic.components import aggregated_tariff_types
@@ -545,7 +579,7 @@ class DynamicTariffSourceSerializer(serializers.ModelSerializer):
         model = DynamicTariffSource
         fields = [
             "id", "label", "url", "api_version", "tariff_type", "tariff_name", "enabled",
-            "last_fetch_status", "last_fetch_at", "last_success_at", "last_fetch_error",
+            "last_fetch_status", "last_fetch_at", "last_success_at", "last_fetch_error", "last_fetch_diagnostics",
             "covers_from", "covers_to", "recovery_from", "point_count", "linked_tariff_count", "linked_zev_count",
             "supports_backfill", "empty_on_not_found", "aggregated_tariff_types", "created_at", "updated_at",
         ]

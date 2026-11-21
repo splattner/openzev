@@ -583,6 +583,7 @@ class PlanningTests(TestCase):
         self.assertEqual(planned[0].status, CandidateStatus.CONFLICT)
         self.assertEqual(created, [])
         self.assertIn("already exists in this ZEV", report.skipped[0]["reason"])
+        self.assertEqual(planned[0].detail.code, "tariff_conflict")
 
     # ── Re-importing a fee whose billing mode the user already chose ───────
     #
@@ -644,6 +645,7 @@ class PlanningTests(TestCase):
 
         self.assertEqual(created, [])
         self.assertIn("must agree", report.skipped[0]["reason"])
+        self.assertEqual(report.skipped[0]["reason"].code, "tariff_mode_conflict")
         self.assertEqual(Tariff.objects.filter(name="Netznutzung Basis (Grundpreis)").count(), 1)
 
     def test_choosing_the_mode_the_series_already_uses_is_accepted(self):
@@ -1058,6 +1060,7 @@ class PlanningTests(TestCase):
             tariff_name="",
             last_fetch_status="failed",
             last_fetch_error="The operator endpoint is unavailable.",
+            last_fetch_diagnostics=[{"code": "http_status", "params": {"status": 503}}],
         )
 
         report, created = apply_import(
@@ -1072,6 +1075,16 @@ class PlanningTests(TestCase):
         warnings = report.created[0]["dynamic_source_warnings"]
         self.assertIn(warning, warnings)
         self.assertTrue(any("currently failing" in message for message in warnings))
+
+        from tariffs.serializers import VseTariffImportCreatedSerializer
+        result = VseTariffImportCreatedSerializer(report.created[0]).data
+        self.assertIsNone(result["dynamic_source_warning_diagnostics"][0])
+        self.assertEqual(result["dynamic_source_warning_diagnostics"][1], {
+            "code": "source_fetch_failed", "params": {
+                "name": "Known broken source",
+                "diagnostics": [{"code": "http_status", "params": {"status": 503}}],
+            },
+        })
 
     def test_an_unreachable_dynamic_url_is_reported_and_creates_nothing(self):
         from tariffs.importers.remote import TariffFetchError

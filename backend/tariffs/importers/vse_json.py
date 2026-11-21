@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
+from config.ui_notices import UiNotice
 from tariffs.models import (
     ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE,
     BillingMode,
@@ -115,6 +116,8 @@ class TariffDocumentError(Exception):
     stop the import of the one the ZEV actually needs, so entry-level failures
     are collected in ``ParsedDocument.errors`` instead.
     """
+
+    code = "import_document"
 
 
 @dataclass
@@ -246,6 +249,8 @@ def _decimal(raw, label: str) -> Decimal:
         value = Decimal(str(raw))
     except (InvalidOperation, TypeError, ValueError) as exc:
         raise ValueError(f"{label} is not a number: {raw!r}") from exc
+    if not value.is_finite():
+        raise ValueError(f"{label} is not a number: {raw!r}")
     if value < 0:
         raise ValueError(f"{label} is negative ({value}); the standard requires prices ≥ 0.")
     return value
@@ -259,7 +264,12 @@ def _quantize(value: Decimal, quantum: Decimal, label: str, warnings: list[str])
     """
     rounded = value.quantize(quantum, rounding=ROUND_HALF_UP)
     if rounded != value:
-        warnings.append(f"{label} was rounded from {value} to {rounded} to fit the stored precision.")
+        warnings.append(UiNotice(
+            f"{label} was rounded from {value} to {rounded} to fit the stored precision.",
+            "price_rounded",
+            value=value,
+            rounded=rounded,
+        ))
     return rounded
 
 
@@ -433,8 +443,12 @@ def _map_energy_bands(entries: list, label: str, warnings: list[str]) -> list[Pr
     covered = frozenset().union(*seasons) if seasons else frozenset()
     if covered != ALL_MONTHS:
         warnings.append(
-            f"The document prices only {len(covered)} of 12 months; the remaining months "
-            "will bill at this tariff's first band."
+            UiNotice(
+                f"The document prices only {len(covered)} of 12 months; the remaining months "
+                "will bill at this tariff's first band.",
+                "months_missing",
+                count=len(covered),
+            )
         )
 
     periods: list[ProposedPeriod] = []
@@ -474,8 +488,12 @@ def _map_one_season(months: frozenset[int], bands: list[_Band], warnings: list[s
 
     if _uncovered_hours(bands):
         warnings.append(
-            f"The document leaves part of the day unpriced{where}; those hours will bill "
-            "at this tariff's first band."
+            UiNotice(
+                f"The document leaves part of the day unpriced{where}; those hours will bill "
+                "at this tariff's first band.",
+                "hours_missing",
+                months=format_number_list(sorted(months)) if seasonal else "",
+            )
         )
 
     if len(prices) == 1:
@@ -501,9 +519,15 @@ def _map_one_season(months: frozenset[int], bands: list[_Band], warnings: list[s
         # there is no HT/NT pair to guess at, so nothing is assumed and nothing
         # is warned about.
         warnings.append(
-            f"The standard does not label its bands, so the higher price ({high} CHF/kWh) was "
-            f"taken as the high tariff (HT) and the lower ({low} CHF/kWh) as the low tariff (NT)"
-            f"{where}."
+            UiNotice(
+                f"The standard does not label its bands, so the higher price ({high} CHF/kWh) was "
+                f"taken as the high tariff (HT) and the lower ({low} CHF/kWh) as the low tariff (NT)"
+                f"{where}.",
+                "bands_assigned",
+                high=high,
+                low=low,
+                months=format_number_list(sorted(months)) if seasonal else "",
+            )
         )
         band_type = {high: PeriodType.HIGH, low: PeriodType.LOW}
     else:
@@ -533,7 +557,7 @@ def _tariff_name(base: str, suffix: str, warnings: list[str]) -> str:
         return name
     keep = MAX_TARIFF_NAME_LENGTH - len(suffix) - 4  # " (…)" around the suffix
     name = f"{base[:keep].rstrip()}… ({suffix})"
-    warnings.append("The published tariff name was too long and has been shortened.")
+    warnings.append(UiNotice("The published tariff name was too long and has been shortened.", "name_shortened"))
     return name
 
 
@@ -660,22 +684,31 @@ def _dropped_component_warnings(prices: dict) -> list[str]:
 
     if _has_money(prices.get("power")):
         warnings.append(
-            "A power/demand charge (CHF/kW) was published but is not imported: OpenZEV "
-            "does not bill demand, and no demand data is metered."
+            UiNotice(
+                "A power/demand charge (CHF/kW) was published but is not imported: OpenZEV "
+                "does not bill demand, and no demand data is metered.",
+                "demand_omitted",
+            )
         )
     if _has_money(prices.get("reactivePower")):
         warnings.append(
-            "A reactive-power charge (CHF/kVarh) was published but is not imported."
+            UiNotice(
+                "A reactive-power charge (CHF/kVarh) was published but is not imported.",
+                "reactive_omitted",
+            )
         )
     refund = prices.get("refundStorage")
     if refund is not None:
         try:
             if _price_of(refund, "refundStorage")[0] > 0:
                 warnings.append(
-                    "A storage grid-usage refund was published but is not imported."
+                    UiNotice("A storage grid-usage refund was published but is not imported.", "storage_omitted")
                 )
         except ValueError:
-            warnings.append("The published storage refund could not be read and is not imported.")
+            warnings.append(UiNotice(
+                "The published storage refund could not be read and is not imported.",
+                "storage_unreadable",
+            ))
     return warnings
 
 
@@ -760,25 +793,39 @@ def _dynamic_candidate(prices: dict, header: dict, category: str) -> Candidate:
     else:
         energy_type = ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE[tariff_type]
         warnings.append(
-            "This document does not name which product the dynamic source should fetch. "
-            "Choose the product name or explicitly confirm the endpoint default before importing."
+            UiNotice(
+                "This document does not name which product the dynamic source should fetch. "
+                "Choose the product name or explicitly confirm the endpoint default before importing.",
+                "product_selection_required",
+            )
         )
         certain = certain_components(tariff_type)
         if certain:
             extra = possible_extra_components(tariff_type)
             if extra:
                 warnings.append(
-                    f"The dynamic {tariff_type} component already includes "
-                    f"{', '.join(certain)}; on a version 2.0.0 endpoint it also "
-                    f"includes {', '.join(extra)}. The endpoint's version is "
-                    "detected when you import. Do not bill those components "
-                    "again as separate tariffs."
+                    UiNotice(
+                        f"The dynamic {tariff_type} component already includes "
+                        f"{', '.join(certain)}; on a version 2.0.0 endpoint it also "
+                        f"includes {', '.join(extra)}. The endpoint's version is "
+                        "detected when you import. Do not bill those components "
+                        "again as separate tariffs.",
+                        "components_included_v2",
+                        tariff_type=tariff_type,
+                        components=", ".join(certain),
+                        extra_components=", ".join(extra),
+                    )
                 )
             else:
                 warnings.append(
-                    f"The dynamic {tariff_type} component already includes "
-                    f"{', '.join(certain)}. Do not bill those components again "
-                    "as separate tariffs."
+                    UiNotice(
+                        f"The dynamic {tariff_type} component already includes "
+                        f"{', '.join(certain)}. Do not bill those components again "
+                        "as separate tariffs.",
+                        "components_included",
+                        tariff_type=tariff_type,
+                        components=", ".join(certain),
+                    )
                 )
     return _candidate(
         name=name, category=category, header=header, warnings=warnings,

@@ -5,7 +5,8 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useState, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
-import { formatApiError } from '../../lib/api/errors'
+import { ImportDiagnostic } from '../../components/ImportDiagnostic'
+import { importRequestFailure } from '../../lib/importDiagnostics'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
 import { queryKeys } from '../../lib/api/queryKeys'
 import {
@@ -36,7 +37,7 @@ export function ZevImportModal({ isOpen, onClose, onImported }: ZevImportModalPr
   const [manifest, setManifest] = useState<ArchiveManifest | null>(null)
   const [selected, setSelected] = useState<TransferSectionName[]>([])
   const [name, setName] = useState('')
-  const [fatalError, setFatalError] = useState<string | null>(null)
+  const [fatalError, setFatalError] = useState<{ error: unknown; step: 'inspect' | 'import' } | null>(null)
   const [entryErrors, setEntryErrors] = useState<ImportEntryError[]>([])
   const sorting = useTableSorting(entryErrors, {
     section: row => row.section,
@@ -88,7 +89,7 @@ export function ZevImportModal({ isOpen, onClose, onImported }: ZevImportModalPr
     onError: (error) => {
       setManifest(null)
       setSelected([])
-      setFatalError(formatApiError(error, t('zevTransfer.unreadableArchive')))
+      setFatalError({ error, step: 'inspect' })
     },
   })
 
@@ -110,12 +111,7 @@ export function ZevImportModal({ isOpen, onClose, onImported }: ZevImportModalPr
       const entries = data?.errors ?? []
       setEntryErrors(entries)
       setTotalErrors(data?.total_errors ?? 0)
-      // The backend's `detail` is an untranslated summary of the same count the
-      // table below already states, so it is only worth showing when there is
-      // no table — a malformed archive, a bad version, an unreachable server.
-      setFatalError(
-        entries.length > 0 ? null : data?.detail ?? formatApiError(error, t('zevTransfer.importFailed')),
-      )
+      setFatalError(entries.length > 0 ? null : { error, step: 'import' })
     },
   })
 
@@ -138,8 +134,8 @@ export function ZevImportModal({ isOpen, onClose, onImported }: ZevImportModalPr
       <FormModal isOpen={isOpen} title={t('zevTransfer.importTitle')} onClose={close} dirty={false}>
         <div className="page-stack">
           <p>{t('zevTransfer.importSuccess', { name: imported.zev_name })}</p>
-          {imported.warnings.map((warning) => (
-            <div className="warning-banner" key={warning}>{warning}</div>
+          {imported.warnings.map((warning, index) => (
+            <div className="warning-banner" key={index}><ImportDiagnostic text={warning} diagnostic={imported.warning_diagnostics?.[index]} fallback={t('importDiagnostics.importedWarningFallback')} /></div>
           ))}
           <button type="button" className="button button-primary" onClick={close}>{t('common.close')}</button>
         </div>
@@ -207,7 +203,10 @@ export function ZevImportModal({ isOpen, onClose, onImported }: ZevImportModalPr
           </>
         )}
 
-        {fatalError && <div className="error-banner">{fatalError}</div>}
+        {fatalError && <div className="error-banner" role="alert"><ImportDiagnostic
+          {...importRequestFailure(fatalError.error, t, settings)}
+          fallback={t(fatalError.step === 'inspect' ? 'zevTransfer.unreadableArchive' : 'zevTransfer.importFailed')}
+        /></div>}
 
         {entryErrors.length > 0 && (
           <div className="page-stack" style={{ gap: '0.5rem' }}>
@@ -235,7 +234,7 @@ export function ZevImportModal({ isOpen, onClose, onImported }: ZevImportModalPr
                         {Object.entries(entry.errors).map(([field, messages]) => (
                           <div key={field}>
                             {field !== '__all__' && <code>{field}: </code>}
-                            {messages.join(' ')}
+                            {messages.map((message, index) => <div key={index}><ImportDiagnostic text={message} diagnostic={entry.diagnostics?.[field]?.[index]} fallback={t('importDiagnostics.entryInvalid')} /></div>)}
                           </div>
                         ))}
                       </td>

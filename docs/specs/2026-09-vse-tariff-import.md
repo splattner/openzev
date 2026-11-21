@@ -410,6 +410,15 @@ and `Source: <url> (imported <date>)`.
 Both are declared in `tariffs/urls.py` **before** `router.urls` so the viewset
 detail routes cannot shadow them.
 
+The UI translates normal import outcomes and billing warnings from optional
+`{code, params}` metadata, with English technical detail behind a disclosure.
+See the [import UI contract](2026-09-dynamic-tariffs.md#101-vse-importer).
+Candidate responses add nullable `detail_diagnostic` and parallel
+`warning_diagnostics`. Document/apply error rows add nullable `error_diagnostic`;
+skipped rows add `reason_diagnostic`; created rows add
+`dynamic_source_warning_diagnostics`. Legacy strings remain available and do not
+vary with request-language headers.
+
 **Preview request** — `VseTariffImportPreviewRequestSerializer`:
 
 ```json

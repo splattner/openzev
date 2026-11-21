@@ -7,11 +7,13 @@ these assert against what the operators actually served rather than against a
 guess about what they might serve.
 """
 
+import copy
 import json
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
 from django.test import SimpleTestCase
 
 from .dynamic.adapters import DynamicRequestMode, FetchWindow, request_url
@@ -26,6 +28,63 @@ from .dynamic.vse_v1 import (
 )
 
 TESTDATA = Path(__file__).parent / "dynamic" / "testdata"
+
+
+@pytest.mark.parametrize("version", ["v1_0_5", "v2_0_0"])
+@pytest.mark.parametrize("case,code", [
+    ("missing", "timestamp_missing"), ("timestamp", "timestamp_invalid"),
+    ("offset", "timestamp_offset_missing"), ("interval", "price_interval_invalid"),
+    ("overlap", "price_intervals_overlap"), ("NaN", "component_value_invalid"),
+    ("Infinity", "component_value_invalid"), ("-Infinity", "component_value_invalid"),
+])
+def test_actionable_parser_failures_carry_stable_codes_and_parameters(version, case, code):
+    component = [{"unit": "CHF_kWh", "value": 0.1}] if version == "v1_0_5" else {
+        "tariff_name": "demo", "energy": {"unit": "CHF/kWh", "value": 0.1},
+    }
+    row = {
+        "start_timestamp": "2026-01-01T00:00:00+00:00",
+        "end_timestamp": "2026-01-01T00:15:00+00:00", "grid": component,
+    }
+    payload = {"prices": [row]}
+    if case == "missing":
+        row.pop("start_timestamp")
+    elif case == "timestamp":
+        row["start_timestamp"] = "not-a-timestamp"
+    elif case == "offset":
+        row["start_timestamp"] = "2026-01-01T00:00:00"
+    elif case == "interval":
+        row["end_timestamp"] = row["start_timestamp"]
+    elif case == "overlap":
+        payload["prices"].append(copy.deepcopy(row))
+    elif version == "v1_0_5":
+        component[0]["value"] = case
+    else:
+        component["energy"]["value"] = case
+    with pytest.raises(DynamicTariffResponseError) as caught:
+        parse_versioned_response(payload, api_version=version, tariff_type="grid", tariff_name="demo")
+    assert caught.value.code == code
+    assert caught.value.params
+    assert all(isinstance(value, str) and value for value in caught.value.params.values())
+
+
+@pytest.mark.parametrize("name,code", [("other", "product_mismatch"), (None, "product_response_missing")])
+def test_returned_product_identity_has_an_actionable_error(name, code):
+    payload = {"prices": [{"grid": {"tariff_name": name}}]}
+    with pytest.raises(DynamicTariffResponseError) as caught:
+        parse_versioned_response(payload, api_version="v2_0_0", tariff_type="grid", tariff_name="demo")
+    assert caught.value.code == code
+    if name:
+        assert caught.value.params == {"expected": "demo", "actual": "other"}
+
+
+@pytest.mark.parametrize("value", ["NaN", "Infinity", "-Infinity"])
+def test_nonfinite_bfe_prices_are_rejected_with_an_actionable_field(value):
+    from .dynamic.bfe_rmp import parse_tariff_response as parse_bfe
+
+    with pytest.raises(DynamicTariffResponseError) as caught:
+        parse_bfe(f"Year,Month,Price_pv_CHF_MWh\n2026,1,{value}\n", tariff_name="pv")
+    assert caught.value.code == "component_value_invalid"
+    assert caught.value.params == {"field": "CSV[0].Price_pv_CHF_MWh", "received": repr(value)}
 
 
 def fixture(name: str) -> dict:
@@ -199,10 +258,12 @@ class EmptyAndMalformedTests(SimpleTestCase):
             payload, api_version="v2_0_0", tariff_type="grid", tariff_name="standard"
         )
         self.assertEqual(series.points[0].price_chf_per_kwh, Decimal("0.11300"))
-        with self.assertRaisesMessage(DynamicTariffResponseError, "different product"):
+        with self.assertRaises(DynamicTariffResponseError) as caught:
             parse_versioned_response(
                 payload, api_version="v2_0_0", tariff_type="grid", tariff_name="other"
             )
+        self.assertEqual(caught.exception.code, "product_mismatch")
+        self.assertEqual(caught.exception.params, {"expected": "other", "actual": "standard"})
 
     def test_v2_units_that_cannot_be_billed_are_reported_rather_than_dropped_silently(self):
         # The fixture's grid component carries energy (CHF/kWh, billable) and

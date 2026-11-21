@@ -1,4 +1,5 @@
 import { IconActionButton } from '../../components/IconActionButton'
+import { formatDynamicFetchError } from './errors'
 import { useState, type ReactNode, type Ref } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
@@ -363,7 +364,7 @@ export function TariffDetailPane({
     }
 
     const failedFetch = dynamicSource?.last_fetch_status === 'failed' && (
-        <IssueText title={t('pages.tariffs.dynamicFetchFailedTooltip', { error: dynamicSource.last_fetch_error })}>
+        <IssueText title={t('pages.tariffs.dynamicFetchFailedTooltip', { error: formatDynamicFetchError(dynamicSource, t) })}>
             {t('pages.tariffs.dynamicFetchFailed')}
         </IssueText>
     )

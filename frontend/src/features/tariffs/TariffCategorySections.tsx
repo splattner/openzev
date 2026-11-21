@@ -1,3 +1,4 @@
+import { formatDynamicFetchError } from './errors'
 import { ResponsiveTableHead, SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faChevronRight, faClock } from '@fortawesome/free-solid-svg-icons'
@@ -143,7 +144,7 @@ export function TariffCategorySections({
                                                 </IssueText>
                                             )}
                                             {fetchFailed && (
-                                                <IssueText title={t('pages.tariffs.dynamicFetchFailedTooltip', { error: dynamicSource.last_fetch_error })}>
+                                                <IssueText title={t('pages.tariffs.dynamicFetchFailedTooltip', { error: formatDynamicFetchError(dynamicSource, t) })}>
                                                     {t('pages.tariffs.dynamicFetchFailed')}
                                                 </IssueText>
                                             )}

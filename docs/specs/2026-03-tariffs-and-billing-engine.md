@@ -1436,6 +1436,11 @@ field annotation. Fixed-price errors carry the submitted or existing/copied
 | `name_exists`, `overlap`, `series_identity`, `confirmation_mismatch` | `name` |
 | `history_limit`, native length/digit limits | `count`: numeric limit |
 | `http_status`, `host_unresolved`, `document_size` | `status`, `host`, `size` (MB), respectively |
+| `timestamp_missing`, `timestamp_offset_missing` | `field`: schema field/path |
+| `timestamp_invalid`, `component_value_invalid` | `field`, `received`: safe string values |
+| `price_interval_invalid` | `start`, `end`: interval timestamps |
+| `price_intervals_overlap` | `start`, `end`, `other_start`, `other_end`: interval timestamps |
+| `product_mismatch` | `expected`, `actual`: product names |
 | `source_in_use` | `tariff_count`, `community_count`: integer dependency counts |
 
 Business codes cover tariff rules, imports, permissions and source operations.
@@ -1445,9 +1450,12 @@ invoice, including a draft. These conditions have distinct user explanations.
 
 Clients translate recognized codes using allowlisted, validated parameters;
 unusable parameters preserve the readable `message`. Codes and technical logs
-are not translated. Unknown codes, including the provider/parser diagnostic
-`invalid_dynamic_response`, retain their safe messages. Uncoded responses and
-malformed/empty metadata preserve all readable field messages and band context;
+are not translated. Provider/parser code `invalid_dynamic_response` has a translated
+explanation, as do `billed_price_changed` and `price_series_conflict` for stored fetch refusals.
+Unknown API error codes retain their safe messages. Stored background-fetch
+diagnostics instead use a translated generic fallback; see the
+[dynamic tariff error contract](2026-09-dynamic-tariffs.md#103-api). Uncoded responses
+and malformed/empty metadata preserve all readable field messages and band context;
 the band splitter applies the same all-or-nothing metadata check as the formatter.
 Inline bands are matched by their full path, including non-field messages;
 unconsumed diagnostics remain in the notice. Root response metadata such as

@@ -10,6 +10,7 @@ from django.db.models import F, Max, Min, RowRange, Window
 
 from ..importers.remote import TariffFetchError, fetch_tariff_document, fetch_tariff_text
 from .adapters import MAX_WINDOW_DAYS, DynamicApiVersion, FetchWindow, request_url
+from .diagnostics import normalize_fetch_diagnostics
 from .models import DynamicPricePoint, DynamicTariffSource, FetchStatus
 from .protocol import parse_tariff_response
 from .vse_v1 import DynamicTariffResponseError, PricePoint
@@ -121,9 +122,9 @@ def refresh_source(source: DynamicTariffSource, *, backfill: bool = False, now: 
         range_start = start
         windows = list(chunk_windows(start, today + timedelta(days=2), max_days=MAX_WINDOW_DAYS))
 
-    failed: list[str] = []
+    failed: list[TariffFetchError] = []
     failed_windows: list[FetchWindow] = []
-    refused: list[str] = []
+    refused: list[ValueError] = []
     refused_windows: list[FetchWindow] = []
     recovery_from = None
     try:
@@ -131,12 +132,12 @@ def refresh_source(source: DynamicTariffSource, *, backfill: bool = False, now: 
             try:
                 points, warnings = fetch_window(source, window)
             except TariffFetchError as exc:
-                failed.append(str(exc))
+                failed.append(exc)
                 if window is not None:
                     failed_windows.append(window)
                 continue
             except DynamicTariffResponseError as exc:
-                refused.append(str(exc))
+                refused.append(exc)
                 if window is not None:
                     refused_windows.append(window)
                 continue
@@ -148,7 +149,7 @@ def refresh_source(source: DynamicTariffSource, *, backfill: bool = False, now: 
                     requested_window=(window.start, window.end) if window is not None else None,
                 )
             except PriceSeriesConflict as exc:
-                refused.append(str(exc))
+                refused.append(exc)
                 if window is not None:
                     refused_windows.append(window)
                 continue
@@ -167,12 +168,15 @@ def refresh_source(source: DynamicTariffSource, *, backfill: bool = False, now: 
         )
         if refused:
             # Surface deterministic conflicts before transport failures.
-            raise PriceSeriesConflict("; ".join(refused[:3]))
+            raise PriceSeriesConflict("; ".join(str(exc) for exc in refused[:3]))
         if failed and result.requests == 0:
-            raise TariffFetchError("; ".join(failed[:3]), log_detail="; ".join(failed[:3]))
+            raise TariffFetchError(
+                "; ".join(str(exc) for exc in failed[:3]),
+                log_detail="; ".join(exc.log_detail for exc in failed[:3]),
+            )
         if failed:
             # Partial success remains OK; retain failed windows for recovery.
-            summary = "; ".join(failed[:3])
+            summary = "; ".join(str(exc) for exc in failed[:3])
             logger.warning(
                 "Dynamic tariff fetch for %s answered %s window(s) and failed %s: %s",
                 source.pk, result.requests, len(failed), summary,
@@ -186,6 +190,7 @@ def refresh_source(source: DynamicTariffSource, *, backfill: bool = False, now: 
             last_fetch_status=FetchStatus.FAILED,
             last_fetch_at=now,
             last_fetch_error=str(exc)[:500],
+            last_fetch_diagnostics=_fetch_diagnostics(failed or [exc]),
         )
         raise
     except (PriceSeriesConflict, DynamicTariffResponseError) as exc:
@@ -194,6 +199,7 @@ def refresh_source(source: DynamicTariffSource, *, backfill: bool = False, now: 
             last_fetch_status=FetchStatus.FAILED,
             last_fetch_at=now,
             last_fetch_error=str(exc)[:500],
+            last_fetch_diagnostics=_fetch_diagnostics(refused or [exc]),
         )
         raise
     except Exception as exc:
@@ -203,6 +209,7 @@ def refresh_source(source: DynamicTariffSource, *, backfill: bool = False, now: 
             last_fetch_at=now,
             # Keep operator-facing errors generic; full details are logged above.
             last_fetch_error=f"Unexpected {type(exc).__name__} while fetching; see the server log."[:500],
+            last_fetch_diagnostics=[],
         )
         raise
 
@@ -211,9 +218,23 @@ def refresh_source(source: DynamicTariffSource, *, backfill: bool = False, now: 
         last_fetch_at=now,
         last_success_at=now,
         last_fetch_error="",
+        last_fetch_diagnostics=[],
         recovery_from=recovery_from,
     )
     return result
+
+
+def _fetch_diagnostics(errors: list[Exception]) -> list[dict]:
+    diagnostics = []
+    for exc in errors:
+        if isinstance(exc, BilledPriceChanged):
+            code = "billed_price_changed"
+        elif isinstance(exc, PriceSeriesConflict):
+            code = "price_series_conflict"
+        else:
+            code = getattr(exc, "code", "unknown")
+        diagnostics.append({"code": code, "params": getattr(exc, "params", {})})
+    return normalize_fetch_diagnostics(diagnostics)
 
 
 def coverage_gaps(source: DynamicTariffSource, start: datetime, end: datetime) -> list[tuple[datetime, datetime]]:
