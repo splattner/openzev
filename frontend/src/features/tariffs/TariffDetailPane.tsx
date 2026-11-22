@@ -22,7 +22,7 @@ import { formatBandSchedule } from './rateLines'
 import { useTariffDisplay } from './useTariffDisplay'
 import { listedVersion, validityState } from './validity'
 import { deltaSummary, formatDelta, versionDeltas, type PriceDelta } from './priceDelta'
-import { bandCoverage } from './bandCoverage'
+import { bandCoverage, type BandSeed } from './bandCoverage'
 import { TariffPriceHistoryChart } from './TariffPriceHistoryChart'
 import { TariffBandCoverage } from './TariffBandCoverage'
 import { DynamicSourceSection } from './DynamicSourceSection'
@@ -42,7 +42,7 @@ type TariffDetailPaneProps = {
     onShowVersion: (versionId: string) => void
     onClose: () => void
     onEditTariff: (tariff: TariffVersion, actionKey: string) => void
-    onOpenCreatePeriod: (tariffId: string) => void
+    onOpenCreatePeriod: (tariffId: string, actionKey: string, seed?: BandSeed) => void
     onEditPeriod: (period: TariffPeriod, actionKey: string) => void
     /** Asks first; the page owns the confirmation and the request. */
     onDeleteVersion: (version: TariffVersion, window: string) => void
@@ -349,13 +349,15 @@ export function TariffDetailPane({
                                 className="button button-ghost button-compact tariff-add-band"
                                 type="button"
                                 data-action-key={`add-period-${version.id}`}
-                                onClick={() => onOpenCreatePeriod(version.id)}
+                                onClick={() => onOpenCreatePeriod(version.id, `add-period-${version.id}`)}
                             >
                                 <FontAwesomeIcon icon={faPlus} fixedWidth />
                                 {t('pages.tariffs.addPeriod')}
                             </button>
                         )}
-                        <TariffBandCoverage bands={version.periods} validity={version} />
+                        <TariffBandCoverage bands={version.periods} validity={version}
+                            onAddBand={readOnly ? undefined : (seed) => onOpenCreatePeriod(version.id, `add-gap-band-${version.id}`, seed)}
+                            addBandActionKey={`add-gap-band-${version.id}`} />
                     </section>
                 )}
                 </div>}

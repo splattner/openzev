@@ -135,6 +135,24 @@ describe('TariffDetailPane', () => {
         expect(onDeletePeriod.mock.calls[0][0].id).toBe('p2')
     })
 
+    it('offers writers a band for the uncovered hours outside the warning\u2019s live region, and names each add for focus', async () => {
+        const high = { id: 'h', tariff: 'e1', period_type: 'high', label: '', price_chf_per_kwh: '0.3', percentage: null,
+            time_from: '07:00:00', time_to: '21:00:00', weekdays: '0,1,2,3,4', months: '' }
+        const energy = { ...version('e1', '2001-01-01', null), billing_mode: 'energy', periods: [high] } as unknown as TariffVersion
+        const energySeries = { ...series, billing_mode: 'energy', version_count: 1, active_version_id: 'e1', versions: [energy] } as unknown as TariffSeries
+        const offer = (container: HTMLElement) => [...container.querySelectorAll('button')].find((button) => button.textContent === 'pages.tariffs.coverage.addBand')
+        const onOpenCreatePeriod = vi.fn()
+        const container = await pane({ series: energySeries, allSeries: [energySeries], onOpenCreatePeriod })
+        const button = offer(container)!
+        expect(button.closest('[role="status"]')).toBeNull()
+        expect(button.dataset.actionKey).toBe('add-gap-band-e1')
+        act(() => button.click())
+        expect(onOpenCreatePeriod).toHaveBeenLastCalledWith('e1', 'add-gap-band-e1', { period_type: 'low', weekdays: '', months: '' })
+        act(() => container.querySelector<HTMLButtonElement>('[data-action-key="add-period-e1"]')!.click())
+        expect(onOpenCreatePeriod).toHaveBeenLastCalledWith('e1', 'add-period-e1')
+        expect(offer(await pane({ series: energySeries, allSeries: [energySeries], readOnly: true }))).toBeUndefined()
+    })
+
     it('shows a version\u2019s notes only where the overview row does not already say them', async () => {
         const noted = (id: string, base: TariffVersion, notes: string) => ({ ...base, id, notes }) as TariffVersion
         const container = await pane({ shownVersionId: 'next', series: { ...series, versions: [

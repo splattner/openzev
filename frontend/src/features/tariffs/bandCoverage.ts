@@ -125,3 +125,27 @@ export function bandCoverage<T extends CoverageBand>(
     }
     return result
 }
+
+/** The new band's type, weekdays and months; `''` is every day or every month. */
+export type BandSeed = { period_type: TariffPeriodType, weekdays: string, months: string }
+
+/**
+ * One band without times on every gapped weekday in every gapped month, typed
+ * as the high or low the version lacks. Months and weekdays are independent
+ * selectors, so `null` where that would meet another band without times: the
+ * backend rejects two of them on one month and weekday.
+ */
+export function bandForGaps(bands: CoverageBand[], gaps: CoverageGap[]): BandSeed | null {
+    const months = [...new Set(gaps.flatMap((gap) => gap.months))].sort((a, b) => a - b)
+    const weekdays = [...new Set(gaps.flatMap((gap) => gap.weekdays))].sort((a, b) => a - b)
+    const meets = (ours: number[], theirs: number[]) => theirs.length === 0 || theirs.some((value) => ours.includes(value))
+    const clashes = bands.some((band) => band.period_type !== 'flat' && !(band.time_from && band.time_to)
+        && meets(months, parseMonths(band.months)) && meets(weekdays, parseWeekdays(band.weekdays)))
+    if (clashes) return null
+    const list = (values: number[], every: number) => values.length === every ? '' : values.join(',')
+    return {
+        period_type: (['low', 'high'] as const).find((type) => !bands.some((band) => band.period_type === type)) ?? 'band',
+        weekdays: list(weekdays, 7),
+        months: list(months, 12),
+    }
+}

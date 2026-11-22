@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { Notice } from '../../components/Notice'
 import { useFocusFirstField } from './useFocusFirstField'
 import { TariffBandFields, useWatchedBand } from './TariffBandFields'
+import type { BandSeed } from './bandCoverage'
 import { TariffBandCoverage } from './TariffBandCoverage'
 import { FormModalFooter } from '../../components/FormModalFooter'
 import type { Tariff, TariffPeriod, TariffPeriodInput } from '../../types/api'
@@ -19,6 +20,8 @@ import {
 } from './useTariffForms'
 
 type TariffPeriodFormProps = {
+  /** A new band's starting values, from the coverage notice's offer. */
+  seed?: BandSeed
   onSubmit: (payload: TariffPeriodInput) => void
   onCancel: () => void
   /** Whether anything was changed, for the pane's unsaved-input guard. */
@@ -37,6 +40,7 @@ type TariffPeriodFormProps = {
 
 /** Add or change a price band of the shown version, in the detail pane. */
 export function TariffPeriodForm({
+  seed,
   onSubmit,
   onCancel,
   onDirtyChange,
@@ -63,6 +67,7 @@ export function TariffPeriodForm({
         ...defaultTariffPeriodFormValues,
         tariff: defaultTariffId ?? defaultTariffPeriodFormValues.tariff,
         billing_mode: owner?.billing_mode ?? 'energy',
+        ...seed,
       },
   })
 

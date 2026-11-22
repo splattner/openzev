@@ -2577,6 +2577,7 @@ export const en = {
             },
             coverage: {
                 covered: 'Every hour of the year has a price band.',
+                addBand: 'Add a band for these hours',
                 fallback: 'No band covers {{schedule}}. Those hours are billed as {{band}} at {{price}}.',
                 overlaps: 'Some hours match more than one band; the first matching band applies.',
                 badge: 'Hours without a band',

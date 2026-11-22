@@ -187,6 +187,7 @@ export function TariffsPage() {
         editingTariffId,
         editingPeriodId,
         periodTariffId,
+        periodSeed,
         editingTariff,
         editingPeriod,
         saveError: crudSaveError,
@@ -430,6 +431,7 @@ export function TariffsPage() {
                         key={editingPeriodId ?? 'new'}
                         initialPeriod={editingPeriod}
                         defaultTariffId={periodTariffId}
+                        seed={periodSeed}
                         tariffs={bandableTariffs}
                         periods={periods}
                         isPending={periodPending}
@@ -502,7 +504,7 @@ export function TariffsPage() {
                                 onShowVersion={(versionId) => showVersion(openSeries, versionId)}
                                 onClose={escapePane}
                                 onEditTariff={(version, actionKey) => beginEditing(actionKey, () => startTariffEdit(version))}
-                                onOpenCreatePeriod={(versionId) => beginEditing('add-period', () => openCreatePeriod(versionId))}
+                                onOpenCreatePeriod={(versionId, actionKey, seed) => beginEditing(actionKey, () => openCreatePeriod(versionId, seed))}
                                 onEditPeriod={(period, actionKey) => beginEditing(actionKey, () => startPeriodEdit(period))}
                                 onDeleteVersion={confirmDeleteTariff}
                                 onDeletePeriod={confirmDeletePeriod}
