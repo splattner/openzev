@@ -2,6 +2,7 @@ import type { TariffSeries, TariffVersion } from '../../types/api'
 import { bandName, bandWindow } from './bands'
 import { formatSeason, formatWeekdays } from './recurrence'
 import type { Translate } from '../../lib/translate'
+import { formatChfAmount } from '../../lib/numbers'
 
 export type RateLine = { applies: string, price: string, unit: string }
 
@@ -116,7 +117,7 @@ export function buildRateLines(
         : series.billing_mode.startsWith('shared') ? 'shared' : 'perParticipant'
     return [{
         applies: t(`pages.tariffs.rateCard.${basis}`),
-        price: Number(version.fixed_price_chf || 0).toFixed(2),
+        price: formatChfAmount(Number(version.fixed_price_chf || 0)),
         unit: t(tariffRateUnit(series, version) === 'year' ? 'pages.tariffs.rateCard.perYear' : 'pages.tariffs.rateCard.perMonth'),
     }]
 }

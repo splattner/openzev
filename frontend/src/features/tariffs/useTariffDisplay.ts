@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { fetchDynamicTariffSources } from '../../lib/api/tariffs'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { formatShortDate } from '../../lib/appSettings'
+import { formatChf } from '../../lib/numbers'
 import type { AppSettings, DynamicTariffSource, Tariff, TariffSeries, TariffVersion } from '../../types/api'
 import { validityState } from './validity'
 import { MONTH_KEYS, WEEKDAY_KEYS } from './recurrence'
@@ -94,7 +95,7 @@ export function useTariffDisplay(settings: AppSettings, today: string) {
         if (series.billing_mode === 'percentage_of_energy') {
             return percentageRangeLabel(percentageValues(version)) ?? t('pages.tariffs.noPeriods')
         }
-        return `CHF ${version.fixed_price_chf || '0.00'}`
+        return formatChf(Number(version.fixed_price_chf || 0))
     }
 
     function dynamicAverageLabel(version: TariffVersion): string {
