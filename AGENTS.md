@@ -121,6 +121,7 @@ After relevant changes, run what CI runs for the side you touched:
 
 - Backend: `ruff check .`, `python manage.py check`, `python -m pytest -q`
 - Frontend: `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-hex.mjs`, `npm run test:unit`, `npm run build`
+- The tariff browser specs mock the API and run in CI ("Tariff browser tests"). Locally, against the Vite dev server: `SCREENSHOT_BASE_URL=http://localhost:5173 npm run test:browser -- --no-deps screenshots/tariff-*.spec.ts`.
 - For user-facing frontend changes, also check the change in the running dev stack (screenshot it, check the console for errors), including a narrow (~400px) viewport.
 - For a UI/UX review of a feature (spec conformance plus whether each role can see and do what it needs, from screenshots), use the `ui-review` skill.
 
