@@ -42,8 +42,8 @@ figure per band, in the order of the prices), *Prices and schedule change from
 later version. **Ended tariffs** opens by itself when you follow a link to the past
 version of a tariff that has ended. The headings carry no counts.
 
-Where the community adds upstream VAT on invoices, a plain note above the list
-explains that the displayed prices are net.
+Where the community adds upstream VAT on invoices, a plain note beside the
+actions explains that the displayed prices are net.
 
 Each category is a rate card, set like the tariff overview PDF, with one row
 per tariff:
