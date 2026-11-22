@@ -63,7 +63,7 @@ services:
     restart: on-failure
 
   db:
-    image: postgres:18-alpine
+    image: postgres:19-alpine
     environment:
       POSTGRES_DB: openzev
       POSTGRES_USER: openzev
