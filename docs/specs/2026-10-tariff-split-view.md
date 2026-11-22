@@ -332,7 +332,7 @@ checked with forced colours emulated. Changes the audit made:
 | 4 Consistent typography | Each section had the same text-style count at both widths; no one-off size, weight or casing was seen | No change |
 | 7 Icon usage | The grid, local and feed-in icons replace the energy type's name | `TariffTypeLegend` below the lists names the types of the rows in view |
 | 11 Visible links | The one link, **Manage source in platform admin**, stays underlined at both widths, also with forced colours emulated; the next-change control is a button with underlined text | No change |
-| 12 No redundant text | Repeated names and statuses identify separate records or panels; a form's submit label names its task | No change |
+| 12 No redundant text | An open dynamic card named its source in the price line and again in the source section below it | The open card's price line leaves the name out. Folded cards keep it, since versions can use different sources (ADR 0018); `tariff-detail-pane.test.ts` covers both |
 
 Rules 1 and 9 are no longer open: the coverage warning offers **Add a band for
 these hours** (§11) and the band has one term per locale (terminology row above).

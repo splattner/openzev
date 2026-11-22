@@ -3,11 +3,18 @@ import { act } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TariffDetailPane } from '../src/features/tariffs/TariffDetailPane'
 import { renderWithProviders } from './helpers/render'
-import type { TariffSeries, TariffVersion } from '../src/types/api'
+import { fetchDynamicTariffSources } from '../src/lib/api/tariffs'
+import type { DynamicTariffSource, TariffSeries, TariffVersion } from '../src/types/api'
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string, values?: { name?: string }) => key.endsWith('Named') && values?.name ? `${key}: ${values.name}` : key }) }))
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string, values?: { name?: string; label?: string }) =>
+    key.endsWith('Named') && values?.name ? `${key}: ${values.name}` : values?.label ? `${key}: ${values.label}` : key }) }))
 vi.mock('../src/lib/auth', () => ({ useAuth: () => ({ user: { id: 1, role: 'admin' } }) }))
 vi.mock('../src/lib/api/tariffs', () => ({ fetchDynamicTariffSources: vi.fn().mockResolvedValue([]) }))
+// The real section's chart needs AppSettingsProvider; the stub renders only the source name.
+vi.mock('../src/features/tariffs/DynamicSourceSection', () => ({
+    DynamicSourceSection: ({ source }: { source: DynamicTariffSource }) =>
+        createElement('div', { className: 'tariff-source-summary' }, createElement('strong', null, source.label)),
+}))
 
 // The detail pane is in flow beside the list, not an overlay (SPEC-2026-10-tariff-split-view §5, §6).
 
@@ -23,7 +30,10 @@ const series = { zev: 'z', name: 'Grid', category: 'grid_fees', billing_mode: 'm
     version_count: 3, active_version_id: 'current', gaps: [], versions: [next, current, past] } as unknown as TariffSeries
 
 const cleanups: (() => void)[] = []
-afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()))
+afterEach(() => {
+    cleanups.splice(0).forEach((cleanup) => cleanup())
+    vi.mocked(fetchDynamicTariffSources).mockResolvedValue([])
+})
 
 const noop = () => undefined
 const handlers = {
@@ -46,6 +56,21 @@ describe('TariffDetailPane', () => {
         expect(edit.textContent).toBe('')
         act(() => edit.click())
         expect(onEditTariff).toHaveBeenCalledExactlyOnceWith(next, 'edit-next')
+    })
+
+    it('names a dynamic source in a folded card but not in the price line of an open one', async () => {
+        vi.mocked(fetchDynamicTariffSources).mockResolvedValue([
+            { id: 'src-1', label: 'Example source' }, { id: 'src-2', label: 'Other source' },
+        ] as DynamicTariffSource[])
+        const dynamic = (id: string, validFrom: string, source: string) => ({
+            ...version(id, validFrom, null), billing_mode: 'energy', dynamic_source: source }) as unknown as TariffVersion
+        // Versions of one series can use different sources (ADR 0018).
+        const dynamicSeries = { ...series, billing_mode: 'energy', version_count: 2,
+            versions: [dynamic('next', '2999-01-01', 'src-2'), dynamic('current', '2001-01-01', 'src-1')] } as unknown as TariffSeries
+        const container = await pane({ series: dynamicSeries, allSeries: [dynamicSeries] })
+        await vi.waitFor(() => expect(container.querySelector('.tariff-source-summary')?.textContent).toBe('Example source'))
+        expect(container.querySelector('.tariff-version-card-price')?.textContent).not.toContain('Example source')
+        expect(container.querySelector('.tariff-version-card-summary')?.textContent).toContain('Other source')
     })
 
     it('is a region named by its title and is not modal', async () => {
