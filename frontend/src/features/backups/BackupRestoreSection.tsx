@@ -16,7 +16,6 @@ import { queryKeys } from '../../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
 import { Badge } from '../../components/Badge'
 import { DataTable, type ColumnDef } from '../../components/DataTable'
-import { formatNumber } from '../../lib/numbers'
 import { useToast } from '../../lib/toast'
 import type { BackupStatus, RestoreJob } from '../../types/api'
 import {
@@ -221,7 +220,8 @@ export function BackupRestoreSection({ status }: { status?: BackupStatus } = {})
                     {!job.dry_run && job.status === 'completed' && (
                         <div className="success-banner">
                             {t('pages.backups.restore.done', {
-                                count: formatNumber(Object.values(plan.restored ?? {}).reduce((sum, n) => sum + n, 0)),
+                                // A number, not a formatted string: i18next only picks a plural form for numbers.
+                                count: Object.values(plan.restored ?? {}).reduce((sum, n) => sum + n, 0),
                             })}
                             {plan.safety_backup_id && <div>{t('pages.backups.restore.safetyTaken')}</div>}
                         </div>

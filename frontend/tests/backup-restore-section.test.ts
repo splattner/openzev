@@ -7,7 +7,10 @@ import { BackupRestoreSection } from '../src/features/backups/BackupRestoreSecti
 import type { BackupDestination, BackupJob, BackupStatus, RestoreConflict, RestoreJob, RestorePlan } from '../src/types/api'
 
 // `t` returns the key, so assertions read as "this message is shown".
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
+// A numeric count is shown, so a formatted string (which skips i18next's plural lookup) fails.
+vi.mock('react-i18next', () => ({ useTranslation: () => ({
+    t: (key: string, options?: { count?: unknown }) => (typeof options?.count === 'number' ? `${key}#${options.count}` : key),
+}) }))
 
 const pushToast = vi.fn()
 vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast }) }))
@@ -323,7 +326,7 @@ describe('applying', () => {
         const before = api.fetchBackupJobs.mock.calls.length
         await click(button(container, 'pages.backups.restore.apply'))
         await settle()
-        expect(container.querySelector('.success-banner')?.textContent).toContain('pages.backups.restore.done')
+        expect(container.querySelector('.success-banner')?.textContent).toContain('pages.backups.restore.done#101')
         expect(container.querySelector('.success-banner')?.textContent).toContain('pages.backups.restore.safetyTaken')
         expect(api.fetchBackupJobs.mock.calls.length).toBeGreaterThan(before)
     })

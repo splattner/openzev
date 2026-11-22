@@ -193,8 +193,8 @@ export function AdminDynamicSourcesPanel() {
       accessorFn: (source) => source.linked_tariff_count + source.linked_zev_count,
       header: t('pages.dynamicSources.columns.reuse'),
       cell: ({ row }) => t('pages.dynamicSources.reuseSummary', {
-        tariffs: row.original.linked_tariff_count,
-        zevs: row.original.linked_zev_count,
+        tariffs: t('pages.dynamicSources.reuseTariffs', { count: row.original.linked_tariff_count }),
+        zevs: t('pages.dynamicSources.reuseZevs', { count: row.original.linked_zev_count }),
       }),
     },
     {
