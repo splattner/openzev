@@ -122,11 +122,11 @@ and the selection as they were.
    [Percentage of Energy Tariff](#percentage-of-energy-tariff)), or — for a
    per-kWh tariff — a [dynamic price source](#dynamic-tariffs) if it has one
 
-5. For a per-kWh tariff without a dynamic source, add its **Bands** right in
-   the form: **Add band**, enter price, times, weekdays and months, then
-   **Keep band**. You can edit or remove a band before saving, and the form
+5. For a per-kWh tariff without a dynamic source, add its **Price bands** right in
+   the form: **Add price band**, enter price, times, weekdays and months, then
+   **Keep price band**. You can edit or remove a band before saving, and the form
    warns about hours without a band while you build the list (see
-   [Tariff Periods](#tariff-periods))
+   [Price bands](#tariff-periods))
 
    ![The create form with an HT and an NT band entered before saving](screenshots/07f-tariff-create-bands.png)
 
@@ -136,7 +136,7 @@ and the selection as they were.
    the pane
 
    A per-kWh tariff created without a band prices nothing until you add one
-   later as a [Tariff Period](#tariff-periods); a percentage tariff starts with
+   later as a [price band](#tariff-periods); a percentage tariff starts with
    its one flat band and takes more later
 
 ## Importing Tariffs from Your Grid Operator
@@ -525,12 +525,12 @@ line shows the base with VAT (for example "65% von CHF 0.2162/kWh").
 
 Saving creates the tariff with one flat percentage band. Like a per-kWh
 tariff, a percentage tariff can be split into several **time-of-use bands** —
-open its entry and use **Add Period** to add a High/Low or named band, this
+open its entry and use **Add price band** to add a High/Low or named band, this
 time entering a **percentage** instead of a CHF/kWh price. A local-energy
 surcharge that is cheaper at midday and dearer in the morning and evening, for
 example, can be modelled as three bands (00:00–10:00 at 90%, 10:00–16:00 at
 60%, 16:00–00:00 at 90%) instead of a single flat percentage — see
-[Tariff Periods](#tariff-periods) for how bands, weekdays and months combine;
+[Price bands](#tariff-periods) for how bands, weekdays and months combine;
 everything there applies to a percentage tariff's bands exactly as it does to
 a per-kWh tariff's.
 
@@ -641,16 +641,15 @@ they have a participant record in the ZEV. An issuer that is not a participant
 **Credits:** enter a negative amount to distribute a community-wide *rebate*
 across the participants. It appears on invoices as a credit line.
 
-## Tariff Periods
+## Price bands { #tariff-periods }
 
-**Tariff periods** hold a per-kWh tariff's prices. There are no default
-periods: a new per-kWh tariff has none until you add one. A [percentage
-tariff](#percentage-of-energy-tariff) uses the same periods and the same
-**Add Period** form, entering a **percentage** instead of a **CHF/kWh**
-price — everything below about period types, time windows, weekdays and
-months applies to it unchanged. Each period has a type:
+**Price bands** hold a per-kWh tariff's prices. There are no default
+bands: a new per-kWh tariff has none until you add one. A [percentage
+tariff](#percentage-of-energy-tariff) uses the same bands and the same
+**Add price band** form, entering a **percentage** instead of a **CHF/kWh**
+price. Each band has a type:
 
-| Period type | Use for |
+| Band type | Use for |
 | --- | --- |
 | **Flat** | One price around the clock |
 | **High (HT)** / **Low (NT)** | The usual two-rate tariff, e.g. HT 06:00–22:00 and NT for the rest |
@@ -659,22 +658,22 @@ months applies to it unchanged. Each period has a type:
 To add one:
 
 1. Click the tariff to open its detail pane
-2. Click **Add Period** under the version's bands
+2. Click **Add price band** under the version's bands
 3. Enter:
-   - **Period type** (see above) and, for a time band, a **Band name**
+   - **Band type** (see above) and, for a time band, a **Band name**
    - **Time from** / **Time to** — HH:MM (24-hour format), in Swiss time
      (CET/CEST): 06:00 means 06:00 on the clock in Switzerland in winter and
      summer alike, whatever format the readings were imported in
-   - **Weekdays** and **Months** the period applies to (all selected means
+   - **Weekdays** and **Months** the band applies to (all selected means
      every day / all year)
    - **CHF/kWh** (per-kWh tariff), or **Percentage** (percentage tariff)
-4. Click **Save Tariff Period**
+4. Click **Save price band**
 
 > **Crossing midnight:** If the end time is not after the start time, the
-> period wraps past midnight: 22:00–06:00 covers the night, and an end time of
+> band wraps past midnight: 22:00–06:00 covers the night, and an end time of
 > 00:00 means the end of the day (16:00–00:00 is the evening). The weekdays
 > you select refer to the day of each hour itself, so a Monday–Friday
-> 22:00–06:00 period covers Friday night up to midnight and the early hours of
+> 22:00–06:00 band covers Friday night up to midnight and the early hours of
 > Monday to Friday, but not Saturday morning.
 
 ## Multi-Tariff Configuration
@@ -745,7 +744,7 @@ own card, the one in force first:
   validity window, so you can't mistake a future version for the current rate,
   and has its own pencil button (**Edit**). Hover or focus it to see the action
   and validity window. Below come the dynamic source if there is
-  one, or the price bands with a pencil on each and **Add Period** under them.
+  one, or the price bands with a pencil on each and **Add price band** under them.
   The notes appear on a card only when they differ from the ones the list row
   already shows.
 - A **scheduled** version starts as a single line — its prices, what they change
@@ -980,7 +979,7 @@ When OpenZEV generates an invoice:
 1. **For each timestamp in billing period:**
    - Identify energy type (local vs. grid)
    - Find applicable tariff by validity date
-   - Find applicable period (HT vs. NT) by timestamp
+   - Find applicable price band (HT vs. NT) by timestamp
    - Multiply energy × price
 
 2. **Fixed fees:**

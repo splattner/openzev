@@ -30,7 +30,7 @@ function mockT(key: string, opts?: Record<string, unknown>): string {
     if (key === 'pages.tariffs.approxPriceTooltip') return `${String(opts?.percentage)}% of CHF ${String(opts?.basePrice)}/kWh = CHF ${String(opts?.effectivePrice)}/kWh`
     if (key === 'pages.tariffs.dynamicAveragePartialTooltip') return 'The average uses only the intervals available in the reference period.'
     if (key === 'pages.tariffs.dynamicPriced') return 'Dynamic price'
-    if (key === 'pages.tariffs.noPeriods') return 'No tariff periods yet.'
+    if (key === 'pages.tariffs.noPeriods') return 'No price bands yet.'
     if (key === 'pages.tariffs.rateCard.percentOf') return `${String(opts?.percentage)}% of the grid tariff`
     if (key === 'pages.tariffs.rateCard.percentOfBase') return `${String(opts?.percentage)}% of the grid tariff (${String(opts?.base)})`
     if (key.startsWith('pages.tariffs.periodTypes.')) {
@@ -255,7 +255,7 @@ describe('buildRateLines', () => {
         const series = energySeries({})
         const version = energyVersion([])
         const [line] = buildRateLines(series, version, t, DAY_NAMES, MONTH_NAMES, formatDate)
-        expect(line.applies).toBe('No tariff periods yet.')
+        expect(line.applies).toBe('No price bands yet.')
         expect(line.price).toBe('')
     })
 })
