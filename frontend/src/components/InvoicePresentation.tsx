@@ -4,11 +4,12 @@ import { useTranslation } from 'react-i18next'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faEllipsis, faFilePdf, faSpinner } from '@fortawesome/free-solid-svg-icons'
 import { ActionMenu, type ActionMenuItem } from './ActionMenu'
+import { Badge } from './Badge'
 import { openInvoicePdf } from '../lib/api/invoices'
 import { formatChf, formatChfAmount } from '../lib/numbers'
 import type { Invoice } from '../types/api'
 import { amountDueChf, hasCreditApplied } from '../features/invoices/invoiceCredits'
-import { INVOICE_STATUS_BADGE_CLASS, isPartlyPaid, paymentState } from '../features/invoices/invoiceStatus'
+import { isPartlyPaid, paymentState } from '../features/invoices/invoiceStatus'
 import { IssueText } from './IssueText'
 
 export function InvoiceLink({ invoice, from, period, children, className }: {
@@ -39,13 +40,14 @@ export function InvoiceStatusBadge({ status, paidChf, variant = 'badge' }: {
     const partlyPaid = isPartlyPaid({ status, paid_chf: paidChf })
     const label = partlyPaid ? t('invoice.status.partlyPaid')
         : status ? t(`invoice.status.${status}`) : ''
-    if (status === 'cancelled') return <span className={variant === 'plain' ? 'error-text' : 'badge badge-danger'}>{label}</span>
     if (variant === 'plain') {
-        const className = partlyPaid ? 'invoice-status-partly-paid'
-            : ['draft', 'approved', 'sent', 'paid'].includes(status) ? `invoice-status-${status}` : 'muted'
+        let className = 'muted'
+        if (status === 'cancelled') className = 'error-text'
+        else if (partlyPaid) className = 'invoice-status-partly-paid'
+        else if (['draft', 'approved', 'sent', 'paid'].includes(status)) className = `invoice-status-${status}`
         return <span className={className}>{label}</span>
     }
-    return <span className={status === 'paid' ? 'badge badge-success' : INVOICE_STATUS_BADGE_CLASS}>{label}</span>
+    return <Badge status={status} domain="invoice">{label}</Badge>
 }
 
 /**
@@ -108,10 +110,10 @@ export function InvoicePdfCell({ invoice, pending = false, keepExistingDuringPen
     const regenerating = pending || invoice.pdf_status === 'pending'
     if (regenerating && (!keepExistingDuringPending || !invoice.pdf_url)) {
         return (
-            <span className="badge badge-info" role="status">
+            <Badge tone="info" role="status">
                 <FontAwesomeIcon icon={faSpinner} spin fixedWidth aria-hidden="true" />
                 {t('pages.invoices.pdfGenerating')}
-            </span>
+            </Badge>
         )
     }
     if (invoice.pdf_status === 'failed' && !invoice.pdf_url) {

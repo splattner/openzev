@@ -18,9 +18,10 @@ import { formatDateTime, useAppSettings } from '../../lib/appSettings'
 import { downloadBlob } from '../../lib/downloadBlob'
 import { formatBytes } from '../../lib/numbers'
 import { useToast } from '../../lib/toast'
+import { Badge } from '../../components/Badge'
 import { ConfirmDialog, consumeReportedError, useConfirmDialog } from '../../components/ConfirmDialog'
 import { DataTable, type CellContext, type ColumnDef } from '../../components/DataTable'
-import type { BackupJob, BackupJobScope, BackupJobStatus, BackupStatus } from '../../types/api'
+import type { BackupJob, BackupJobScope, BackupStatus } from '../../types/api'
 import { BackupJobDetailsModal } from './BackupJobDetailsModal'
 import {
     BACKUP_JOB_STATUS_RANK,
@@ -34,13 +35,6 @@ import {
 
 const POLL_MS = 3000
 const VERIFICATION_RANK = { failed: 0, checking: 1, never: 2, ok: 3 }
-
-const STATUS_BADGE: Record<BackupJobStatus, string> = {
-    queued: 'badge-neutral',
-    running: 'badge-info',
-    completed: 'badge-success',
-    failed: 'badge-danger badge-quiet',
-}
 
 const JobActionsContext = createContext<{
     verifying: boolean
@@ -229,9 +223,9 @@ export function BackupJobsSection({ status }: { status: BackupStatus | undefined
                             ? job.zev_name || t('pages.backups.jobs.scopeZev')
                             : t('pages.backups.jobs.scopeInstance')}
                         {job.trigger !== 'manual' && (
-                            <span className="badge badge-neutral" style={{ marginLeft: '0.4rem' }}>
+                            <Badge tone="neutral" style={{ marginLeft: '0.4rem' }}>
                                 {t(`pages.backups.jobs.trigger.${job.trigger}`)}
-                            </span>
+                            </Badge>
                         )}
                     </>
                 )
@@ -253,9 +247,9 @@ export function BackupJobsSection({ status }: { status: BackupStatus | undefined
                 const job = row.original
                 return (
                     <>
-                        <span className={`badge ${STATUS_BADGE[job.status]}`}>
+                        <Badge status={job.status} domain="backup">
                             {t(`pages.backups.jobs.status.${job.status}`)}
-                        </span>
+                        </Badge>
                         {fileGone(job) && (
                             <div className="muted" style={{ marginTop: '0.25rem' }}>
                                 {t(`pages.backups.jobs.fileGone.${job.artifact_deleted_reason || 'manual'}`)}
@@ -291,11 +285,11 @@ export function BackupJobsSection({ status }: { status: BackupStatus | undefined
                 const job = row.original
                 if (job.status !== 'completed') return '—'
                 return (
-                    <span className={`badge ${job.encrypted ? 'badge-success' : 'badge-warning badge-quiet'}`}>
+                    <Badge tone={job.encrypted ? 'success' : 'warning'} quiet={!job.encrypted}>
                         {job.encrypted
                             ? t('pages.backups.jobs.encrypted')
                             : t('pages.backups.jobs.notEncrypted')}
-                    </span>
+                    </Badge>
                 )
             },
         },
@@ -436,13 +430,11 @@ function VerificationBadge({ job }: { job: BackupJob }) {
     const { settings } = useAppSettings()
     const state = verificationState(job)
 
-    if (state === 'checking') return <span className="badge badge-info">{t('pages.backups.jobs.verification.checking')}</span>
-    if (state === 'never') return <span className="badge badge-neutral">{t('pages.backups.jobs.verification.never')}</span>
+    const badge = <Badge status={state} domain="verification">{t(`pages.backups.jobs.verification.${state}`)}</Badge>
+    if (state === 'checking' || state === 'never') return badge
     return (
         <>
-            <span className={`badge ${state === 'ok' ? 'badge-success' : 'badge-danger badge-quiet'}`}>
-                {t(`pages.backups.jobs.verification.${state}`)}
-            </span>
+            {badge}
             <div className="muted" style={{ marginTop: '0.25rem', maxWidth: '20rem', overflowWrap: 'anywhere' }}>
                 {job.verified_at ? formatDateTime(job.verified_at, settings) : ''}
                 {state === 'failed' && job.verification_message && <div>{job.verification_message}</div>}

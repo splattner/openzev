@@ -15,6 +15,7 @@ import {
 import { formatApiError } from '../../lib/api/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { useToast } from '../../lib/toast'
+import { Badge } from '../../components/Badge'
 import { ConfirmDialog, consumeReportedError, useConfirmDialog } from '../../components/ConfirmDialog'
 import { DataTable, type CellContext, type ColumnDef } from '../../components/DataTable'
 import { FormModal } from '../../components/FormModal'
@@ -228,11 +229,11 @@ export function BackupDestinationsSection({ status }: { status: BackupStatus | u
             accessorFn: (destination) => destination.enabled ? 1 : 0,
             header: t('pages.backups.destinations.columns.status'),
             cell: ({ row }) => (
-                <span className={`badge ${row.original.enabled ? 'badge-success' : 'badge-neutral'}`}>
+                <Badge tone={row.original.enabled ? 'success' : 'neutral'}>
                     {row.original.enabled
                         ? t('pages.backups.destinations.enabled')
                         : t('pages.backups.destinations.disabled')}
-                </span>
+                </Badge>
             ),
         },
         {

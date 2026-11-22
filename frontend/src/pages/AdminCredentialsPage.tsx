@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
+import { Badge } from '../components/Badge'
 import { fetchUsers } from '../lib/api/auth'
 import { fetchAllCredentials, revokeCredential } from '../lib/api/credentials'
 import { formatApiError } from '../lib/api/errors'
@@ -18,6 +19,21 @@ import { Notice } from '../components/Notice'
 
 type StatusFilter = '' | 'active' | 'expired' | 'revoked'
 type KindFilter = '' | CredentialKind
+
+type CredentialState = AdminAccessCredential['status'] | 'expiring'
+
+const STATE_LABEL_KEYS = {
+    active: 'pages.adminCredentials.statusActive',
+    expiring: 'pages.adminCredentials.statusExpiring',
+    expired: 'pages.adminCredentials.statusExpired',
+    revoked: 'pages.adminCredentials.statusRevoked',
+} as const satisfies Record<CredentialState, string>
+
+/** An active key close to its expiry date reads as expiring. */
+function credentialState(credential: AdminAccessCredential): CredentialState {
+    if (credential.status !== 'active') return credential.status
+    return apiKeyStatus(credential) === 'expiring' ? 'expiring' : 'active'
+}
 
 /**
  * Tokens & keys across every account (SPEC-2026-tokens-and-keys §7.4): API keys,
@@ -84,14 +100,6 @@ export function AdminCredentialsPage({ embedded = false }: { embedded?: boolean 
         })
     }
 
-    function statusLabel(credential: AdminAccessCredential): { label: string; className: string } {
-        if (credential.status === 'revoked') return { label: t('pages.adminCredentials.statusRevoked'), className: 'badge badge-danger badge-quiet' }
-        if (credential.status === 'expired') return { label: t('pages.adminCredentials.statusExpired'), className: 'badge badge-warning badge-quiet' }
-        if (apiKeyStatus(credential) === 'expiring') {
-            return { label: t('pages.adminCredentials.statusExpiring'), className: 'badge badge-warning badge-quiet' }
-        }
-        return { label: t('pages.adminCredentials.statusActive'), className: 'badge badge-success' }
-    }
 
     function ownerText(credential: AdminAccessCredential): string {
         if (credential.owner) return credential.owner.email || credential.owner.username
@@ -181,7 +189,7 @@ export function AdminCredentialsPage({ embedded = false }: { embedded?: boolean 
                         </thead>
                         <tbody>
                             {sorting.rows.map((credential) => {
-                                const status = statusLabel(credential)
+                                const state = credentialState(credential)
                                 return (
                                     <tr key={`${credential.kind}:${credential.id}`}>
                                         <td>{credential.name}</td>
@@ -194,7 +202,7 @@ export function AdminCredentialsPage({ embedded = false }: { embedded?: boolean 
                                         <td>{ownerText(credential)}</td>
                                         <td><code>{credential.prefix}</code></td>
                                         <td>{scopeText(credential) ?? '—'}</td>
-                                        <td><span className={status.className}>{status.label}</span></td>
+                                        <td><Badge status={state} domain="credential">{t(STATE_LABEL_KEYS[state])}</Badge></td>
                                         <td>
                                             {credential.last_used_at
                                                 ? formatDateTime(credential.last_used_at, settings)

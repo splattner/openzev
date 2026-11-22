@@ -8,6 +8,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowLeft, faDownload, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
+import { Badge } from '../../components/Badge'
 import { FormModal } from '../../components/FormModal'
 import { applyVseTariffImport, previewVseTariffImport } from '../../lib/api/tariffs'
 import { useToast } from '../../lib/toast'
@@ -27,7 +28,6 @@ import {
 } from './vseImportSelection'
 import type {
     VseTariffCandidate,
-    VseTariffCandidateStatus,
     VseTariffImportPreview,
     VseTariffImportResult,
 } from '../../types/api'
@@ -42,15 +42,6 @@ type VseTariffImportModalProps = {
 }
 
 const CATEGORY_ORDER: VseTariffCandidate['category'][] = ['energy', 'grid_fees', 'levies', 'metering']
-
-const STATUS_BADGE: Record<VseTariffCandidateStatus, string> = {
-    new: 'badge-success',
-    new_version: 'badge-info',
-    duplicate: 'badge-neutral',
-    conflict: 'badge-warning badge-quiet',
-    unsupported: 'badge-danger badge-quiet',
-}
-
 
 export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: VseTariffImportModalProps) {
     const { t } = useTranslation()
@@ -430,9 +421,9 @@ function CandidateRow({
                 <div>
                     {candidate.name}
                     {candidate.standard_basegroup && (
-                        <span className="badge badge-info" style={{ marginLeft: '0.5rem' }}>
+                        <Badge tone="info" style={{ marginLeft: '0.5rem' }}>
                             {t('pages.tariffs.import.standardBadge')}
-                        </span>
+                        </Badge>
                     )}
                 </div>
                 {candidate.series_name !== candidate.name && (
@@ -490,9 +481,9 @@ function CandidateRow({
                 {candidate.valid_from} … {(candidate.effective_valid_to ?? candidate.valid_to) ?? t('pages.tariffs.openEnded')}
             </td>
             <td>
-                <span className={`badge ${STATUS_BADGE[candidate.status]}`}>
+                <Badge status={candidate.status} domain="tariffImport">
                     {t(`pages.tariffs.import.status.${candidate.status}`)}
-                </span>
+                </Badge>
                 {candidate.detail && <div className="muted"><ImportDiagnostic text={candidate.detail} diagnostic={candidate.detail_diagnostic} fallback={t(candidate.status === 'unsupported' ? 'importDiagnostics.tariff_unsupported' : 'importDiagnostics.notImported')} /></div>}
             </td>
         </tr>
@@ -511,7 +502,7 @@ function CandidatePrice({ candidate }: { candidate: VseTariffCandidate }) {
         // document. See docs/specs/2026-09-dynamic-tariffs.md.
         return (
             <span>
-                <span className="badge badge-tag">{t('pages.tariffs.import.dynamicBadge')}</span>
+                <Badge tone="tag">{t('pages.tariffs.import.dynamicBadge')}</Badge>
                 <small className="muted" style={{ display: 'block' }}>{candidate.dynamic_url}</small>
             </span>
         )

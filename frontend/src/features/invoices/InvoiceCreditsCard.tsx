@@ -11,7 +11,8 @@ import { formatChf, formatChfAmount } from '../../lib/numbers'
 import { useToast } from '../../lib/toast'
 import type { Credit, Invoice } from '../../types/api'
 import { InvoiceCorrectionButton } from './InvoiceCorrectionButton'
-import { CREDIT_STATUS_BADGE, canCorrectInvoice, canRefundCredit } from './invoiceCredits'
+import { Badge } from '../../components/Badge'
+import { canCorrectInvoice, canRefundCredit } from './invoiceCredits'
 import { RefundCreditModal, type RefundCreditValues } from './RefundCreditModal'
 
 /**
@@ -102,9 +103,9 @@ export function InvoiceCreditsCard({
                                     <td className="numeric">{formatChfAmount(Number(credit.amount_chf))}</td>
                                     <td className="numeric">{formatChfAmount(Number(credit.remaining_chf))}</td>
                                     <td>
-                                        <span className={CREDIT_STATUS_BADGE[credit.status]}>
+                                        <Badge status={credit.status} domain="credit">
                                             {t(`pages.invoiceDetail.credits.status.${credit.status}`)}
-                                        </span>
+                                        </Badge>
                                         {(credit.applications ?? []).filter((a) => a.released_at === null).map((application) => (
                                             <small key={application.id} className="muted" style={{ display: 'block' }}>
                                                 {t('pages.invoiceDetail.credits.appliedTo', {

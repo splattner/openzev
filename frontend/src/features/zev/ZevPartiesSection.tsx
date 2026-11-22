@@ -2,6 +2,7 @@ import { SortableHeader, useTableSorting } from '../../components/tableSorting'
 import { useId, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { Badge } from '../../components/Badge'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faEllipsis, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { CivilDateInput } from '../../components/CivilDateInput'
@@ -393,10 +394,10 @@ export function ZevPartiesSection({ zevId, canManage }: Props) {
                                                     {party.name_addition && <span className="muted">{party.name_addition}</span>}
                                                     <span className="people-row-tags">
                                                         {party.participations.length > 0 && (
-                                                            <span className="badge badge-tag">{t('pages.zevSettings.parties.participant')}</span>
+                                                            <Badge tone="tag">{t('pages.zevSettings.parties.participant')}</Badge>
                                                         )}
                                                         {[...new Set(party.roles.map((row) => row.role))].map((role) => (
-                                                            <span key={role} className="badge badge-tag">{t(`pages.participants.roles.${role}`)}</span>
+                                                            <Badge key={role} tone="tag">{t(`pages.participants.roles.${role}`)}</Badge>
                                                         ))}
                                                     </span>
                                                 </span>
@@ -647,7 +648,7 @@ function SingleHolderRole({ role, rows, parties, canManage, busy, onAssign, onNe
             )}
             {upcoming.map((row) => (
                 <p key={row.id} className="zev-parties-holder">
-                    <span className="badge badge-info">{t('pages.zevSettings.parties.upcoming')}</span>
+                    <Badge tone="info">{t('pages.zevSettings.parties.upcoming')}</Badge>
                     <strong>{row.party_display_name}</strong>
                     <span className="muted">{windowText(row)}</span>
                 </p>
@@ -773,7 +774,7 @@ function Landowners({ rows, parties, canManage, busy, buildings, onAssign, onSet
                             <li key={row.id}>
                                 <RoleRow
                                     name={row.party_display_name}
-                                    tags={row.building_name ? <span className="badge badge-tag">{row.building_name}</span> : undefined}
+                                    tags={row.building_name ? <Badge tone="tag">{row.building_name}</Badge> : undefined}
                                     windowText={[
                                         t('pages.zevSettings.access.since', { date: formatShortDate(row.valid_from, settings) }),
                                         row.valid_to ? t('pages.zevSettings.access.until', { date: formatShortDate(row.valid_to, settings) }) : null,

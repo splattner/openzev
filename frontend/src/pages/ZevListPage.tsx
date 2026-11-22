@@ -34,6 +34,7 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { EmptyState } from '../components/EmptyState'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
+import { Badge } from '../components/Badge'
 import { todayBusinessIso } from '../lib/dates'
 import { isValidIban, normalizeIban } from '../lib/iban'
 import { getDefaultZevForm, mapZevToForm } from '../lib/zevForm'
@@ -937,21 +938,22 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                         <td>
                                             <div className="actions-row">
                                                 <span>{zev.name}</span>
-                                                <span className="badge badge-tag">
+                                                <Badge tone="tag">
                                                     {zev.zev_type.toUpperCase()}
-                                                </span>
+                                                </Badge>
                                                 {!isValidIban(zev.bank_iban ?? '') && (
                                                     <IssueText tone="warning" title={t('pages.zevs.ibanWarningHint')}>
                                                         {t('pages.zevs.ibanWarning')}
                                                     </IssueText>
                                                 )}
                                                 {zev.disabled_at && (
-                                                    <span
-                                                        className="badge badge-danger badge-quiet"
+                                                    <Badge
+                                                        tone="danger"
+                                                        quiet
                                                         title={t('pages.zevs.disabledSince', { date: formatShortDate(zev.disabled_at, settings) })}
                                                     >
                                                         {t('pages.zevs.disabledBadge')}
-                                                    </span>
+                                                    </Badge>
                                                 )}
                                             </div>
                                         </td>

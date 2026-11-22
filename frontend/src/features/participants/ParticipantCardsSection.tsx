@@ -21,6 +21,7 @@ import type { TFunction } from 'i18next'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { Badge } from '../../components/Badge'
 import { EmptyState } from '../../components/EmptyState'
 import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
 import { PlugIcon } from '../../components/IconSvg'
@@ -79,10 +80,6 @@ const STATUS_ICONS: Record<StatusStep, ReactNode> = {
     address: <FontAwesomeIcon icon={faLocationDot} fixedWidth />,
     meteringPoint: <PlugIcon />,
     invitation: <FontAwesomeIcon icon={faEnvelope} fixedWidth />,
-}
-
-function validityBadgeClass(state: ParticipantValidityState): string {
-    return state === 'upcoming' ? 'badge badge-info' : 'badge badge-neutral'
 }
 
 type StatusEntry = {
@@ -346,12 +343,12 @@ export function ParticipantCardsSection({
                                             {(roles.length > 0 || !isCurrent) && (
                                                 <span className="participant-row-badges">
                                                     {roles.map((role) => (
-                                                        <span key={role} className="badge badge-tag">{t(`pages.participants.roles.${role}`)}</span>
+                                                        <Badge key={role} tone="tag">{t(`pages.participants.roles.${role}`)}</Badge>
                                                     ))}
                                                     {!isCurrent && (
-                                                        <span className={validityBadgeClass(validityState)}>
+                                                        <Badge status={validityState} domain="participantValidity">
                                                             {t(`pages.participants.validity.${validityState}`)}
-                                                        </span>
+                                                        </Badge>
                                                     )}
                                                 </span>
                                             )}

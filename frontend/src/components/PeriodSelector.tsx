@@ -23,6 +23,7 @@ import {
     shiftBillingPeriod,
 } from '../lib/billingPeriod'
 import { quickRangeToDates, type QuickRangePreset } from '../lib/dateRangePresets'
+import { Badge } from './Badge'
 import { IssueText } from './IssueText'
 
 type PeriodRange = { from: string; to: string }
@@ -152,7 +153,7 @@ export function PeriodSelector({
                 // came from a link and is not one of the community's periods.
                 <IssueText tone="warning">{t('common.periodSelector.notBillingPeriod')}</IssueText>
             ) : (
-                <span className="badge badge-info">{t('common.periodSelector.custom')}</span>
+                <Badge tone="info">{t('common.periodSelector.custom')}</Badge>
             )}
         </span>
     )
