@@ -321,15 +321,19 @@ long translated labels beyond the existing narrow-band and category-header check
 ### 11.1 Usability audit of the tariff screens (§10.3, rollout phase 9)
 
 The tariff list, pane and create form were checked against the twelve rules by
-reading the code only; narrow layout, forced colours and screen-reader
-behaviour were not verified. Changes it made:
+reading the code. Rules 4, 11 and 12 were also reviewed from screenshots of the
+list, the pane and each tariff form at 1440 px and 400 px, and the one link was
+checked with forced colours emulated. Changes the audit made:
 
 | Rule | Finding | Change |
 | --- | --- | --- |
 | 2 Field order | **Energy type** came before **Dynamic source**, which sets it (`impliedEnergyType`) | Source and **Create dynamic source** first, then energy type, then the minimum price and double-counting warning that depend on both |
 | 3 Visible information | **Source details** folded four short lines | Shown under the status; the `sourceDetails` key is gone |
+| 4 Consistent typography | Each section had the same text-style count at both widths; no one-off size, weight or casing was seen | No change |
 | 7 Icon usage | The grid, local and feed-in icons replace the energy type's name | `TariffTypeLegend` below the lists names the types of the rows in view |
+| 11 Visible links | The one link, **Manage source in platform admin**, stays underlined at both widths, also with forced colours emulated; the next-change control is a button with underlined text | No change |
+| 12 No redundant text | Repeated names and statuses identify separate records or panels; a form's submit label names its task | No change |
 
-Open: rule 1 (the coverage warning offers no action), rule 9 (the band is
-called period, band, plage, tranche and fascia in turn), and rules 4, 11 and 12,
-which need screenshots at desktop and 400 px.
+Rules 1 and 9 are no longer open: the coverage warning offers **Add a band for
+these hours** (§11) and the band has one term per locale (terminology row above).
+The checks still open are listed in §11.
