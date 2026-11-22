@@ -2566,6 +2566,7 @@ export const fr = {
             },
             coverage: {
                 covered: 'Chaque heure de l’année a une période tarifaire.',
+                addBand: 'Ajouter une période tarifaire pour ces heures',
                 fallback: 'Aucune période tarifaire ne couvre {{schedule}}. Ces heures sont facturées comme {{band}} à {{price}}.',
                 overlaps: 'Certaines heures correspondent à plusieurs périodes tarifaires ; la première applicable s’applique.',
                 badge: 'Heures sans période tarifaire',

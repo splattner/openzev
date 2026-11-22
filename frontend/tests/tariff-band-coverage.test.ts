@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bandCoverage, type CoverageBand } from '../src/features/tariffs/bandCoverage'
+import { bandCoverage, bandForGaps, type CoverageBand } from '../src/features/tariffs/bandCoverage'
 import { nextChange } from '../src/features/tariffs/rateLines'
 
 // Mirrors tariffs.periods.resolve_band: what the engine prices, and what it leaves to the fallback.
@@ -96,6 +96,42 @@ describe('bandCoverage', () => {
 
     it('has nothing to say about a version with no bands at all', () => {
         expect(bandCoverage([]).fallbacks).toEqual([])
+    })
+})
+
+describe('bandForGaps', () => {
+    const seedFor = (bands: CoverageBand[]) => bandForGaps(bands, bandCoverage(bands).gaps)
+
+    it('takes the type the version lacks, for every day and month when the gap is all of them', () => {
+        expect(seedFor([high()])).toEqual({ period_type: 'low', weekdays: '', months: '' })
+        expect(seedFor([low()])).toEqual({ period_type: 'high', weekdays: '', months: '' })
+    })
+
+    it('names only the weekdays and months that have a gap, and falls back to a named band', () => {
+        expect(seedFor([high({ weekdays: '0,1,2,3,4' }), low()])).toEqual({ period_type: 'band', weekdays: '5,6', months: '' })
+        expect(seedFor([high({ months: '1,2,3' }), low({ months: '1,2,3' })]).months).toBe('4,5,6,7,8,9,10,11,12')
+    })
+
+    it('closes every gap it was given without meeting another band without times', () => {
+        const summer = '4,5,6,7,8,9'
+        const bands = [
+            high({ weekdays: '0,1,2,3,4', months: summer }),
+            low({ time_from: null, time_to: null, weekdays: '5,6', months: summer }),
+            low({ time_from: null, time_to: null, months: '1,2,3,10,11,12' }),
+        ]
+        const seed = bandForGaps(bands, bandCoverage(bands).gaps)!
+        expect(seed).toEqual({ period_type: 'band', weekdays: '0,1,2,3,4', months: summer })
+        const closed = bandCoverage([...bands, { ...low({ time_from: null, time_to: null }), ...seed }])
+        expect(closed.uncovered).toBe(false)
+        expect(closed.overlaps).toBe(false)
+    })
+
+    it('offers nothing when the gaps\' days and months together meet another band without times', () => {
+        // January lacks Monday, February Tuesday; one band on both would also take January Tuesday and February Monday.
+        const catchAll = (months: string, weekdays: string) => low({ time_from: null, time_to: null, months, weekdays })
+        const bands = [catchAll('1', '1,2,3,4,5,6'), catchAll('2', '0,2,3,4,5,6'), catchAll('3,4,5,6,7,8,9,10,11,12', '')]
+        expect(bandCoverage(bands).gaps.map(({ months, weekdays }) => [months, weekdays])).toEqual([[[1], [0]], [[2], [1]]])
+        expect(bandForGaps(bands, bandCoverage(bands).gaps)).toBeNull()
     })
 })
 

@@ -2566,6 +2566,7 @@ export const de = {
             },
             coverage: {
                 covered: 'Jede Stunde des Jahres hat eine Tarifperiode.',
+                addBand: 'Tarifperiode für diese Stunden hinzufügen',
                 fallback: 'Keine Tarifperiode deckt {{schedule}} ab. Diese Stunden werden als {{band}} zu {{price}} abgerechnet.',
                 overlaps: 'Einige Stunden passen zu mehreren Tarifperioden; es gilt die erste passende.',
                 badge: 'Stunden ohne Tarifperiode',

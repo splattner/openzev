@@ -208,7 +208,7 @@
   margin: 0;
 }
 
-.tariff-band-coverage > div > p + p {
+.tariff-band-coverage [role="status"] > p + p {
   margin-top: 0.25rem;
 }
 
@@ -219,6 +219,10 @@
   border-radius: var(--radius-sm);
   background: var(--surface-card);
   color: var(--text-primary);
+}
+
+.tariff-band-coverage .tariff-coverage-action {
+  margin-top: 0.5rem;
 }
 
 .tariff-band-coverage.is-covered {

@@ -8,6 +8,7 @@ import type { ItemFieldErrors } from '../../lib/api/errors'
 import { bandName } from './bands'
 import { MONTH_KEYS, WEEKDAY_KEYS } from './recurrence'
 import { formatBandSchedule, kwhPrice } from './rateLines'
+import type { BandSeed } from './bandCoverage'
 import { TariffBandCoverage } from './TariffBandCoverage'
 import { TariffBandFields, toCoverageBand, useWatchedBand } from './TariffBandFields'
 import {
@@ -55,6 +56,7 @@ export function TariffDraftBands({
   const { t } = useTranslation()
   // A band index, 'new' for a band being added, or nothing open.
   const [editing, setEditing] = useState<number | 'new' | null>(null)
+  const [seed, setSeed] = useState<BandSeed>()
   // The server's verdict is about the bands as sent; it follows them while they
   // are edited here, and a new verdict replaces it.
   const [errors, setErrors] = useState(serverErrors)
@@ -67,8 +69,9 @@ export function TariffDraftBands({
   const monthNames = MONTH_KEYS.map((key) => t(`pages.tariffs.monthsShort.${key}` as Parameters<typeof t>[0]))
   const dayNames = WEEKDAY_KEYS.map((key) => t(`pages.tariffs.weekdaysShort.${key}` as Parameters<typeof t>[0]))
 
-  function open(next: number | 'new' | null) {
+  function open(next: number | 'new' | null, from?: BandSeed) {
     setEditing(next)
+    setSeed(from)
     onEditingChange(next !== null)
   }
 
@@ -158,7 +161,7 @@ export function TariffDraftBands({
             })}
           </div>
         )}
-        {editing === 'new' && editor({ ...defaultTariffPeriodFormValues, billing_mode: 'energy' }, 'new')}
+        {editing === 'new' && editor({ ...defaultTariffPeriodFormValues, billing_mode: 'energy', ...seed }, 'new')}
         {editing === null && (
           <button className="button button-ghost button-compact tariff-add-band" type="button" onClick={() => open('new')}>
             <FontAwesomeIcon icon={faPlus} fixedWidth />
@@ -166,7 +169,12 @@ export function TariffDraftBands({
           </button>
         )}
         {editing === null && bands.length > 0 && (
-          <TariffBandCoverage bands={bands.map(toCoverageBand)} validity={validity} showCovered />
+          <TariffBandCoverage
+            bands={bands.map(toCoverageBand)}
+            validity={validity}
+            showCovered
+            onAddBand={(from) => open('new', from)}
+          />
         )}
       </fieldset>
     </section>

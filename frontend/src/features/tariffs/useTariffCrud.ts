@@ -13,6 +13,7 @@ import { useWriteScope } from '../../lib/useWriteScope'
 import type { ItemFieldErrors } from '../../lib/api/errors'
 import { formatTariffError, formatTariffErrorData, splitTariffBandErrors } from './errors'
 import { useAppSettings } from '../../lib/appSettings'
+import type { BandSeed } from './bandCoverage'
 import { invalidateTariffQueries } from './invalidate'
 import type { Tariff, TariffInput, TariffPeriod, TariffPeriodInput } from '../../types/api'
 import type { Translate } from '../../lib/translate'
@@ -71,6 +72,7 @@ export function useTariffCrud({
   const [editingTariffId, setEditingTariffId] = useState<string | null>(null)
   const [editingPeriodId, setEditingPeriodId] = useState<string | null>(null)
   const [periodTariffId, setPeriodTariffId] = useState<string | undefined>(undefined)
+  const [periodSeed, setPeriodSeed] = useState<BandSeed | undefined>(undefined)
   const [tariffFormOpen, setTariffFormOpen] = useState(false)
   const [periodFormOpen, setPeriodFormOpen] = useState(false)
   // A failure that belongs to the open form: shown in it, not only as a toast.
@@ -95,6 +97,7 @@ export function useTariffCrud({
     setEditingTariffId(null)
     setEditingPeriodId(null)
     setPeriodTariffId(undefined)
+    setPeriodSeed(undefined)
   }, [scope])
 
   const editingTariff = useMemo(
@@ -256,7 +259,7 @@ export function useTariffCrud({
     setEditingTariffId(null)
   }
 
-  function openCreatePeriod(tariffId?: string) {
+  function openCreatePeriod(tariffId?: string, seed?: BandSeed) {
     const defaultTariffId = resolvePeriodTariffId(bandableTariffs, tariffId)
 
     if (!defaultTariffId) {
@@ -266,6 +269,7 @@ export function useTariffCrud({
     startSession()
     setEditingPeriodId(null)
     setPeriodTariffId(defaultTariffId)
+    setPeriodSeed(seed)
     setPeriodFormOpen(true)
   }
 
@@ -307,6 +311,7 @@ export function useTariffCrud({
     editingTariffId,
     editingPeriodId,
     periodTariffId,
+    periodSeed,
     editingTariff,
     editingPeriod,
     saveError,

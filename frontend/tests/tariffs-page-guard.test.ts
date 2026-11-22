@@ -11,7 +11,7 @@ import { setInputValue } from './helpers/render'
 import { waitForCondition } from './helpers/waitForCondition'
 import type { TariffSeries, TariffVersion } from '../src/types/api'
 
-const api = vi.hoisted(() => ({ fetchSeries: vi.fn(), save: vi.fn(), remove: vi.fn() }))
+const api = vi.hoisted(() => ({ fetchSeries: vi.fn(), save: vi.fn(), remove: vi.fn(), savePeriod: vi.fn() }))
 // The selected community, changeable like the real context.
 const scope = vi.hoisted(() => {
     const listeners = new Set<() => void>()
@@ -43,7 +43,7 @@ vi.mock('../src/lib/appSettings', async (importOriginal) => ({
 }))
 vi.mock('../src/lib/api/tariffs', () => ({
     fetchTariffSeries: api.fetchSeries,
-    updateTariff: api.save, createTariff: api.save, deleteTariff: api.remove,
+    updateTariff: api.save, createTariff: api.save, deleteTariff: api.remove, createTariffPeriod: api.savePeriod,
     fetchDynamicTariffSources: vi.fn().mockResolvedValue([]),
 }))
 vi.mock('../src/lib/api/invoices', () => ({ downloadTariffOverview: vi.fn() }))
@@ -303,4 +303,41 @@ it('closes an open form when the community changes', async () => {
     await act(async () => scope.set('other'))
     expect(q('.tariff-pane-form')).toBeNull()
     expect(hasUnsavedZevSettingsDraft()).toBe(false)
+})
+
+// Band coverage
+
+it('adds the band the coverage warning offers with its days and months, and gives focus back on cancel', async () => {
+    const summer = '4,5,6,7,8,9'
+    const band = (id: string, extra: object) => ({ id, tariff: 'energy', label: '', price_chf_per_kwh: '0.2', percentage: null,
+        time_from: null, time_to: null, weekdays: '', months: '', ...extra })
+    const energy = { ...version('energy', 'Energy'), billing_mode: 'energy', periods: [
+        band('h', { period_type: 'high', time_from: '07:00:00', time_to: '21:00:00', weekdays: '0,1,2,3,4', months: summer }),
+        band('w', { period_type: 'low', weekdays: '5,6', months: summer }),
+        band('x', { period_type: 'low', months: '1,2,3,10,11,12' }),
+    ] } as unknown as TariffVersion
+    shown = [{ ...seriesOf('energy', 'Energy'), billing_mode: 'energy', versions: [energy] } as unknown as TariffSeries]
+    api.savePeriod.mockResolvedValue({})
+    await act(async () => { await client.invalidateQueries({ queryKey: queryKeys.tariffs.series('z') }) })
+    await waitForCondition(() => q('[data-row-key="z:Energy:energy"]') !== null, 'energy row')
+    await click(q('[data-row-key="z:Energy:energy"] .tariff-select, [data-row-key="z:Energy:energy"]'))
+    const offer = () => q<HTMLButtonElement>('[data-action-key="add-gap-band-energy"]')
+    const checkedChips = () => container.querySelectorAll('.tariff-pane-form input[type="checkbox"]:checked').length
+
+    await click(offer())
+    expect(checkedChips()).toBe(5 + 6)
+    await click(dialogButton('common.cancel'))
+    expect(document.activeElement).toBe(offer())
+
+    // The plain add starts from no seed: every weekday and month.
+    await click(q('[data-action-key="add-period-energy"]'))
+    expect(checkedChips()).toBe(7 + 12)
+    await click(dialogButton('common.cancel'))
+
+    await click(offer())
+    await act(async () => setInputValue(priceInput()!, '0.25'))
+    await submit()
+    expect(api.savePeriod).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+        tariff: 'energy', period_type: 'band', price_chf_per_kwh: '0.25', time_from: null, time_to: null, weekdays: '0,1,2,3,4', months: summer,
+    }))
 })

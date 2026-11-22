@@ -1,7 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCircleCheck, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons'
+import { faCircleCheck, faPlus, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
-import { bandCoverage, type CoverageBand, type CoverageGap } from './bandCoverage'
+import { bandCoverage, bandForGaps, type BandSeed, type CoverageBand, type CoverageGap } from './bandCoverage'
 import { bandName, bandWindow } from './bands'
 import { kwhPrice } from './rateLines'
 import { MONTH_KEYS, WEEKDAY_KEYS, formatSeason, formatWeekdays } from './recurrence'
@@ -11,6 +11,10 @@ type TariffBandCoverageProps = {
     validity?: { valid_from?: string, valid_to?: string | null }
     /** Say so when every hour has a band; the form wants the reassurance, the pane only the problems. */
     showCovered?: boolean
+    /** Offers to add a band for the hours no band prices; left out where the reader cannot add one. */
+    onAddBand?: (seed: BandSeed) => void
+    /** The offer's `data-action-key`, so focus can come back to it. */
+    addBandActionKey?: string
 }
 
 /** Seconds into the day as `07:00`; the end of the day is `24:00`. */
@@ -22,7 +26,7 @@ const clock = (seconds: number) => [Math.floor(seconds / 3600), Math.floor(secon
  * twice, said in the user's words: which months, days and hours, and what
  * those hours are priced at instead.
  */
-export function TariffBandCoverage({ bands, validity, showCovered = false }: TariffBandCoverageProps) {
+export function TariffBandCoverage({ bands, validity, showCovered = false, onAddBand, addBandActionKey }: TariffBandCoverageProps) {
     const { t } = useTranslation()
     if (bands.length === 0) return null
     const { uncovered, overlaps, gaps, fallbacks } = bandCoverage(bands, validity)
@@ -37,6 +41,7 @@ export function TariffBandCoverage({ bands, validity, showCovered = false }: Tar
 
     const monthNames = MONTH_KEYS.map((key) => t(`pages.tariffs.monthsShort.${key}` as Parameters<typeof t>[0]))
     const dayNames = WEEKDAY_KEYS.map((key) => t(`pages.tariffs.weekdaysShort.${key}` as Parameters<typeof t>[0]))
+    const seed = uncovered && onAddBand ? bandForGaps(bands, gaps) : null
 
     // The same days and season are one phrase: `07:00–21:00 · Sat–Sun · Nov–Mar`.
     // Every day and every month are left out: no qualifier means no restriction.
@@ -57,23 +62,33 @@ export function TariffBandCoverage({ bands, validity, showCovered = false }: Tar
     }
 
     return (
-        <div className="tariff-band-coverage is-warning grid-span-full" role="status">
+        <div className="tariff-band-coverage is-warning grid-span-full">
             <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth aria-hidden="true" />
             <div>
-                {fallbacks.map(({ band, months }, index) => {
-                    const name = bandName(band, t(`pages.tariffs.periodTypes.${band.period_type}` as Parameters<typeof t>[0]))
-                    const window = bandWindow(band)
-                    return (
-                        <p key={index}>
-                            {t('pages.tariffs.coverage.fallback', {
-                                schedule: describe(months),
-                                band: [name, name !== window && window].filter(Boolean).join(' '),
-                                price: priceOf(band),
-                            })}
-                        </p>
-                    )
-                })}
-                {overlaps && <p>{t('pages.tariffs.coverage.overlaps')}</p>}
+                {/* The offer stays outside the live region, which is read as plain text. */}
+                <div role="status">
+                    {fallbacks.map(({ band, months }, index) => {
+                        const name = bandName(band, t(`pages.tariffs.periodTypes.${band.period_type}` as Parameters<typeof t>[0]))
+                        const window = bandWindow(band)
+                        return (
+                            <p key={index}>
+                                {t('pages.tariffs.coverage.fallback', {
+                                    schedule: describe(months),
+                                    band: [name, name !== window && window].filter(Boolean).join(' '),
+                                    price: priceOf(band),
+                                })}
+                            </p>
+                        )
+                    })}
+                    {overlaps && <p>{t('pages.tariffs.coverage.overlaps')}</p>}
+                </div>
+                {seed && onAddBand && (
+                    <button type="button" className="button button-secondary button-compact tariff-coverage-action"
+                        data-action-key={addBandActionKey} onClick={() => onAddBand(seed)}>
+                        <FontAwesomeIcon icon={faPlus} fixedWidth aria-hidden="true" />
+                        {t('pages.tariffs.coverage.addBand')}
+                    </button>
+                )}
             </div>
         </div>
     )

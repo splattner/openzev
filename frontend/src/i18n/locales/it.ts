@@ -2566,6 +2566,7 @@ export const it = {
             },
             coverage: {
                 covered: 'Ogni ora dell’anno ha una fascia tariffaria.',
+                addBand: 'Aggiungi una fascia tariffaria per queste ore',
                 fallback: 'Nessuna fascia copre {{schedule}}. Queste ore sono fatturate come {{band}} a {{price}}.',
                 overlaps: 'Alcune ore corrispondono a più fasce tariffarie; si applica la prima corrispondente.',
                 badge: 'Ore senza fascia tariffaria',
