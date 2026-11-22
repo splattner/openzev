@@ -1,0 +1,61 @@
+name: Tariff browser tests
+
+# The tariff Playwright specs mock the API (`mockApi`), so they run against a
+# production build served by `vite preview`, with no backend. A new
+# `screenshots/tariff-*.spec.ts` must mock the API the same way.
+on:
+    pull_request:
+        branches: [main]
+        paths:
+            - "frontend/**"
+            - ".node-version"
+            - ".github/workflows/tariff-browser.yml"
+
+permissions:
+    contents: read
+
+jobs:
+    tariff-browser:
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        defaults:
+            run:
+                working-directory: frontend
+        steps:
+            - name: Checkout
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+            - name: Setup Node
+              uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+              with:
+                  node-version-file: .node-version
+                  cache: npm
+                  cache-dependency-path: frontend/package-lock.json
+
+            - name: Install dependencies and Chromium
+              run: |
+                  npm ci
+                  npx playwright install --with-deps chromium
+
+            - name: Build frontend
+              run: npm run build
+
+            - name: Run tariff browser tests
+              env:
+                  SCREENSHOT_BASE_URL: http://127.0.0.1:4173
+              run: |
+                  npm run preview -- --host 127.0.0.1 --port 4173 --strictPort > /tmp/tariff-preview.log 2>&1 &
+                  preview_pid=$!
+                  trap 'kill "$preview_pid"' EXIT
+                  curl --fail --silent --retry 30 --retry-delay 1 --retry-all-errors "$SCREENSHOT_BASE_URL" > /dev/null \
+                      || { cat /tmp/tariff-preview.log; exit 1; }
+                  # --no-deps: the login setup project needs a backend; these specs start logged out.
+                  npm run test:browser -- --no-deps --trace=retain-on-failure screenshots/tariff-*.spec.ts
+
+            - name: Upload Playwright results
+              if: failure()
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+              with:
+                  name: tariff-browser-traces
+                  path: frontend/test-results/
+                  if-no-files-found: ignore

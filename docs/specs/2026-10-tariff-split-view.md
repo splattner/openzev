@@ -305,6 +305,10 @@ browser; `tariff-presentation.spec.ts` asserts, against mocked data:
   keeps the draft, Discard returns to viewing, and a further Escape closes the
   pane.
 
+CI (`.github/workflows/tariff-browser.yml`) runs every
+`screenshots/tariff-*.spec.ts` against a production preview with the API
+mocked, so a new tariff spec must mock it too.
+
 The category-header regression in `tariff-presentation.spec.ts` checks English,
 German and French at a narrow card width and immediately either side of the
 56rem container breakpoint. It verifies category-only card headings, restored table sorting controls,
