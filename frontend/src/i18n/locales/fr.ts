@@ -5211,7 +5211,7 @@ export const fr = {
         zev: 'RCP',
         participant: 'Participant',
         period: 'Période',
-        total: 'Total',
+        total: 'Total (CHF)',
         status: 'Statut',
         allStatuses: 'Tous les statuts',
         quickFilterPlaceholder: 'Rechercher des factures…',
