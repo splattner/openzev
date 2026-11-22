@@ -2900,7 +2900,6 @@ export const de = {
             noCoverage: "Noch keine gespeicherten Preise.",
             coverageHint: 'Gespeicherte Preisdaten können Lücken enthalten.',
             manageSource: 'Quelle in der Plattformverwaltung öffnen',
-            sourceDetails: 'Quellendetails',
             showAllSources: "Alle Quellen anzeigen",
             sourceFilter: 'Quelle: {{label}}',
             sourceNotFound: 'Quelle nicht gefunden.',

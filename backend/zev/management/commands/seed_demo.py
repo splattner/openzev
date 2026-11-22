@@ -820,7 +820,11 @@ class Command(BaseCommand):
                 participant.allocation_weight = weight
                 participant.save(update_fields=["allocation_weight"])
 
-        self._seed_tariffs(zev, start_date, history_start=main_valid_from)
+        # Past today and the seeded window, so no seeded invoice bills it.
+        self._seed_tariffs(
+            zev, start_date, history_start=main_valid_from,
+            upcoming_from=max(today, end_date) + timedelta(days=30),
+        )
         dynamic_tariff = self._seed_dynamic_tariff(zev, end_date=end_date)
         self._upsert_vat_rates()
 
@@ -2118,9 +2122,12 @@ class Command(BaseCommand):
 
     def _seed_tariffs(
         self, zev: Zev, valid_from: date, specs: list | None = None,
-        *, history_start: date | None = None,
+        *, history_start: date | None = None, upcoming_from: date | None = None,
     ) -> None:
         """Rebuild a ZEV's seeded tariffs, optionally from caller-supplied specs.
+
+        ``upcoming_from`` starts the scheduled change of a spec that has
+        ``upcoming_prices``; the version in force ends the day before.
 
         The main community uses the default list below; the second community
         passes its own so the two demo cost structures stay different.
@@ -2172,6 +2179,8 @@ class Command(BaseCommand):
                     {"prices": [Decimal("0.24500"), Decimal("0.19500")]},
                     {"prices": [Decimal("0.27000"), Decimal("0.21000")]},
                 ],
+                # +5 %, for the overview's next-change line and the pane's Upcoming card.
+                "upcoming_prices": [Decimal("0.30975"), Decimal("0.23625")],
             },
             {
                 "name": "Feed-in Credit",
@@ -2247,7 +2256,13 @@ class Command(BaseCommand):
 
             # Unchanged tariffs must cover the paid historical invoices too.
             first_day = min(valid_from, history_start) if history_start and not history else valid_from
-            self._create_tariff_version(zev, spec, {}, valid_from=first_day, valid_to=None)
+            upcoming = spec.get("upcoming_prices") if upcoming_from else None
+            self._create_tariff_version(
+                zev, spec, {}, valid_from=first_day,
+                valid_to=upcoming_from - timedelta(days=1) if upcoming else None,
+            )
+            if upcoming:
+                self._create_tariff_version(zev, spec, {"prices": upcoming}, valid_from=upcoming_from, valid_to=None)
 
     def _seed_dynamic_tariff(self, zev: Zev, *, end_date: date) -> Tariff:
         """A local price series for the tariff drawer and platform console.

@@ -121,6 +121,18 @@ describe('TariffOverview', () => {
         expect(container.querySelector<HTMLDetailsElement>('details.tariff-overview-history')!.open).toBe(true)
     })
 
+    it('names in its legend only the energy types of the rows in view', async () => {
+        const grid = { ...series, name: 'Grid', energy_type: 'grid' } as TariffSeries
+        const feedIn = { ...series, name: 'Feed-in', energy_type: 'feed_in', versions: [past] } as TariffSeries
+        const legend = async (selected: { seriesKey: string, versionId: string } | null) => {
+            const groups = tariffOverview([grid, feedIn], TODAY)
+            const { container } = await renderWithProviders(createElement(TariffOverview, { groups, settings, selected, onOpenDetail: vi.fn() }), cleanups)
+            return container.querySelector('.tariff-type-legend')!.textContent
+        }
+        expect(await legend(null)).not.toContain('energyTypes.feed_in')
+        expect(await legend({ seriesKey: 'z:Feed-in', versionId: 'past' })).toContain('energyTypes.feed_in')
+    })
+
     it('says so when nothing is in force, and keeps a past-only tariff reachable', async () => {
         const container = await list(null, true)
         expect(container.querySelector('p.muted')?.textContent).toBe('pages.tariffs.overview.nothingCurrent')

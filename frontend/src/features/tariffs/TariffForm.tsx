@@ -203,16 +203,6 @@ export function TariffForm({
                 <option value="shared_yearly_fee">{t('pages.tariffs.billingModes.shared_yearly_fee')}</option>
               </select>
             </label>
-            {(billingMode === 'energy' || billingMode === 'percentage_of_energy') && (
-              <label>
-                <span>{t('pages.tariffs.form.energyType')}</span>
-                <select {...form.register('energy_type')}>
-                  <option value="local">{t('pages.tariffs.energyTypes.local')}</option>
-                  <option value="grid">{t('pages.tariffs.energyTypes.grid')}</option>
-                  <option value="feed_in">{t('pages.tariffs.energyTypes.feed_in')}</option>
-                </select>
-              </label>
-            )}
           </>
         )}
 
@@ -237,29 +227,6 @@ export function TariffForm({
               </small>
             </label>
             <p className="muted m-0">{t('pages.tariffs.form.sharedSourceHint')}</p>
-            {energyType === 'feed_in' && dynamicSourceId && (
-              <label>
-                <span>{t('pages.tariffs.form.minimumPrice')}</span>
-                <input
-                  type="number"
-                  step="0.00001"
-                  min="0"
-                  placeholder={t('pages.tariffs.form.minimumPricePlaceholder')}
-                  {...form.register('minimum_price_chf_per_kwh')}
-                />
-                <small className="muted">{t('pages.tariffs.form.minimumPriceHint')}</small>
-                {fieldError('minimum_price_chf_per_kwh')}
-              </label>
-            )}
-            {selectedSourceAggregatedTypes.length > 0 && (
-              <div className="warning-banner">
-                {t('pages.dynamicSources.form.doubleCountingWarning', {
-                  components: selectedSourceAggregatedTypes
-                    .map((type) => t(`pages.dynamicSources.types.${type}` as Parameters<typeof t>[0]))
-                    .join(', '),
-                })}
-              </div>
-            )}
             {!isVersion && (
               <div>
                 <button
@@ -272,6 +239,43 @@ export function TariffForm({
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* The energy type follows the dynamic source: picking a source sets it. */}
+        {!isVersion && (billingMode === 'energy' || billingMode === 'percentage_of_energy') && (
+          <label className={billingMode === 'energy' ? 'grid-span-full' : undefined}>
+            <span>{t('pages.tariffs.form.energyType')}</span>
+            <select {...form.register('energy_type')}>
+              <option value="local">{t('pages.tariffs.energyTypes.local')}</option>
+              <option value="grid">{t('pages.tariffs.energyTypes.grid')}</option>
+              <option value="feed_in">{t('pages.tariffs.energyTypes.feed_in')}</option>
+            </select>
+          </label>
+        )}
+
+        {billingMode === 'energy' && energyType === 'feed_in' && dynamicSourceId && (
+          <label className="grid-span-full">
+            <span>{t('pages.tariffs.form.minimumPrice')}</span>
+            <input
+              type="number"
+              step="0.00001"
+              min="0"
+              placeholder={t('pages.tariffs.form.minimumPricePlaceholder')}
+              {...form.register('minimum_price_chf_per_kwh')}
+            />
+            <small className="muted">{t('pages.tariffs.form.minimumPriceHint')}</small>
+            {fieldError('minimum_price_chf_per_kwh')}
+          </label>
+        )}
+
+        {billingMode === 'energy' && selectedSourceAggregatedTypes.length > 0 && (
+          <div className="warning-banner grid-span-full">
+            {t('pages.dynamicSources.form.doubleCountingWarning', {
+              components: selectedSourceAggregatedTypes
+                .map((type) => t(`pages.dynamicSources.types.${type}` as Parameters<typeof t>[0]))
+                .join(', '),
+            })}
           </div>
         )}
 

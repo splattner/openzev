@@ -2900,7 +2900,6 @@ export const fr = {
             noCoverage: "Aucun prix enregistré pour le moment.",
             coverageHint: 'Les données enregistrées peuvent contenir des lacunes.',
             manageSource: 'Gérer la source dans l’administration de la plateforme',
-            sourceDetails: 'Détails de la source',
             showAllSources: "Afficher toutes les sources",
             sourceFilter: 'Source : {{label}}',
             sourceNotFound: 'Source introuvable.',

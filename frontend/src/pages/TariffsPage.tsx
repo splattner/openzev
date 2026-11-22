@@ -369,14 +369,17 @@ export function TariffsPage() {
     })
 
     const actions = selectedZevId && seriesQuery.isSuccess ? (
-        <div className="actions-row actions-row-wrap actions-row-end">
-            <TariffActions
-                onOpenCreateTariff={createTariff}
-                onOpenImportModal={!readOnly ? () => setShowImportModal(true) : undefined}
-                readOnly={readOnly}
-                onDownloadOverview={(scope) => overviewMutation.mutate(scope)}
-                overviewBusy={overviewMutation.isPending}
-            />
+        <div className="tariff-page-actions">
+            {selectedZev?.vat_mode === 'inclusive' && <p className="muted m-0">{t('pages.tariffs.vatInclusiveNotice')}</p>}
+            <div className="actions-row actions-row-wrap actions-row-end">
+                <TariffActions
+                    onOpenCreateTariff={createTariff}
+                    onOpenImportModal={!readOnly ? () => setShowImportModal(true) : undefined}
+                    readOnly={readOnly}
+                    onDownloadOverview={(scope) => overviewMutation.mutate(scope)}
+                    overviewBusy={overviewMutation.isPending}
+                />
+            </div>
         </div>
     ) : null
 
@@ -454,10 +457,6 @@ export function TariffsPage() {
                 {seriesQuery.isLoading ? <PageSkeleton variant="table" /> : seriesQuery.isError ? (
                     <Notice tone="error" onRetry={() => void seriesQuery.refetch()} isRetrying={seriesQuery.isFetching}>{t('common.error')}</Notice>
                 ) : <>
-                    {selectedZev?.vat_mode === 'inclusive' && (
-                        <p className="muted m-0">{t('pages.tariffs.vatInclusiveNotice')}</p>
-                    )}
-
                     {selectedZevId && (
                         <VseTariffImportModal
                             isOpen={showImportModal}

@@ -69,6 +69,20 @@
   color: var(--text-muted);
 }
 
+.tariff-type-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  font-size: 0.8125rem;
+}
+
+.tariff-type-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
 .tariff-table-name {
   display: flex;
   align-items: center;

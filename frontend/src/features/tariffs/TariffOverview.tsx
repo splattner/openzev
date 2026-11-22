@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Disclosure } from '../../components/Disclosure'
 import type { AppSettings, TariffSeries } from '../../types/api'
 import { TariffCategorySections } from './TariffCategorySections'
+import { TariffTypeLegend } from './TariffTypeIcon'
 import { seriesKeyOf } from './useTariffDisplay'
 import type { TariffOverview as TariffOverviewGroups } from './validity'
 
@@ -30,6 +31,8 @@ export function TariffOverview({ groups, settings, selected, onOpenDetail }: Tar
         setSeenSelection(selectedKey)
         if (selectedInHistory) setHistoryOpen(true)
     }
+
+    const types = [...groups.current, ...groups.upcoming, ...(historyOpen ? groups.history : [])].map((row) => row.series.energy_type)
 
     return (
         <div className="tariff-overview">
@@ -59,6 +62,7 @@ export function TariffOverview({ groups, settings, selected, onOpenDetail }: Tar
                     <TariffCategorySections rows={groups.history} kind="history" settings={settings} selected={selected} onOpenDetail={onOpenDetail} />
                 </Disclosure>
             )}
+            <TariffTypeLegend types={types} />
         </div>
     )
 }

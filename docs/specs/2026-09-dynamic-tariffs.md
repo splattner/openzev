@@ -722,7 +722,7 @@ label, fetch status, disabled state, last success and user-safe fetch error
 up front. Failed fetches use the shared red `badge-danger` pill, matching
 failed source statuses in the admin source table, its activity dialog and audit logs.
 The endpoint, protocol, component/product, stored range/point
-count and global linked-tariff/ZEV totals sit in a “Source details” disclosure. A positive point count shows stored coverage and a gap
+count and global linked-tariff/ZEV totals are shown directly under the status, not in a disclosure. A positive point count shows stored coverage and a gap
 hint; zero points show “No stored prices yet.” Last success is shown only when
 its timestamp is present. The history panel is scoped to the shown tariff's validity.
 When the stored series has no price for time that has already passed, the summary

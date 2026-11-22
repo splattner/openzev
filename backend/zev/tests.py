@@ -2402,6 +2402,20 @@ class SeedDemoTariffVersionTests(TestCase):
 			date(2025, 3, 31), date(2026, 3, 31), None,
 		])
 
+	def test_a_scheduled_change_follows_the_version_in_force(self):
+		"""Only a tariff whose spec carries upcoming prices gets one, and only
+		when the caller says when it starts."""
+		starts = date(2026, 12, 22)
+		SeedDemoCommand()._seed_tariffs(self.zev, self.valid_from, upcoming_from=starts)
+		versions = self._versions("Grid Energy HT/NT")
+		self.assertEqual([version.valid_from for version in versions][-2:], [date(2026, 4, 1), starts])
+		self.assertEqual(versions[-2].valid_to, date(2026, 12, 21))
+		self.assertIsNone(versions[-1].valid_to)
+		self.assertEqual(find_gaps(versions), [])
+		prices = {period.period_type: period.price_chf_per_kwh for period in versions[-1].periods.all()}
+		self.assertEqual(prices, {PeriodType.HIGH: Decimal("0.30975"), PeriodType.LOW: Decimal("0.23625")})
+		self.assertEqual(len(self._versions("Local Solar Energy")), 3)
+
 	def test_the_active_version_carries_the_current_prices(self):
 		"""History is added behind the billed window, so invoices generated from
 		the seed bill exactly what they billed before it existed."""
