@@ -285,7 +285,7 @@ $$\text{Invoice Total} = \text{Subtotal} + \text{VAT}$$
 flowchart TD
   A[Start invoice generation] --> B[Load participant IN/OUT readings in period]
   B --> C[Load ZEV total IN/OUT per timestamp]
-  C --> D[Load active tariffs + tariff periods]
+  C --> D[Load active tariffs + price bands]
   D --> E[For each participant IN reading timestamp]
   E --> F[Compute local pool = min ZEV production, ZEV consumption]
   F --> G[Allocate participant local share proportionally]
