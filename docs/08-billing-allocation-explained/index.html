@@ -2436,7 +2436,7 @@ $<span class="arithmatex">\(\text{Invoice Total} = \text{Subtotal} + \text{VAT}\
 <pre class="mermaid"><code>flowchart TD
   A[Start invoice generation] --&gt; B[Load participant IN/OUT readings in period]
   B --&gt; C[Load ZEV total IN/OUT per timestamp]
-  C --&gt; D[Load active tariffs + tariff periods]
+  C --&gt; D[Load active tariffs + price bands]
   D --&gt; E[For each participant IN reading timestamp]
   E --&gt; F[Compute local pool = min ZEV production, ZEV consumption]
   F --&gt; G[Allocate participant local share proportionally]
