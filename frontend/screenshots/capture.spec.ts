@@ -345,8 +345,7 @@ test.describe('User Guide Screenshots', () => {
   })
 
   // 07b — A tariff's detail pane: the version in force, the scheduled change opened
-  // beside it and the history with its price chart (capture.setup.ts schedules the
-  // change).
+  // beside it and the history with its price chart (the seed schedules the change).
   test('07b-tariff-versions', async ({ page }) => {
     await navigateTo(page, '/tariffs')
     const row = page.getByRole('button', { name: 'Grid Energy HT/NT', expanded: false }).first()
