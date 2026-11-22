@@ -262,7 +262,8 @@ on the spring day there is no 02:xx reading.
 5. **Fallback:** when there is no catch-all either, the day's **first band in
    this season** — `periods[0]` under the ordering above, which is the earliest
    window. Preferring an in-season band matters once seasons exist: billing a
-   January night at the summer rate would be the worse guess. A tariff without
+   January night at the summer rate would be the worse guess. When no band is
+   in season at all, the tariff's first band overall. A tariff without
    a catch-all band prices exactly as before step 4 existed.
 
 Validation (`TariffPeriodSerializer._reject_ambiguous_catch_all`): a non-flat
@@ -450,6 +451,10 @@ Frontend: `frontend/tests/tariff-band-coverage.test.ts` (16) covers catch-all
 coverage, weekday-restricted catch-alls and catch-all overlaps;
 `frontend/tests/tariff-rate-lines.test.ts` covers "all other hours" in the
 rate lines.
+
+**Shared band scenarios.** The cases in
+[`backend/tariffs/testdata/band-resolution.json`](../../backend/tariffs/testdata/README.md#band-resolutionjson)
+check billing's band selection and the coverage warning's gaps and fallback band.
 
 **Tests (§3.2c).** `backend/tariffs/test_multi_band_periods.py` (13): a
 three-band tariff pricing each window and its boundaries; bands read back in
