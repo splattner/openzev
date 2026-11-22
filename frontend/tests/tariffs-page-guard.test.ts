@@ -6,17 +6,33 @@ import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { TariffsHubPage } from '../src/pages/TariffsHubPage'
 import { queryKeys } from '../src/lib/api/queryKeys'
+import { hasUnsavedZevSettingsDraft } from '../src/lib/zevUnsavedGuard'
 import { setInputValue } from './helpers/render'
 import { waitForCondition } from './helpers/waitForCondition'
 import type { TariffSeries, TariffVersion } from '../src/types/api'
 
 const api = vi.hoisted(() => ({ fetchSeries: vi.fn(), save: vi.fn(), remove: vi.fn() }))
+// The selected community, changeable like the real context.
+const scope = vi.hoisted(() => {
+    const listeners = new Set<() => void>()
+    return {
+        zevId: 'z',
+        subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } },
+        set(id: string) { this.zevId = id; listeners.forEach((listener) => listener()) },
+    }
+})
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
 vi.mock('../src/lib/auth', () => ({ useAuth: () => ({ user: { id: 1, role: 'admin' } }) }))
 vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast: vi.fn() }) }))
-vi.mock('../src/lib/managedZev', () => ({
-    useManagedZev: () => ({ selectedZevId: 'z', selectedZev: { id: 'z', name: 'Z', vat_mode: 'exclusive' } }),
-}))
+vi.mock('../src/lib/managedZev', async () => {
+    const { useSyncExternalStore } = await import('react')
+    return {
+        useManagedZev: () => {
+            const zevId = useSyncExternalStore(scope.subscribe, () => scope.zevId)
+            return { selectedZevId: zevId, selectedZev: { id: zevId, name: 'Z', vat_mode: 'exclusive' } }
+        },
+    }
+})
 vi.mock('../src/lib/communityAccess', () => ({
     useCommunityAccess: () => ({ isZevScope: true, canWriteSelectedCommunity: true }),
     useScopeNote: () => undefined,
@@ -80,6 +96,7 @@ beforeAll(async () => { await import('../src/pages/TariffsPage') })
 
 beforeEach(async () => {
     vi.clearAllMocks()
+    scope.zevId = 'z'
     shown = [grid, levy]
     api.fetchSeries.mockImplementation(async () => shown)
     api.remove.mockResolvedValue(undefined)
@@ -257,4 +274,33 @@ it('lets an import run while a save is in flight: the save still lands on its ta
     await land(version('grid', 'Grid (changed)'))
     await waitForCondition(() => priceInput() === null, 'form closed after the save')
     expect(router.state.location.search).toContain('Grid')
+})
+
+// The community switcher
+
+it('tells the community switcher about a changed draft, and stops once the page is left', async () => {
+    expect(hasUnsavedZevSettingsDraft()).toBe(false)
+    await openEditForm('')
+    expect(hasUnsavedZevSettingsDraft()).toBe(false)
+    await act(async () => setInputValue(priceInput()!, '12.50'))
+    expect(hasUnsavedZevSettingsDraft()).toBe(true)
+    await act(async () => { void router.navigate('/other') })
+    await click(dialogButton('common.unsavedChanges.discard') ?? null)
+    expect(hasUnsavedZevSettingsDraft()).toBe(false)
+})
+
+it('tells the community switcher about a save in flight from an unchanged form', async () => {
+    holdSave()
+    await openEditForm('')
+    await submit()
+    expect(api.save).toHaveBeenCalledOnce()
+    expect(hasUnsavedZevSettingsDraft()).toBe(true)
+})
+
+it('closes an open form when the community changes', async () => {
+    await click([...container.querySelectorAll('button')].find((button) => button.textContent === 'pages.tariffs.newTariff') ?? null)
+    expect(q('.tariff-pane-form')).not.toBeNull()
+    await act(async () => scope.set('other'))
+    expect(q('.tariff-pane-form')).toBeNull()
+    expect(hasUnsavedZevSettingsDraft()).toBe(false)
 })

@@ -14,6 +14,7 @@ import { TariffActions } from '../features/tariffs/TariffActions'
 import { TariffVersionForm } from '../features/tariffs/TariffVersionForm'
 import { useTariffVersions } from '../features/tariffs/useTariffVersions'
 import { useDraftGuard, allowNavigation } from '../components/useDraftGuard'
+import { setZevUnsavedDraftGuard } from '../lib/zevUnsavedGuard'
 import { listedVersion, tariffOverview } from '../features/tariffs/validity'
 import { seriesKeyOf } from '../features/tariffs/useTariffDisplay'
 import { tariffOverviewFilename, tariffOverviewParams, type TariffValidityFilter } from '../features/tariffs/tariffOverview'
@@ -232,9 +233,10 @@ export function TariffsPage() {
     const editor: EditorKind | null = versions.dialog?.kind
         ?? (tariffFormOpen ? (editingTariffId ? 'edit' : 'create') : periodFormOpen ? 'period' : null)
     const [formDirty, setFormDirty] = useState(false)
+    const dirty = editor !== null && formDirty
     const saving = editor !== null && (tariffPending || periodPending || versions.isPending)
     const guard = useDraftGuard({
-        dirty: editor !== null && formDirty,
+        dirty,
         saving,
         confirm,
         bypass: bypassGuard,
@@ -245,6 +247,12 @@ export function TariffsPage() {
         closePeriodForm()
         versions.closeDialog()
     }
+
+    // Shared with the community switcher in the hub header.
+    useEffect(() => {
+        setZevUnsavedDraftGuard(dirty || saving)
+        return () => setZevUnsavedDraftGuard(false)
+    }, [dirty, saving])
 
     function beginEditing(actionKey: string, open: () => void) {
         returnFocusAction.current = actionKey

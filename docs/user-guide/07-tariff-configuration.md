@@ -92,7 +92,7 @@ a failed community refresh keeps the loaded scope and your open draft available.
 
 **Managers** create tariffs in **Tariffs**.
 
-Switching community or losing write access closes the open tariff pane, its form and any import dialog or delete confirmation. Save your draft before switching.
+Switching community asks first when a tariff form has unsaved changes or a save is still running. Switching community or losing write access closes the open tariff pane, its form and any import dialog or delete confirmation.
 
 The forms for creating and changing tariffs open in the detail pane, in the
 place you were just looking at the tariff, and the list stays beside them.
