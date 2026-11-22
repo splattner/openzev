@@ -22,3 +22,12 @@ of anything.
 Synthetic documents for shapes this one does not contain — seasonal prices,
 dynamic tariffs, three-price bands, the NNMV-CH annex's drifted spellings —
 are built inline in `tariffs/test_vse_import.py`.
+
+## `band-resolution.json`
+
+Synthetic schedule cases. `test_band_resolution_contract.py` checks that
+`resolve_band` bills each sample at `band_id`, including fallback;
+`frontend/tests/tariff-band-resolution-contract.test.ts` checks that the coverage
+warning's `bandCoverage` reports a gap exactly where `covered` is false and names
+`band_id` as its fallback. `at` is Swiss wall-clock time without an offset; both
+tests read it without zone conversion. Fixed UUIDs make tie cases deterministic.

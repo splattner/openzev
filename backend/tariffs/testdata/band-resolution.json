@@ -1,0 +1,98 @@
+[
+  {
+    "name": "weekday overnight and half-open boundaries",
+    "bands": [
+      {"id": "00000000-0000-4000-8000-000000000001", "period_type": "high", "time_from": "07:00", "time_to": "21:00", "weekdays": "0,1,2,3,4", "months": ""},
+      {"id": "00000000-0000-4000-8000-000000000002", "period_type": "low", "time_from": "22:00", "time_to": "06:00", "weekdays": "0,1,2,3,4", "months": ""}
+    ],
+    "samples": [
+      {"at": "2026-10-23T05:00:00", "band_id": "00000000-0000-4000-8000-000000000002", "covered": true},
+      {"at": "2026-10-23T06:00:00", "band_id": "00000000-0000-4000-8000-000000000001", "covered": false},
+      {"at": "2026-10-23T21:30:00", "band_id": "00000000-0000-4000-8000-000000000001", "covered": false},
+      {"at": "2026-10-23T22:00:00", "band_id": "00000000-0000-4000-8000-000000000002", "covered": true},
+      {"at": "2026-10-24T05:00:00", "band_id": "00000000-0000-4000-8000-000000000001", "covered": false}
+    ]
+  },
+  {
+    "name": "equal endpoints cover a full day",
+    "bands": [
+      {"id": "00000000-0000-4000-8000-000000000001", "period_type": "band", "time_from": "00:00", "time_to": "00:00", "weekdays": "5,6", "months": ""},
+      {"id": "00000000-0000-4000-8000-000000000002", "period_type": "band", "time_from": "00:00", "time_to": "00:00", "weekdays": "0,1,2,3,4", "months": ""}
+    ],
+    "samples": [
+      {"at": "2026-10-26T00:00:00", "band_id": "00000000-0000-4000-8000-000000000002", "covered": true},
+      {"at": "2026-10-26T23:45:00", "band_id": "00000000-0000-4000-8000-000000000002", "covered": true},
+      {"at": "2026-10-24T12:00:00", "band_id": "00000000-0000-4000-8000-000000000001", "covered": true}
+    ]
+  },
+  {
+    "name": "flat ignores time and weekday but respects season",
+    "bands": [
+      {"id": "00000000-0000-4000-8000-000000000001", "period_type": "flat", "time_from": "07:00", "time_to": "08:00", "weekdays": "0", "months": "1,2,3"},
+      {"id": "00000000-0000-4000-8000-000000000002", "period_type": "high", "time_from": "07:00", "time_to": "21:00", "weekdays": "", "months": "4,5,6,7,8,9"}
+    ],
+    "samples": [
+      {"at": "2026-01-04T23:00:00", "band_id": "00000000-0000-4000-8000-000000000001", "covered": true},
+      {"at": "2026-06-01T08:00:00", "band_id": "00000000-0000-4000-8000-000000000002", "covered": true},
+      {"at": "2026-06-01T23:00:00", "band_id": "00000000-0000-4000-8000-000000000002", "covered": false},
+      {"at": "2026-10-26T08:00:00", "band_id": "00000000-0000-4000-8000-000000000001", "covered": false}
+    ]
+  },
+  {
+    "name": "saved ties use UUID order",
+    "bands": [
+      {"id": "00000000-0000-4000-8000-000000000002", "period_type": "high", "time_from": "07:00", "time_to": "21:00", "weekdays": "", "months": ""},
+      {"id": "00000000-0000-4000-8000-000000000001", "period_type": "high", "time_from": "07:00", "time_to": "21:00", "weekdays": "", "months": ""}
+    ],
+    "samples": [
+      {"at": "2026-10-26T08:00:00", "band_id": "00000000-0000-4000-8000-000000000001", "covered": true},
+      {"at": "2026-10-26T23:00:00", "band_id": "00000000-0000-4000-8000-000000000001", "covered": false}
+    ]
+  },
+  {
+    "name": "untimed band prices all other hours",
+    "bands": [
+      {"id": "00000000-0000-4000-8000-000000000001", "period_type": "high", "time_from": "07:00", "time_to": "21:00", "weekdays": "0,1,2,3,4", "months": ""},
+      {"id": "00000000-0000-4000-8000-000000000002", "period_type": "low", "time_from": null, "time_to": null, "weekdays": "", "months": ""}
+    ],
+    "samples": [
+      {"at": "2026-10-26T12:00:00", "band_id": "00000000-0000-4000-8000-000000000001", "covered": true},
+      {"at": "2026-10-26T23:00:00", "band_id": "00000000-0000-4000-8000-000000000002", "covered": true},
+      {"at": "2026-10-24T12:00:00", "band_id": "00000000-0000-4000-8000-000000000002", "covered": true}
+    ]
+  },
+  {
+    "name": "untimed band respects weekday mask",
+    "bands": [
+      {"id": "00000000-0000-4000-8000-000000000001", "period_type": "high", "time_from": "07:00", "time_to": "21:00", "weekdays": "0,1,2,3,4", "months": ""},
+      {"id": "00000000-0000-4000-8000-000000000002", "period_type": "low", "time_from": null, "time_to": null, "weekdays": "5,6", "months": ""}
+    ],
+    "samples": [
+      {"at": "2026-10-24T05:00:00", "band_id": "00000000-0000-4000-8000-000000000002", "covered": true},
+      {"at": "2026-10-26T12:00:00", "band_id": "00000000-0000-4000-8000-000000000001", "covered": true},
+      {"at": "2026-10-26T23:00:00", "band_id": "00000000-0000-4000-8000-000000000001", "covered": false}
+    ]
+  },
+  {
+    "name": "untimed band respects month mask",
+    "bands": [
+      {"id": "00000000-0000-4000-8000-000000000001", "period_type": "high", "time_from": "07:00", "time_to": "21:00", "weekdays": "", "months": ""},
+      {"id": "00000000-0000-4000-8000-000000000002", "period_type": "low", "time_from": null, "time_to": null, "weekdays": "", "months": "11,12,1,2,3"}
+    ],
+    "samples": [
+      {"at": "2026-12-01T23:00:00", "band_id": "00000000-0000-4000-8000-000000000002", "covered": true},
+      {"at": "2026-06-02T23:00:00", "band_id": "00000000-0000-4000-8000-000000000001", "covered": false}
+    ]
+  },
+  {
+    "name": "untimed high band is a catch-all",
+    "bands": [
+      {"id": "00000000-0000-4000-8000-000000000001", "period_type": "high", "time_from": null, "time_to": null, "weekdays": "", "months": ""},
+      {"id": "00000000-0000-4000-8000-000000000002", "period_type": "low", "time_from": "21:00", "time_to": "07:00", "weekdays": "", "months": ""}
+    ],
+    "samples": [
+      {"at": "2026-10-26T12:00:00", "band_id": "00000000-0000-4000-8000-000000000001", "covered": true},
+      {"at": "2026-10-26T23:00:00", "band_id": "00000000-0000-4000-8000-000000000002", "covered": true}
+    ]
+  }
+]
