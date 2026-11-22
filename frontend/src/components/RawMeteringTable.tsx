@@ -1,7 +1,7 @@
 import { SortableHeader, useTableSorting } from './tableSorting'
 import { Badge } from './Badge'
 import { useQuery } from '@tanstack/react-query'
-import { CHART_LOCAL, CONS_COLORS } from '../lib/chartTokens'
+import { CHART_CONSUMPTION, CHART_LOCAL } from '../lib/chartTokens'
 import { CHART_AXIS_TICK } from '../lib/chartTheme'
 import { formatNumber } from '../lib/numbers'
 import { Fragment, useId, useState } from 'react'
@@ -385,9 +385,9 @@ function DaySparkline({
                             type="monotone"
                             dataKey="in"
                             name={labels.in}
-                            stroke={CONS_COLORS[0]}
+                            stroke={CHART_CONSUMPTION}
                             strokeWidth={1.5}
-                            fill={CONS_COLORS[0]}
+                            fill={CHART_CONSUMPTION}
                             fillOpacity={0.12}
                             dot={false}
                             isAnimationActive={false}

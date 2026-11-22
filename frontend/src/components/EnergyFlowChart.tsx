@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { CHART_GRID, CHART_INK, CHART_MUTED, CONS_COLORS, FLOW_GRID_EXP, FLOW_LOCAL_CONS, OTHERS_COLOR, PROD_COLORS } from '../lib/chartTokens'
+import { CHART_GRID, CHART_INK, CHART_LOCAL, CHART_MUTED, CONS_COLORS, FLOW_GRID_EXP, OTHERS_COLOR, PROD_COLORS } from '../lib/chartTokens'
 import { formatKwh, formatPercent } from '../lib/numbers'
 
 interface EnergyFlowChartProps {
@@ -227,7 +227,7 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
                 id: 'local-cons',
                 label: t('pages.dashboard.energyFlow.localConsumption'),
                 value: localCons,
-                color: FLOW_LOCAL_CONS,
+                color: CHART_LOCAL,
                 col: 2,
                 pct: formatPercent(selfConsumptionPct),
             })
@@ -327,7 +327,7 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
 
         // Col 1 -> Col 2: total production -> local consumption + grid export
         if (nMap['total-prod'] && nMap['local-cons']) {
-            rawLinks.push({ id: 'total-prod->local-cons', sourceId: 'total-prod', targetId: 'local-cons', value: localCons, color: FLOW_LOCAL_CONS })
+            rawLinks.push({ id: 'total-prod->local-cons', sourceId: 'total-prod', targetId: 'local-cons', value: localCons, color: CHART_LOCAL })
         }
         if (nMap['total-prod'] && nMap['grid-export']) {
             rawLinks.push({ id: 'total-prod->grid-export', sourceId: 'total-prod', targetId: 'grid-export', value: gridExport, color: FLOW_GRID_EXP })
@@ -339,7 +339,7 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
                 if (c.from_zev_kwh < 0.01) continue
                 const tid = `cons-${c.participant_id}`
                 if (!nMap[tid]) continue
-                rawLinks.push({ id: `local-cons->${tid}`, sourceId: 'local-cons', targetId: tid, value: c.from_zev_kwh, color: FLOW_LOCAL_CONS })
+                rawLinks.push({ id: `local-cons->${tid}`, sourceId: 'local-cons', targetId: tid, value: c.from_zev_kwh, color: CHART_LOCAL })
             }
         }
 
@@ -487,7 +487,7 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
                                 <text x={x + BAR_W / 2} y={n.y + n.h + 14} textAnchor="middle" fontSize={10} fill={CHART_INK}>{n.label}</text>
                                 <text x={x + BAR_W / 2} y={n.y + n.h + 26} textAnchor="middle" fontSize={9} fill={CHART_MUTED}>{formatKwh(n.value)} kWh</text>
                                 {n.pct && (
-                                    <text x={x + BAR_W / 2} y={n.y + n.h + 38} textAnchor="middle" fontSize={10} fontWeight={600} fill={n.color}>{n.pct}</text>
+                                    <text x={x + BAR_W / 2} y={n.y + n.h + 38} textAnchor="middle" fontSize={10} fontWeight={600} fill={CHART_INK}>{n.pct}</text>
                                 )}
                             </>
                         )}

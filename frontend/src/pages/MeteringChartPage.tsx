@@ -38,7 +38,7 @@ import { daysInPeriod, formatBusinessIsoDate } from '../lib/dates'
 import { formatKwh } from '../lib/numbers'
 import { formatMeteringBucketLabel, meteringPointOptionLabel, outReadingLabelKey } from '../lib/meteringLabels'
 import type { AppSettings, ChartDataPoint, DataQualitySeverity, MeteringPoint, MeteringPointDataQuality } from '../types/api'
-import { AXIS_COLOR, CHART_GRID, CHART_GRIDLINE, CONS_COLORS, NEGATIVE_COLOR, PROD_COLORS } from '../lib/chartTokens'
+import { AXIS_COLOR, CHART_CONSUMPTION, CHART_GRIDLINE, CHART_LOCAL, DIVERGING_POSITIVE, NEGATIVE_COLOR } from '../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../lib/chartTheme'
 import { selectedCommunityName } from '../lib/membership'
 import { PageHeader } from '../components/PageHeader'
@@ -474,7 +474,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
                             <div
                                 style={{
                                     height: '100%',
-                                    background: mp.severity === 'green' ? PROD_COLORS[0] : mp.severity === 'yellow' ? CHART_GRID : NEGATIVE_COLOR,
+                                    background: mp.severity === 'green' ? DIVERGING_POSITIVE : mp.severity === 'yellow' ? CHART_LOCAL : NEGATIVE_COLOR,
                                     width: `${mp.data_completeness}%`,
                                 }}
                             />
@@ -750,11 +750,11 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
                                                 <Tooltip
                                                     content={<CustomTooltip resolution={effectiveBucket} settings={settings} />}
                                                 />
-                                                <Legend />
+                                                <Legend itemSorter={null} />
                                                 <Bar
                                                     dataKey="in_kwh"
                                                     name={t('pages.meteringData.series.consumption')}
-                                                    fill={CONS_COLORS[0]}
+                                                    fill={CHART_CONSUMPTION}
                                                     radius={[3, 3, 0, 0]}
                                                     maxBarSize={48}
                                                 />
@@ -762,7 +762,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
                                                     <Bar
                                                         dataKey="out_kwh"
                                                         name={t(outReadingLabelKey(selectedMp?.meter_type, 'pages.meteringData.series.production', 'pages.meteringData.series.feedIn'))}
-                                                        fill={PROD_COLORS[0]}
+                                                        fill={CHART_LOCAL}
                                                         radius={[3, 3, 0, 0]}
                                                         maxBarSize={48}
                                                     />
