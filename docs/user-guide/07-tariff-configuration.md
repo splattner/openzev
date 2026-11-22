@@ -5,8 +5,8 @@ This guide covers setting up tariffs and pricing in OpenZEV.
 The **Tariffs** page has two tabs: **Tariff components** to manage
 individual tariffs, and **Price progression** for their combined prices over time.
 
-Column headings sort tariffs within their categories. In card view, sorting
-controls appear beside the category name and wrap when needed. Price uses the lowest
+Column headings sort tariffs within their categories. When the list is narrow (a
+small screen, or a tariff open beside it), it shows cards, which cannot be sorted. Price uses the lowest
 listed CHF rate for a multi-band tariff; unavailable prices stay last. Unit sorts
 by kWh, month or year. **Applies** stays a plain heading because it can describe
 several schedules. Import
@@ -762,9 +762,9 @@ own card, the one in force first:
 
 ![A tariff's current version and the scheduled change](screenshots/07e-tariff-scheduled-change.png)
 
-**History** is folded away under the cards, with the number of ended versions.
+**History** is folded away under the cards.
 Open it for the price chart and the list of past versions with their window and
-price; click one to show its card — marked **Ended** — underneath. A tariff
+price; click one to show its card underneath. A tariff
 without ended versions has no history. Switching versions in the pane does not
 change the version shown in the list.
 
