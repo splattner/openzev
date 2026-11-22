@@ -1849,16 +1849,21 @@ accessible name is `nav.chooseZevCurrent` ("Choose (v)ZEV, current:
 the trigger on Escape or selection, and outside-click dismissal are the
 menu's. Arrow-key navigation skips the disabled current item; the trigger's
 accessible name announces the current community.
-When the ZEV settings draft is dirty, selecting a different community
-opens `ConfirmDialog` (portalled to `document.body`, since the scope line is a
-paragraph): Cancel keeps the current selection and edits; Switch without
-saving changes the selection and drops the draft. Switching with a clean draft
-opens no confirmation.
+When the ZEV settings draft or the tariff form is dirty, or a tariff save is
+in flight, selecting a different community opens `ConfirmDialog` (portalled to
+`document.body`, since the scope line is a paragraph): Cancel keeps the
+current selection and edits; Switch without saving changes the selection and
+drops the draft. A save in flight keeps running in the community it was sent
+from; its completion no longer touches the page. With nothing unsaved and no
+save in flight, the switch opens no confirmation.
 The switch always shows as a small button (a pill in the kicker's type), so it
 reads as a control without motion or stored state.
-`ZevSettingsPage` publishes and clears this state through `zevUnsavedGuard`;
+`ZevSettingsPage` and `TariffsPage` publish and clear this state through
+`zevUnsavedGuard`. Changing community closes the tariff pane and its forms.
 `community-switcher.test.ts` covers the list, the relation labels, the plain
-fallbacks, the dirty-draft flow and fixed selections. The community cases in
+fallbacks, the dirty-draft flow and fixed selections;
+`tariffs-page-guard.test.ts` covers publishing a changed draft or a save in
+flight, and closing an open form on a community change. The community cases in
 `screenshots/layout-overflow.spec.ts` cover named switch targets at desktop and
 phone widths, keyboard navigation past the disabled current item, selection,
 and focus return on Escape. Pages with the switch:

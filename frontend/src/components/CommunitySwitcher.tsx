@@ -28,8 +28,8 @@ function CommunityMenu({ name, managedZev }: {
     const { entries, selectedZevId, isSelectable, setSelectedZevId } = managedZev
     const currentName = entries.find((entry) => entry.id === selectedZevId)?.name
 
-    // A dirty settings draft lives in ZevSettingsPage; confirm before the
-    // switch drops it. Clean switches go through immediately.
+    // The open page publishes unsaved state through zevUnsavedGuard; confirm
+    // before the switch drops it. Clean switches go through immediately.
     function requestSwitch(zevId: string) {
         if (zevId === selectedZevId) {
             return
