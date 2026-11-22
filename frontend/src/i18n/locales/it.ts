@@ -2899,7 +2899,6 @@ export const it = {
             noCoverage: "Nessun prezzo memorizzato per ora.",
             coverageHint: 'I dati memorizzati possono contenere lacune.',
             manageSource: 'Gestisci la fonte nell’amministrazione della piattaforma',
-            sourceDetails: 'Dettagli della fonte',
             showAllSources: "Mostra tutte le fonti",
             sourceFilter: 'Fonte: {{label}}',
             sourceNotFound: 'Fonte non trovata.',

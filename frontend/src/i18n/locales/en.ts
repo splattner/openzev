@@ -2910,7 +2910,6 @@ export const en = {
             noCoverage: "No stored prices yet.",
             coverageHint: 'Stored coverage may contain gaps.',
             manageSource: 'Manage source in platform admin',
-            sourceDetails: 'Source details',
             showAllSources: "Show all sources",
             sourceFilter: 'Source: {{label}}',
             sourceNotFound: 'Source not found.',

@@ -2,15 +2,13 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { formatDateTime } from '../../lib/appSettings'
 import type { AppSettings, DynamicPriceHistory, DynamicTariffSource } from '../../types/api'
-import { Disclosure } from '../../components/Disclosure'
 import { DynamicFetchFailure } from './DynamicFetchFailure'
 import { Badge } from '../../components/Badge'
 import { missingPriceDates, missingRangeLabel } from './dynamicPriceGaps'
 
 /**
- * Shared-source facts beside the linked tariff: which source and whether it is
- * delivering, up front; where it is fetched from and what it covers, on
- * demand. Maintenance stays in the platform hub, which only an admin can open.
+ * Shared-source facts beside the linked tariff. Maintenance stays in the
+ * platform hub, which only an admin can open.
  *
  * `missing` are the stretches of already-elapsed time the stored series has no
  * price for (see `useElapsedPriceGaps`); they are said up front, as dates.
@@ -46,27 +44,23 @@ export function DynamicSourceSummary({ source, settings, canOperate, missing = [
                     <p className="m-0">{t('pages.dynamicSources.history.missingEffect')}</p>
                 </div>
             )}
-            <Disclosure lazy summary={t('pages.dynamicSources.sourceDetails')}>
-                <div className="tariff-source-summary">
-                    <p className="muted" style={{ margin: 0, overflowWrap: 'anywhere' }}>{source.url}</p>
-                    <p className="muted m-0">
-                        {t(`pages.dynamicSources.versions.${source.api_version}`)}
-                        {' · '}{t(`pages.dynamicSources.types.${source.tariff_type}`)}
-                        {source.tariff_name ? ` · ${source.tariff_name}` : ''}
-                    </p>
-                    <p className="muted m-0">
-                        {source.point_count > 0 ? t('pages.dynamicSources.history.coverage', {
-                            from: formatDateTime(source.covers_from, settings),
-                            to: formatDateTime(source.covers_to, settings),
-                            count: source.point_count,
-                        }) : t('pages.dynamicSources.noCoverage')}
-                        {source.point_count > 0 && <>{' · '}{t('pages.dynamicSources.coverageHint')}</>}
-                    </p>
-                    <p className="muted m-0">
-                        {t('pages.dynamicSources.globalReuseSummary', { tariffs: source.linked_tariff_count, zevs: source.linked_zev_count })}
-                    </p>
-                </div>
-            </Disclosure>
+            <p className="muted" style={{ margin: 0, overflowWrap: 'anywhere' }}>{source.url}</p>
+            <p className="muted m-0">
+                {t(`pages.dynamicSources.versions.${source.api_version}`)}
+                {' · '}{t(`pages.dynamicSources.types.${source.tariff_type}`)}
+                {source.tariff_name ? ` · ${source.tariff_name}` : ''}
+            </p>
+            <p className="muted m-0">
+                {source.point_count > 0 ? t('pages.dynamicSources.history.coverage', {
+                    from: formatDateTime(source.covers_from, settings),
+                    to: formatDateTime(source.covers_to, settings),
+                    count: source.point_count,
+                }) : t('pages.dynamicSources.noCoverage')}
+                {source.point_count > 0 && <>{' · '}{t('pages.dynamicSources.coverageHint')}</>}
+            </p>
+            <p className="muted m-0">
+                {t('pages.dynamicSources.globalReuseSummary', { tariffs: source.linked_tariff_count, zevs: source.linked_zev_count })}
+            </p>
         </div>
     )
 }

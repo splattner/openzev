@@ -409,9 +409,7 @@ test.describe('User Guide Screenshots', () => {
     await screenshotFull(page, '07f-tariff-create-bands')
   })
 
-  // 07d — A dynamic tariff's detail pane: its source with the details
-  // disclosure opened, and the fetched prices below it. Their point table is
-  // paged (12 rows), so opening it does not grow the capture.
+  // 07d — Dynamic source and fetched prices.
   test('07d-tariff-dynamic-source', async ({ page }) => {
     await requireDemoDynamicSource(page)
     await navigateTo(page, '/tariffs')
@@ -419,9 +417,7 @@ test.describe('User Guide Screenshots', () => {
     await row.waitFor({ timeout: 10_000 })
     await row.click()
     const pane = page.locator('.detail-pane')
-    const details = pane.locator('.tariff-period-section .disclosure > summary').first()
-    await details.click()
-    await expect(pane.locator('.tariff-period-section .disclosure[open]'), `Dynamic source details missing — ${SEED_HINT}`).toBeVisible()
+    await expect(pane.locator('.tariff-source-summary'), `Dynamic source details missing — ${SEED_HINT}`).toContainText('https://')
     await pane.locator('.disclosure > summary', { hasText: 'Abgerufene Intervallpreise' }).click()
     await expect(pane.locator('.data-table tbody tr'), `Fetched prices missing — ${SEED_HINT}`).toHaveCount(12)
     await screenshotFull(page, '07d-tariff-dynamic-source')

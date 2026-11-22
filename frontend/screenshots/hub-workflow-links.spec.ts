@@ -106,9 +106,7 @@ for (const role of ['admin', 'manager', 'viewer'] as const) {
     await expect(drawer).toBeVisible()
     await expect(drawer).toContainText('Disabled')
     await expect(drawer).toContainText('Operator unavailable')
-    // Where the source is fetched from and what it covers sit in a disclosure.
-    await expect(drawer).not.toContainText('Across the platform')
-    await drawer.getByText('Source details', { exact: true }).click()
+    // Where the source is fetched from and what it covers are in view.
     await expect(drawer).toContainText('Across the platform: 7 tariffs · 3 ZEVs')
     await expect(drawer).toContainText('Stored coverage may contain gaps')
     const operations = drawer.getByRole('link', { name: 'Manage source in platform admin' })

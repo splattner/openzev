@@ -272,7 +272,7 @@ moment, negative prices included.
 Managers can choose an existing shared source or create a new source from
 the energy-tariff form. Viewers can inspect linked sources and price history.
 Click a dynamic tariff to see its source name, fetch status and last
-successful fetch. **Source details** unfolds the endpoint, protocol, product,
+successful fetch, followed by the endpoint, protocol, product,
 stored coverage and usage. Usage counts cover the whole platform.
 
 Below the source, the pane charts the fetched prices of the last 30 days of the
@@ -289,7 +289,7 @@ table, twelve rows at a time, with previous and next buttons under it.
 Administrators can follow **Manage source in platform admin** to its operational
 row; managers create and reuse sources in the tariff form.
 
-![A dynamic tariff's detail pane with its source details](screenshots/07d-tariff-dynamic-source.png)
+![A dynamic tariff's detail pane with its source facts](screenshots/07d-tariff-dynamic-source.png)
 
 ### Reading a dynamic tariff's price
 
