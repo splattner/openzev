@@ -73,10 +73,11 @@ export function useTariffDisplay(settings: AppSettings, today: string) {
      * version — so falling into the ordinary energy branch below would
      * always read "no bands configured" for one.
      */
-    function priceSummary(series: TariffSeries, version: TariffVersion): string {
+    function priceSummary(series: TariffSeries, version: TariffVersion, { includeSourceLabel = true }: { includeSourceLabel?: boolean } = {}): string {
         if (version.dynamic_source) {
             const source = sourceById.get(version.dynamic_source)
-            const sourceLabel = source
+            // Callers that already show the source section leave the label out.
+            const sourceLabel = includeSourceLabel && source
                 ? t('pages.tariffs.dynamicPricedFrom', { label: source.label })
                 : t('pages.tariffs.dynamicPriced')
             const minimumSuffix = version.minimum_price_chf_per_kwh

@@ -260,7 +260,7 @@ export function TariffDetailPane({
                 {open && <div id={bodyId} className="tariff-version-card-body">
                 {!hasBands && (
                     <p className="tariff-version-card-price" title={pricingTooltipFor(series, version, source)}>
-                        {priceSummary(series, version)}
+                        {priceSummary(series, version, { includeSourceLabel: !source })}
                         {deltas?.version && <> {change(deltas.version)}</>}
                     </p>
                 )}
