@@ -506,13 +506,25 @@ describe('ImportsPage wizard gating', () => {
         })
         expect(mutateCalls).toHaveLength(2)
         expect(container.textContent).toContain('pages.imports.wizard.overwriteConfirmTitle')
-        const confirmButtons = buttons('pages.imports.wizard.startImport')
+        expect(container.textContent).toContain('pages.imports.wizard.overwriteConfirmMessage pages.imports.wizard.overwriteConfirmConsequences')
         act(() => {
-            confirmButtons[confirmButtons.length - 1].click()
+            buttons('pages.imports.wizard.overwriteConfirmAction')[0].click()
         })
         expect(mutateCalls).toHaveLength(3)
         expect(mutateCalls[2].vars.overwriteExisting).toBe(true)
         expect(mutateCalls[2].vars.zevId).toBe('zev-1')
+    })
+
+    it('counts existing readings in the overwrite confirmation', () => {
+        goToStep2()
+        const overwriteCheckbox = container.querySelectorAll('input[type=checkbox]')[1] as HTMLInputElement
+        act(() => overwriteCheckbox.click())
+        loadPreview()
+        const preview = cleanPreview()
+        succeedPreview({ ...preview, summary: { ...preview.summary, readings_existing: 2 } })
+        act(() => startButton().click())
+        expect(translate).toHaveBeenCalledWith('pages.imports.wizard.overwriteConfirmMessageWithCount', expect.objectContaining({ count: 2 }))
+        expect(container.textContent).toContain('pages.imports.wizard.overwriteConfirmMessageWithCount pages.imports.wizard.overwriteConfirmConsequences')
     })
 
     it('shows a file summary and removes the file', () => {

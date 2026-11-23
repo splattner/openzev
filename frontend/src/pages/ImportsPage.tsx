@@ -836,15 +836,16 @@ export function ImportsContent() {
                 const messageKey = multiple
                     ? (withCount ? 'pages.imports.wizard.overwriteConfirmMessageMultiWithCount' : 'pages.imports.wizard.overwriteConfirmMessageMulti')
                     : (withCount ? 'pages.imports.wizard.overwriteConfirmMessageWithCount' : 'pages.imports.wizard.overwriteConfirmMessage')
+                const summary = t(messageKey, {
+                    zevName: selectedZev?.name ?? scopedZevId,
+                    filename: files[0].name,
+                    files: files.length,
+                    count: existingCount,
+                })
                 confirm({
                     title: t('pages.imports.wizard.overwriteConfirmTitle'),
-                    message: t(messageKey, {
-                        zevName: selectedZev?.name ?? scopedZevId,
-                        filename: files[0].name,
-                        files: files.length,
-                        count: existingCount,
-                    }),
-                    confirmText: t('pages.imports.wizard.startImport'),
+                    message: `${summary} ${t('pages.imports.wizard.overwriteConfirmConsequences')}`,
+                    confirmText: t('pages.imports.wizard.overwriteConfirmAction'),
                     isDangerous: true,
                     onConfirm: doUpload,
                 })
