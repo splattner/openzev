@@ -77,7 +77,7 @@ export function TwoFactorSection({ onRemoveTotp, onRemovePasskey }: Props) {
                     </p>
                     <button
                         type="button"
-                        className="button button-secondary button-compact"
+                        className="button button-secondary"
                         disabled={regenerateMutation.isPending}
                         onClick={() => regenerateMutation.mutate()}
                     >
