@@ -845,7 +845,7 @@ export function ImportsContent() {
                 confirm({
                     title: t('pages.imports.wizard.overwriteConfirmTitle'),
                     message: `${summary} ${t('pages.imports.wizard.overwriteConfirmConsequences')}`,
-                    confirmText: t('pages.imports.wizard.startImport'),
+                    confirmText: t('pages.imports.wizard.overwriteConfirmAction'),
                     isDangerous: true,
                     onConfirm: doUpload,
                 })

@@ -507,9 +507,8 @@ describe('ImportsPage wizard gating', () => {
         expect(mutateCalls).toHaveLength(2)
         expect(container.textContent).toContain('pages.imports.wizard.overwriteConfirmTitle')
         expect(container.textContent).toContain('pages.imports.wizard.overwriteConfirmMessage pages.imports.wizard.overwriteConfirmConsequences')
-        const confirmButtons = buttons('pages.imports.wizard.startImport')
         act(() => {
-            confirmButtons[confirmButtons.length - 1].click()
+            buttons('pages.imports.wizard.overwriteConfirmAction')[0].click()
         })
         expect(mutateCalls).toHaveLength(3)
         expect(mutateCalls[2].vars.overwriteExisting).toBe(true)

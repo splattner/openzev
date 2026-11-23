@@ -103,7 +103,7 @@ alike. Delimiter may be any single character (for example `,`, `;`, `|`, or tab)
    - Click **Load Preview**. Configuration changes, including toggling overwrite, invalidate the preview — reload before importing. Selecting or removing a file also requires a new preview. With several files, each gets its own preview section; one file with errors blocks the whole import, and a meter missing from any file is listed once.
    - Check **Metering point exists** per row; missing IDs are listed with copy/download actions and block **Start Import** until the meters exist.
    - Check **Direction**: where each row's readings will land — *Consumption (in)*, *Feed-in (out)*, or both when a bidirectional meter's row splits by sign. If a whole file shows the wrong direction, the **Direction column** mapping is wrong.
-   - Check **Existing data**: the database already holds that reading (standard rows), or the day already holds readings for that meter/direction (daily rows). Enabling overwrite shows an estimate of how many existing readings will be replaced; fully duplicate rows never block the import — they are skipped in skip mode; overwrite mode replaces only changed values. Identical values keep their original source and batch.
+   - Check **Existing data**: the database already holds that reading (standard rows), or the day already holds readings for that meter/direction (daily rows). Enabling overwrite shows how many existing readings the preview matched (identical values among them are skipped); fully duplicate rows never block the import — they are skipped in skip mode; overwrite mode replaces only changed values. Identical values keep their original source and batch.
    - Review **Errors**: parse failures and empty daily rows. Values above 99999999.9999 kWh are rejected: they cannot be stored. Partially duplicate daily rows show no error — the existing slots are skipped and missing ones are imported (gap-fill).
 
 5. **Review Import Options**
@@ -118,6 +118,7 @@ alike. Delimiter may be any single character (for example `,`, `;`, `|`, or tab)
 
 6. **Confirm Import**
    - Click **Start Import** (blocked while the preview is missing, outdated, has errors, or lists missing meters)
+   - With overwrite enabled, a confirmation names the files, the community and the preview's matching readings; click **Import and Overwrite** to proceed
    - The system writes data and shows a result notification. Imports with errors
      or overwrite notes also open **Import Protocol**; other protocols can be
      opened from the history table.
