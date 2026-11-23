@@ -2394,7 +2394,7 @@ alike. Delimiter may be any single character (for example <code>,</code>, <code>
 <li>Click <strong>Load Preview</strong>. Configuration changes, including toggling overwrite, invalidate the preview — reload before importing. Selecting or removing a file also requires a new preview. With several files, each gets its own preview section; one file with errors blocks the whole import, and a meter missing from any file is listed once.</li>
 <li>Check <strong>Metering point exists</strong> per row; missing IDs are listed with copy/download actions and block <strong>Start Import</strong> until the meters exist.</li>
 <li>Check <strong>Direction</strong>: where each row's readings will land — <em>Consumption (in)</em>, <em>Feed-in (out)</em>, or both when a bidirectional meter's row splits by sign. If a whole file shows the wrong direction, the <strong>Direction column</strong> mapping is wrong.</li>
-<li>Check <strong>Existing data</strong>: the database already holds that reading (standard rows), or the day already holds readings for that meter/direction (daily rows). Enabling overwrite shows an estimate of how many existing readings will be replaced; fully duplicate rows never block the import — they are skipped in skip mode; overwrite mode replaces only changed values. Identical values keep their original source and batch.</li>
+<li>Check <strong>Existing data</strong>: the database already holds that reading (standard rows), or the day already holds readings for that meter/direction (daily rows). Enabling overwrite shows how many existing readings the preview matched (identical values among them are skipped); fully duplicate rows never block the import — they are skipped in skip mode; overwrite mode replaces only changed values. Identical values keep their original source and batch.</li>
 <li>Review <strong>Errors</strong>: parse failures and empty daily rows. Values above 99999999.9999 kWh are rejected: they cannot be stored. Partially duplicate daily rows show no error — the existing slots are skipped and missing ones are imported (gap-fill).</li>
 </ul>
 </li>
@@ -2415,6 +2415,7 @@ alike. Delimiter may be any single character (for example <code>,</code>, <code>
 <p><strong>Confirm Import</strong></p>
 <ul>
 <li>Click <strong>Start Import</strong> (blocked while the preview is missing, outdated, has errors, or lists missing meters)</li>
+<li>With overwrite enabled, a confirmation names the files, the community and the preview's matching readings; click <strong>Import and Overwrite</strong> to proceed</li>
 <li>The system writes data and shows a result notification. Imports with errors
    or overwrite notes also open <strong>Import Protocol</strong>; other protocols can be
    opened from the history table.</li>
