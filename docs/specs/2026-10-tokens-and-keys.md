@@ -218,9 +218,12 @@ the old `?tab=api-keys` to `tokens`, so existing links keep working. `AccountPro
   first render (the admin's communities) still has a valid choice.
   Posts `{name, zev, participant?, expires_at}`. The secret panel shows the token and a ready-to-copy
   `curl` line for the series endpoint.
-- Shared `components/SecretReveal.tsx`: warning banner, token in a `<code>`, Copy and Dismiss, extra children.
-  Used by the account section and by `PushTokenPanel` (which keeps its endpoint and column hints as children), so
-  the "shown once" behaviour and styling exist once.
+- Shared `components/SecretReveal.tsx` shows a secret the server keeps only as a hash: its name, the value with
+  **Copy**, and a warning that it is shown only once and what to do if it is lost. The plaintext lives only in the
+  host's state. On a page (Account → Tokens & keys, the recovery codes, a new account's password, a rotated push
+  token in the source pane) **Saved, remove** clears it; a dialog (connecting a push source, the ZEV wizard) clears
+  it when it closes with **Done** or Escape. Copy reports the result in a toast, so a later or failed copy is never
+  shown as done.
 
 ### 7.3 Types and API client
 

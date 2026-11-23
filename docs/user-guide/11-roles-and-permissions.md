@@ -271,8 +271,8 @@ account you want ready before it is needed. Enter a username, email, first and
 last name, and the platform role, then click **Create account**.
 
 There is no password field: OpenZEV generates one and shows it once, with a
-**Copy password** button — share it with the account holder however you
-normally would. They set their own password the first time they sign in.
+**Copy** button beside it — share it with the account holder however you
+normally would, then select **Saved, remove**. They set their own password the first time they sign in.
 
 To create an account **for a specific participant**, use the community's
 Participants page instead — see below.

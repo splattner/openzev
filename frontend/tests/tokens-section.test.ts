@@ -219,8 +219,9 @@ describe('TokensSection creating', () => {
 
         expect(authApi.createApiKey.mock.calls[0][0]).toMatchObject({ name: 'Nightly export', read_only: false })
         expect(container.querySelector('[data-testid="api-key-secret"]')!.textContent).toBe('ozv_zzzz_secret')
-        await click(buttonWith(container, 'account.apiKeys.dismissSecret'))
+        await click(buttonWith(container, 'secretReveal.dismiss'))
         expect(container.querySelector('[data-testid="api-key-secret"]')).toBeNull()
+        expect(buttonWith(container, 'account.tokens.newApiKey')).toBeDefined()
     })
 
     it('creates an analytics token for the chosen scope and shows a ready-made command', async () => {

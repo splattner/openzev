@@ -1,3 +1,5 @@
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faCheck } from '@fortawesome/free-solid-svg-icons'
 import { useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -197,7 +199,15 @@ export function SupplementarySourceModal({ holder = 'participant', point, zevId,
     if (token) {
         return wrap(
             t('supplementary.modal.pushReadyTitle'),
-            <PushTokenPanel token={token} onDismiss={onClose} capabilities={{ history, live }} />,
+            <div className="page-stack">
+                <PushTokenPanel token={token} capabilities={{ history, live }} />
+                <div className="dialog-actions">
+                    <button type="button" className="button button-primary" onClick={onClose}>
+                        <FontAwesomeIcon icon={faCheck} fixedWidth />
+                        {t('common.done')}
+                    </button>
+                </div>
+            </div>,
         )
     }
     if (reused) {

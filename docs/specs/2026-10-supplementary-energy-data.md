@@ -635,7 +635,8 @@ community's, so there the page shows only the meters the user holds with generat
 - **Connect flow** (`SupplementarySourceModal`): what (history, live; skipped when only one is open),
   how (Solar Manager for history only, a new push source, or the meter's existing push source, which
   takes the missing capability with a `PATCH` and consent and no new token), consent for what was chosen,
-  and for a new push source one-time token screen. Without the live flag only history is offered.
+  and for a new push source a one-time token screen (token, endpoints, and **Done**, which opens the new source
+  in its pane). Without the live flag only history is offered.
 - **My connections** (`MyConnections`), a card above the meter cards while the feature is on and the
   source list has loaded: the participant-held sources on the meters the user holds in the selected
   community, one row each (provider and label, the meter id(s) it feeds, a tag per capability it
