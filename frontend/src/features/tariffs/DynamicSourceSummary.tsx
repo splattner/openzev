@@ -59,7 +59,10 @@ export function DynamicSourceSummary({ source, settings, canOperate, missing = [
                 {source.point_count > 0 && <>{' · '}{t('pages.dynamicSources.coverageHint')}</>}
             </p>
             <p className="muted m-0">
-                {t('pages.dynamicSources.globalReuseSummary', { tariffs: source.linked_tariff_count, zevs: source.linked_zev_count })}
+                {t('pages.dynamicSources.globalReuseSummary', {
+                    tariffs: t('pages.dynamicSources.reuseTariffs', { count: source.linked_tariff_count }),
+                    zevs: t('pages.dynamicSources.reuseZevs', { count: source.linked_zev_count }),
+                })}
             </p>
         </div>
     )
