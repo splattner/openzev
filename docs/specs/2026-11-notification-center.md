@@ -198,15 +198,16 @@ several communities can tell them apart.
 
 ### 7.1 NotificationBell
 
-**File:** `frontend/src/components/NotificationBell.tsx`, mounted in the header of `Layout.tsx`.
+**File:** `frontend/src/components/NotificationBell.tsx`, owned by `Layout.tsx`.
 
+- Above 768px, the bell follows the height of the selected community's scope row in `PageHeader`. Other desktop pages use a dedicated bell row. At 768px and below it sits in the sticky app bar.
 - Count: `useQuery({ queryKey: queryKeys.notifications.unreadCount(), queryFn: fetchUnreadNotificationCount, refetchInterval: 60_000, refetchIntervalInBackground: false })`.
 - The unread badge uses `--danger-700` fill and `--surface-card` counter text.
-- Panel: a popover (dialog semantics, focus managed, Escape closes) opened from the bell; loads
-  `queryKeys.notifications.list({ unread: false })` when opened. Each row shows an icon, the rendered
-  line, the community name when the account has more than one, and a relative time; unread rows are
-  marked. Activating a row marks it read and navigates to its target. "Mark all read" sits in the panel
-  header. Empty state through `EmptyState`.
+- Panel: a popover with dialog semantics. Moving focus out or clicking outside closes it. Escape
+  closes it and returns focus to the bell. Opening it loads `queryKeys.notifications.list()`.
+  Each row shows the notification text and its timestamp. Community names appear when the list spans
+  multiple communities. Activating an unread row marks it read and follows its target, when present.
+  The panel header offers “Mark all as read”.
 - Mutations invalidate `queryKeys.notifications.all`.
 - On a narrow viewport the panel is full-width under the header.
 
@@ -278,6 +279,8 @@ Strings live in all four locale files (`de`, `en`, `fr`, `it`) under `notificati
 - `tests/notification-bell.test.ts`: badge count and accessible name, empty state, mark read and navigate,
   no second mark for a read one, mark all read, community name only across communities, Escape.
 - `tests/notifications.test.ts`: translation key and payload, links per target, unknown type fallback.
+- `screenshots/notification-bell-layout.spec.ts`: wrapped scope alignment, desktop and mobile
+  placement, mouse and keyboard access, and panel dismissal on Tab and Escape.
 - `npm run lint`, `lint:style`, hex sweep, `test:unit`, `build`; screenshots at desktop and ~400px.
 
 ### Acceptance criteria

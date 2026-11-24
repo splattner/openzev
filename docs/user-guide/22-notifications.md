@@ -1,6 +1,6 @@
 # Notifications
 
-OpenZEV tells you what happened since you last looked. The bell in the top right corner of every page shows how many notifications you have not read yet. Select it to see the latest ones.
+The bell at the top right shows your unread count. Select it to see recent notifications.
 
 ## What you are told
 

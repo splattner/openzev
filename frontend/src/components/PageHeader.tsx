@@ -1,6 +1,7 @@
-import { useId, type ReactNode } from 'react'
+import { useContext, useId, type ReactNode } from 'react'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
 import { CommunitySwitcher } from './CommunitySwitcher'
+import { NotificationBellSlot } from './notificationBellSlot'
 
 export type PageHeaderProps = {
     /** Community name above the title. */
@@ -8,6 +9,8 @@ export type PageHeaderProps = {
     /** The eyebrow names the selected community: it opens the community list
      * when the account has more than one. */
     communitySwitch?: boolean
+    /** A plain eyebrow that names the selected community. */
+    plainCommunityScope?: boolean
     /** Access label beside the community (a viewer's read-only access); excluded from the browser title. */
     scopeNote?: string
     /** Plain text: it also names the browser tab. */
@@ -19,18 +22,24 @@ export type PageHeaderProps = {
     actions?: ReactNode
 }
 
-export function PageHeader({ eyebrow, communitySwitch, scopeNote, title, documentTitle, description, actions }: PageHeaderProps) {
+export function PageHeader({ eyebrow, communitySwitch, plainCommunityScope, scopeNote, title, documentTitle, description, actions }: PageHeaderProps) {
     useDocumentTitle(documentTitle ?? title, typeof eyebrow === 'string' ? eyebrow : undefined)
+    const notificationSlot = useContext(NotificationBellSlot)
     // Focus lands on the h1 after navigation; it describes itself by the scope line.
     const eyebrowId = useId()
 
     return (
         <header className="page-header">
             {eyebrow ? (
-                <p className="eyebrow" id={eyebrowId}>
-                    {communitySwitch ? <CommunitySwitcher name={eyebrow} /> : eyebrow}
-                    {scopeNote ? <span className="eyebrow-note"> · {scopeNote}</span> : null}
-                </p>
+                <div className="page-header-scope">
+                    <p className="eyebrow" id={eyebrowId}>
+                        {communitySwitch ? <CommunitySwitcher name={eyebrow} /> : eyebrow}
+                        {scopeNote ? <span className="eyebrow-note"> · {scopeNote}</span> : null}
+                    </p>
+                    {notificationSlot && (communitySwitch || plainCommunityScope)
+                        ? <div className="page-header-bell" ref={notificationSlot} />
+                        : null}
+                </div>
             ) : null}
             <div className="page-header-main">
                 <div className="page-header-text">

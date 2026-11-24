@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -22,7 +23,7 @@ function BellIcon() {
 }
 
 /** The shell's bell: an unread count, and a panel of recent notifications that lead to what they are about. */
-export function NotificationBell() {
+export function NotificationBell({ target = null }: { target?: HTMLElement | null }) {
     const { t } = useTranslation()
     const settings = useOptionalAppSettings() ?? undefined
     const navigate = useNavigate()
@@ -51,7 +52,7 @@ export function NotificationBell() {
 
     useEffect(() => {
         if (!open) return
-        function onPointerDown(event: MouseEvent) {
+        function dismissOutside(event: MouseEvent | FocusEvent) {
             if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false)
         }
         function onKeyDown(event: KeyboardEvent) {
@@ -60,10 +61,12 @@ export function NotificationBell() {
                 triggerRef.current?.focus()
             }
         }
-        document.addEventListener('mousedown', onPointerDown)
+        document.addEventListener('mousedown', dismissOutside)
+        document.addEventListener('focusin', dismissOutside)
         document.addEventListener('keydown', onKeyDown)
         return () => {
-            document.removeEventListener('mousedown', onPointerDown)
+            document.removeEventListener('mousedown', dismissOutside)
+            document.removeEventListener('focusin', dismissOutside)
             document.removeEventListener('keydown', onKeyDown)
         }
     }, [open])
@@ -80,7 +83,7 @@ export function NotificationBell() {
         if (link) navigate(link)
     }
 
-    return (
+    const bell = (
         <div className="notification-bell" ref={rootRef}>
             <button
                 ref={triggerRef}
@@ -145,4 +148,5 @@ export function NotificationBell() {
             )}
         </div>
     )
+    return target ? createPortal(bell, target) : bell
 }
