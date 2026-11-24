@@ -1,8 +1,6 @@
 name: Tariff browser tests
 
-# The tariff Playwright specs mock the API (`mockApi`), so they run against a
-# production build served by `vite preview`, with no backend. A new
-# `screenshots/tariff-*.spec.ts` must mock the API the same way.
+# These Playwright specs mock the API and run against `vite preview` without a backend.
 on:
     pull_request:
         branches: [main]
@@ -40,7 +38,7 @@ jobs:
             - name: Build frontend
               run: npm run build
 
-            - name: Run tariff browser tests
+            - name: Run tariff and notification layout browser tests
               env:
                   SCREENSHOT_BASE_URL: http://127.0.0.1:4173
               run: |
@@ -50,7 +48,7 @@ jobs:
                   curl --fail --silent --retry 30 --retry-delay 1 --retry-all-errors "$SCREENSHOT_BASE_URL" > /dev/null \
                       || { cat /tmp/tariff-preview.log; exit 1; }
                   # --no-deps: the login setup project needs a backend; these specs start logged out.
-                  npm run test:browser -- --no-deps --trace=retain-on-failure screenshots/tariff-*.spec.ts
+                  npm run test:browser -- --no-deps --trace=retain-on-failure screenshots/tariff-*.spec.ts screenshots/notification-bell-layout.spec.ts
 
             - name: Upload Playwright results
               if: failure()

@@ -468,7 +468,7 @@
 
 /* The phone's app bar and the notification bell. */
 
-.top-nav {
+.top-nav:not([hidden]) {
   display: grid;
   gap: 0.75rem;
   width: 100%;
@@ -478,6 +478,10 @@
 
 .mobile-bar {
   display: none;
+}
+
+.top-nav > .notification-bell {
+  margin-bottom: 0.5rem;
 }
 
 .impersonation-banner {
@@ -580,13 +584,6 @@
   align-items: center;
   justify-content: center;
   color: var(--text-body);
-}
-
-/* The notification bell sits in the header: on a desktop session it is the only thing there,
-   right-aligned; on a phone it joins the app bar (see responsive.css). */
-
-.top-nav > .notification-bell {
-  margin-bottom: 0.5rem;
 }
 
 /* Forced colours replace the dark sidebar's palette: the current page keeps an outline and the logo, drawn

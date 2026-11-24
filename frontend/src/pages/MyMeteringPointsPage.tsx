@@ -41,6 +41,7 @@ export function MyMeteringPointsPage() {
         <div className="page-stack">
             <PageHeader
                 eyebrow={selectedCommunityName({ selectedZev, entries, selectedZevId })}
+                plainCommunityScope
                 scopeNote={scopeNote}
                 title={t('pages.myMeteringPoints.title')}
                 description={t('pages.myMeteringPoints.description')}

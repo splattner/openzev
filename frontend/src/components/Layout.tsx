@@ -16,6 +16,7 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { apiErrorPayload } from '../lib/api/errors'
 import { LanguageSelector } from './LanguageSelector'
 import { NotificationBell } from './NotificationBell'
+import { NotificationBellSlot } from './notificationBellSlot'
 import { useToast } from '../lib/toast'
 import { useRouteFocus } from '../lib/useRouteFocus'
 import pkg from '../../package.json'
@@ -95,6 +96,8 @@ export function Layout() {
     })
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
     const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY, undefined, { getInitialValueInEffect: false })
+    const [notificationSlot, setNotificationSlot] = useState<HTMLDivElement | null>(null)
+    const bellTarget = isMobile ? null : notificationSlot
     const isNavigationCollapsed = isSidebarCollapsed && !isMobile
     const userMenuRef = useRef<HTMLDivElement | null>(null)
     const userMenuTriggerRef = useRef<HTMLButtonElement | null>(null)
@@ -480,7 +483,7 @@ export function Layout() {
             </aside>
 
             <div className="content" inert={isMobile && isMobileMenuOpen}>
-                <header className="top-nav">
+                <header className="top-nav" hidden={bellTarget !== null}>
                     <div className="mobile-bar">
                         <button
                             ref={mobileMenuButtonRef}
@@ -501,10 +504,12 @@ export function Layout() {
                         </span>
                     </div>
 
-                    <NotificationBell />
+                    <NotificationBell target={bellTarget} />
                 </header>
                 <main id="main-content" ref={mainRef} className="content-main" tabIndex={-1}>
-                    <Outlet />
+                    <NotificationBellSlot.Provider value={isMobile ? null : setNotificationSlot}>
+                        <Outlet />
+                    </NotificationBellSlot.Provider>
                 </main>
             </div>
         </div>

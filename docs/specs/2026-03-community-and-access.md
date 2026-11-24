@@ -1893,9 +1893,10 @@ settings deliberately live behind the account row, not in the main navigation
 (which stays about the community's work); on `/account` the trigger carries
 `is-current` (the current nav row's pale forest), so the sidebar still shows
 where the user is. In the collapsed rail the trigger shows only the selector
-mark (the name as its tooltip) and expands the sidebar before opening. There is no account control in the page header: `header.top-nav`
-holds the mobile app bar (`.mobile-bar`, ≤768px: menu button plus the
-decorative logo lockup, sticky) and the notification bell. During impersonation,
+mark (the name as its tooltip) and expands the sidebar before opening. The
+account control lives in the sidebar.
+On desktop community pages, the notification bell aligns with the community
+name even when it is plain text. During impersonation,
 a sticky gold strip spans the full viewport above both sidebar and content,
 identifies the account in use, and keeps the stop button at the right. The phone
 navigation scrim dims the strip while it is inert. Focused page controls scroll

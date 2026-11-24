@@ -1002,9 +1002,11 @@ contracts are unchanged.
   alone, centred, with the account name as `aria-label` and `title`, and
   expands the sidebar before opening. Focus, Escape and outside-click behave
   as before.
-- `header.top-nav` (outside `main`) holds `.mobile-bar` and the notification bell.
-  On phones (≤768px) `.mobile-bar` is a sticky white app bar with a hairline,
-  the menu button and the lockup; on desktop it is hidden.
+- `header.top-nav` is the banner outside `main`. It holds the sticky phone app
+  bar (`.mobile-bar`), which has a hairline, the menu button, lockup and bell.
+  On desktop community pages, the bell is in the page header inside `main`.
+  Tab reaches it after the switcher when both are present. For placement on
+  other pages, see the [notification-center spec](2026-11-notification-center.md#71-notificationbell).
   During impersonation, `.shell > .impersonation-banner` is a sticky, full-width
   gold strip above both sidebar and content (`--gold` background, `--brand-ink`
   text, 3rem high), with its stop button on the right. The sidebar and mobile
