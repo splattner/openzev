@@ -62,14 +62,14 @@ export function TotpBlock({ device, onRecoveryCodes, onRemove }: Props) {
 
     return (
         <div className="mb-15">
-            <strong>{t('account.mfa.authenticatorTitle')}</strong>
+            <div className="actions-row">
+                <strong>{t('account.mfa.authenticatorTitle')}</strong>
+                {isActive && <Badge tone="brand">{t('account.mfa.enabledBadge')}</Badge>}
+            </div>
             <p className="muted">{t('account.mfa.description')}</p>
 
             {isActive ? (
-                <div className="actions-row" style={{ alignItems: 'center' }}>
-                    <Badge tone="brand">
-                        {t('account.mfa.enabledBadge')}
-                    </Badge>
+                <div className="actions-row">
                     <button
                         type="button"
                         className="button button-danger button-compact"

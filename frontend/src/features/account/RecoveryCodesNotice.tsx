@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faDownload } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
-import { useToast } from '../../lib/toast'
-import { copyToClipboard } from '../../lib/clipboard'
+import { SecretReveal } from '../../components/SecretReveal'
 import { downloadBlob } from '../../lib/downloadBlob'
 
 interface Props {
@@ -16,47 +16,27 @@ interface Props {
  */
 export function RecoveryCodesNotice({ codes, onDismiss }: Props) {
     const { t } = useTranslation()
-    const { pushToast } = useToast()
-    const [copied, setCopied] = useState(false)
-
-    async function handleCopy() {
-        const ok = await copyToClipboard(codes.join('\n'))
-        if (ok) setCopied(true)
-        else pushToast(t('account.mfa.copyFailed'), 'error')
-    }
-
-    function handleDownload() {
-        const blob = new Blob([codes.join('\n') + '\n'], { type: 'text/plain' })
-        downloadBlob(blob, 'openzev-recovery-codes.txt')
-    }
+    const text = codes.join('\n')
 
     return (
-        <div className="warning-banner mb-15" role="alert">
-            <strong>{t('account.mfa.recoveryCodesShownOnceTitle')}</strong>
-            <p className="mt-05">{t('account.mfa.recoveryCodesShownOnceBody')}</p>
-            <code
-                style={{
-                    display: 'block',
-                    whiteSpace: 'pre-line',
-                    background: 'var(--surface-card)',
-                    padding: '0.75rem',
-                    borderRadius: '4px',
-                    border: '1px solid var(--warning-200)',
-                }}
-            >
-                {codes.join('\n')}
-            </code>
-            <div className="actions-row" style={{ marginTop: '0.75rem' }}>
-                <button type="button" className="button button-primary button-compact" onClick={() => void handleCopy()}>
-                    {copied ? t('account.mfa.copied') : t('account.mfa.copy')}
-                </button>
-                <button type="button" className="button button-secondary button-compact" onClick={handleDownload}>
-                    {t('account.mfa.download')}
-                </button>
-                <button type="button" className="button button-secondary button-compact" onClick={onDismiss}>
-                    {t('account.mfa.dismissCodes')}
-                </button>
-            </div>
+        <div className="mb-15">
+            <SecretReveal
+                secret={text}
+                testId="recovery-codes"
+                title={t('account.mfa.recoveryCodesShownOnceTitle')}
+                body={t('account.mfa.recoveryCodesShownOnceBody')}
+                onDismiss={onDismiss}
+                actions={
+                    <button
+                        type="button"
+                        className="button button-secondary button-compact"
+                        onClick={() => downloadBlob(new Blob([text + '\n'], { type: 'text/plain' }), 'openzev-recovery-codes.txt')}
+                    >
+                        <FontAwesomeIcon icon={faDownload} fixedWidth />
+                        {t('account.mfa.download')}
+                    </button>
+                }
+            />
         </div>
     )
 }

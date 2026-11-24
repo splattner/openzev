@@ -1,8 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCopy, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { faXmark } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
-import { copyToClipboard } from '../../lib/clipboard'
-import { useToast } from '../../lib/toast'
+import { SecretReveal } from '../../components/SecretReveal'
 
 export type AccountCreatedNoticeData = {
     username: string
@@ -17,12 +16,20 @@ export type AccountCreatedNoticeData = {
  */
 export function AccountCreatedNotice({ notice, onDismiss }: { notice: AccountCreatedNoticeData; onDismiss: () => void }) {
     const { t } = useTranslation()
-    const { pushToast } = useToast()
 
-    async function copyPassword() {
-        if (!notice.password) return
-        const ok = await copyToClipboard(notice.password)
-        pushToast(ok ? t('pages.accounts.createModal.copied') : t('pages.accounts.createModal.copyFailed'), ok ? 'success' : 'error')
+    if (notice.password) {
+        return (
+            <section className="card">
+                <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>{t('pages.accounts.createModal.createdTitle')}</h3>
+                <SecretReveal
+                    secret={notice.password}
+                    testId="account-created-password"
+                    title={t('pages.accounts.createModal.passwordLabel')}
+                    body={t('pages.accounts.createModal.createdMessage', { username: notice.username })}
+                    onDismiss={onDismiss}
+                />
+            </section>
+        )
     }
 
     return (
@@ -30,22 +37,9 @@ export function AccountCreatedNotice({ notice, onDismiss }: { notice: AccountCre
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                 <div>
                     <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>{t('pages.accounts.createModal.createdTitle')}</h3>
-                    {notice.password ? (
-                        <>
-                            <p className="muted mt-0">{t('pages.accounts.createModal.createdMessage', { username: notice.username })}</p>
-                            <p style={{ margin: '0.2rem 0', fontFamily: 'monospace', wordBreak: 'break-all' }}>{notice.password}</p>
-                        </>
-                    ) : (
-                        <p className="muted mt-0">{t('pages.accounts.createModal.createdMessageOwnPassword', { username: notice.username })}</p>
-                    )}
+                    <p className="muted mt-0">{t('pages.accounts.createModal.createdMessageOwnPassword', { username: notice.username })}</p>
                 </div>
                 <div className="actions-row actions-row-wrap actions-row-end">
-                    {notice.password && (
-                        <button className="button button-secondary button-compact" type="button" onClick={() => void copyPassword()}>
-                            <FontAwesomeIcon icon={faCopy} fixedWidth />
-                            {t('pages.accounts.createModal.copyPassword')}
-                        </button>
-                    )}
                     <button className="button button-secondary button-compact" type="button" onClick={onDismiss}>
                         <FontAwesomeIcon icon={faXmark} fixedWidth />
                         {t('pages.accounts.createModal.dismiss')}

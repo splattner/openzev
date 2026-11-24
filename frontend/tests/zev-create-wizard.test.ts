@@ -155,6 +155,15 @@ function meterIdInputs(container: HTMLElement): HTMLInputElement[] {
     return Array.from(container.querySelectorAll<HTMLInputElement>('[data-testid="wizard-metering-point-row"] input[name="meter_id"]'))
 }
 
+/** The last step has exactly one Done, and it closes the wizard. */
+async function closeWithDone(container: HTMLElement) {
+    const done = [...container.querySelectorAll('button')].filter((button) => button.textContent === 'common.done')
+    expect(done).toHaveLength(1)
+    await act(async () => { done[0].click() })
+    await flush()
+    expect(container.textContent).not.toContain('pages.zevs.wizard.titleDone')
+}
+
 async function walkToReview(container: HTMLElement) {
     await act(async () => {
         clickButton(container, 'pages.zevs.wizard.next').click()
@@ -519,6 +528,7 @@ describe('ZevListPage creation wizard — existing account as owner', () => {
             expect(createZevWithOwnerMock.mock.calls[0][0].owner.account).toBe(7)
             expect(container.textContent).toContain('pages.zevs.wizard.createdExistingAccount')
             expect(container.textContent).not.toContain('pages.zevs.wizard.passwordLabel')
+            await closeWithDone(container)
         } finally {
             act(() => root.unmount())
             container.remove()
@@ -541,7 +551,13 @@ describe('ZevListPage creation wizard — existing account as owner', () => {
             await flush()
 
             expect(createZevWithOwnerMock.mock.calls[0][0].owner.account).toBeUndefined()
-            expect(container.textContent).toContain('pw')
+            expect(container.querySelector('[data-testid="zev-owner-password"]')!.textContent).toBe('pw')
+            expect(container.textContent).toContain('oscar')
+            // Username and password each have their own Copy; the wizard's footer Done is the one primary.
+            const primaries = [...container.querySelectorAll('.form-modal button.button-primary')].map((button) => button.textContent)
+            expect([...container.querySelectorAll('button')].filter((button) => button.textContent === 'common.copy')).toHaveLength(2)
+            expect(primaries).toEqual(['common.done'])
+            await closeWithDone(container)
         } finally {
             act(() => root.unmount())
             container.remove()

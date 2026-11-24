@@ -387,7 +387,7 @@ describe('connect flow', () => {
         await waitForCondition(() => container.querySelector('li[data-capability="history"] [data-source-open]') !== null, 'the connected card')
 
         expect(document.querySelector('[data-testid="push-token"]')?.textContent).toBe('ozs_abcd_secret')
-        await click(buttonWith(dialog()!, 'supplementary.push.dismiss'))
+        await click(buttonWith(dialog()!, 'common.done'))
         expect(document.querySelector('[data-testid="push-token"]')).toBeNull()
         expect(dialog()).toBeNull()
     })
@@ -668,7 +668,7 @@ describe('source dialog', () => {
         expect(document.querySelector('[data-testid="push-token"]')?.textContent).toBe('ozs_wxyz_fresh')
         expect(document.querySelector('[data-testid="live-endpoint"]')).not.toBeNull()
         expect(modal.textContent).toContain('supplementary.push.columns')
-        await click(buttonWith(modal, 'supplementary.push.dismiss'))
+        await click(buttonWith(modal, 'secretReveal.dismiss'))
         expect(document.querySelector('[data-testid="push-token"]')).toBeNull()
     })
 

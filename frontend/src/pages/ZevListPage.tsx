@@ -1,7 +1,7 @@
 import { IconActionButton } from '../components/IconActionButton'
 import { SortableHeader, useTableSorting } from '../components/tableSorting'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
@@ -9,7 +9,6 @@ import {
     faArrowRight,
     faBan,
     faCheck,
-    faCopy,
     faPen,
     faPlay,
     faPlus,
@@ -21,6 +20,8 @@ import {
 import { useManagedZev } from '../lib/managedZev'
 import { useToast } from '../lib/toast'
 import { ConfirmDialog, consumeReportedError, useConfirmDialog } from '../components/ConfirmDialog'
+import { CopyButton } from '../components/CopyButton'
+import { SecretReveal } from '../components/SecretReveal'
 import { ZevEmailTemplateFields } from '../components/ZevEmailTemplateFields'
 import { ZevGeneralSettingsFields } from '../components/ZevGeneralSettingsFields'
 import { ZevImportModal } from '../features/zev/ZevImportModal'
@@ -38,7 +39,6 @@ import { Badge } from '../components/Badge'
 import { todayBusinessIso } from '../lib/dates'
 import { isValidIban, normalizeIban } from '../lib/iban'
 import { getDefaultZevForm, mapZevToForm } from '../lib/zevForm'
-import { copyToClipboard } from '../lib/clipboard'
 import { BILLING_INTERVAL_OPTIONS, METER_TYPE_OPTIONS, ZEV_TYPE_OPTIONS } from '../lib/options'
 import { TITLE_KEYS } from '../lib/participantTitle'
 import type { OwnerMeteringPointInput, Zev, ZevInput, ZevWizardInput, ZevWizardResult } from '../types/api'
@@ -142,9 +142,8 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
     const [editError, setEditError] = useState<string | null>(null)
     const [createError, setCreateError] = useState<string | null>(null)
     const [createdCredentials, setCreatedCredentials] = useState<ZevWizardResult['owner'] | null>(null)
+    const usernameLabelId = useId()
     const [createdZevName, setCreatedZevName] = useState<string>('')
-    const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
-    const copyFeedbackTimeoutRef = useRef<number | null>(null)
     const [meteringPointKeys, setMeteringPointKeys] = useState<string[]>(() => [createMeteringPointKey()])
     const [showMeteringPointErrors, setShowMeteringPointErrors] = useState(false)
     const [focusMeteringPointKey, setFocusMeteringPointKey] = useState<string | null>(null)
@@ -273,24 +272,11 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
         setCreatedCredentials(null)
         setCreatedZevName('')
         setOwnerMode('new')
-        if (copyFeedbackTimeoutRef.current) window.clearTimeout(copyFeedbackTimeoutRef.current)
-        setCopyFeedback(null)
         createSubmittedRef.current = false
         if (wizardStep === 5) {
             setCreateForm(defaultCreateForm())
         }
     }
-
-    async function copyToClipboardWithFeedback(value: string, label: string) {
-        const ok = await copyToClipboard(value)
-        setCopyFeedback(t(ok ? 'common.copyFeedback.copied' : 'common.copyFeedback.error', { label }))
-        if (copyFeedbackTimeoutRef.current) window.clearTimeout(copyFeedbackTimeoutRef.current)
-        copyFeedbackTimeoutRef.current = window.setTimeout(() => setCopyFeedback(null), 2000)
-    }
-
-    useEffect(() => () => {
-        if (copyFeedbackTimeoutRef.current) window.clearTimeout(copyFeedbackTimeoutRef.current)
-    }, [])
 
     function submitEdit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
@@ -766,45 +752,29 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
 
                     {wizardStep === 5 && createdCredentials && (
                         <div className="grid-span-full page-stack">
-                            <p className="m-0">
-                                {t(createdCredentials.temporary_password === null ? 'pages.zevs.wizard.createdIntroExisting' : 'pages.zevs.wizard.createdIntro', { name: createdZevName })}
-                            </p>
+                            <p className="m-0">{t('pages.zevs.wizard.createdIntro', { name: createdZevName })}</p>
 
                             {createdCredentials.temporary_password === null ? (
                                 <div className="card" style={{ padding: '1rem' }}>
                                     {t('pages.zevs.wizard.createdExistingAccount', { username: createdCredentials.username })}
                                 </div>
                             ) : (
-                                <div className="card" style={{ padding: '1rem' }}>
-                                    <p style={{ margin: '0 0 0.5rem' }}><strong>{t('pages.zevs.wizard.usernameLabel')}</strong></p>
-                                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                                        <code>{createdCredentials.username}</code>
-                                        <button
-                                            className="button button-secondary"
-                                            type="button"
-                                            onClick={() => copyToClipboardWithFeedback(createdCredentials.username, t('pages.zevs.wizard.usernameLabel'))}
-                                        >
-                                            <FontAwesomeIcon icon={faCopy} fixedWidth />
-                                            {t('pages.zevs.wizard.copyUsername')}
-                                        </button>
+                                <>
+                                    <div>
+                                        <strong id={usernameLabelId}>{t('pages.zevs.wizard.usernameLabel')}</strong>
+                                        <div className="copy-row mt-05">
+                                            <code>{createdCredentials.username}</code>
+                                            <CopyButton value={createdCredentials.username} labelId={usernameLabelId} />
+                                        </div>
                                     </div>
-
-                                    <p style={{ margin: '1rem 0 0.5rem' }}><strong>{t('pages.zevs.wizard.passwordLabel')}</strong></p>
-                                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                                        <code>{createdCredentials.temporary_password}</code>
-                                        <button
-                                            className="button button-secondary"
-                                            type="button"
-                                            onClick={() => copyToClipboardWithFeedback(createdCredentials.temporary_password ?? '', t('pages.zevs.wizard.passwordLabel'))}
-                                        >
-                                            <FontAwesomeIcon icon={faCopy} fixedWidth />
-                                            {t('pages.zevs.wizard.copyPassword')}
-                                        </button>
-                                    </div>
-                                </div>
+                                    <SecretReveal
+                                        secret={createdCredentials.temporary_password}
+                                        testId="zev-owner-password"
+                                        title={t('pages.zevs.wizard.passwordLabel')}
+                                        body={t('pages.zevs.wizard.passwordShownOnce')}
+                                    />
+                                </>
                             )}
-
-                            {copyFeedback && <div className="muted">{copyFeedback}</div>}
                         </div>
                     )}
 
@@ -835,7 +805,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                         {wizardStep === 5 && (
                             <button key="done" className="button button-primary" type="button" onClick={closeCreateModal}>
                                 <FontAwesomeIcon icon={faCheck} fixedWidth />
-                                {t('pages.zevs.wizard.done')}
+                                {t('common.done')}
                             </button>
                         )}
                     </div>

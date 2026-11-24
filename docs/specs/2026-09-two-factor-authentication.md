@@ -525,9 +525,9 @@ The **Security** tab's two-factor card contains:
   and an "Add a passkey" button calling `navigator.credentials.create()`.
 - **Authenticator app** — status, an "Set up" flow showing the QR (`qr_svg`) alongside the
   typed secret, and a confirm field.
-- **Recovery codes** — remaining count, a regenerate action, and a one-time display in a modal
-  with copy and download actions. The modal states plainly that the codes will not be shown
-  again.
+- **Recovery codes** — remaining count, a regenerate action, and a one-time display at the top of
+  the section (`RecoveryCodesNotice`, the shared `SecretReveal`) with copy and download actions and a
+  warning that the codes will not be shown again. **Saved, remove** clears them from the page.
 - Queries: `useQuery({ queryKey: queryKeys.auth.mfa(), queryFn: fetchMfaStatus })`. Every
   mutation invalidates `queryKeys.auth.mfa()`.
 

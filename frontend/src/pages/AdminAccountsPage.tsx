@@ -98,7 +98,6 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
             setCreateUserForm(defaultCreateUserForm)
             setCreateUserError(null)
             setCreatedNotice({ username: created.username, password: created.generated_password })
-            pushToast(t('pages.accounts.feedback.createSuccess'), 'success')
             void queryClient.invalidateQueries({ queryKey: queryKeys.auth.users() })
         },
         onError: (error) => setCreateUserError(formatApiError(error, t('pages.accounts.feedback.createFailed'))),

@@ -151,6 +151,36 @@ describe('SupplementarySourceModal for live data', () => {
         expect(onConnected).toHaveBeenCalledWith(expect.objectContaining({ id: 'src-new' }))
     })
 
+    it('closes the push token screen with the dialog\'s Done and hands the new source to the host', async () => {
+        const onConnected = vi.fn()
+        const onClose = vi.fn()
+        const modal = await open('participant', { point, available: ['live'], onConnected, onClose })
+        await click(radio(modal, 'supplementary.provider.push'))
+        await submit(modal)
+        await waitForCondition(() => document.querySelector('[data-testid="push-token"]') !== null, 'the token screen')
+        expect(onClose).not.toHaveBeenCalled()
+
+        await click(buttonWith(dialog()!, 'common.done')!)
+
+        expect(onClose).toHaveBeenCalledOnce()
+        expect(onConnected).toHaveBeenCalledWith(expect.objectContaining({ id: 'src-live' }))
+    })
+
+    it('closes the push token screen with Escape like Done, and offers no separate clear there', async () => {
+        const onConnected = vi.fn()
+        const onClose = vi.fn()
+        const modal = await open('participant', { point, available: ['live'], onConnected, onClose })
+        await click(radio(modal, 'supplementary.provider.push'))
+        await submit(modal)
+        await waitForCondition(() => document.querySelector('[data-testid="push-token"]') !== null, 'the token screen')
+        expect(buttonWith(dialog()!, 'secretReveal.dismiss')).toBeUndefined()
+
+        await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+
+        expect(onClose).toHaveBeenCalledOnce()
+        expect(onConnected).toHaveBeenCalledWith(expect.objectContaining({ id: 'src-live' }))
+    })
+
     it('offers Solar Manager for history and live together, with the matching hint', async () => {
         const modal = await open('participant', { point, available: ['history', 'live'], initial: ['history', 'live'] })
         await click(buttonWith(modal, 'supplementary.modal.next')!)

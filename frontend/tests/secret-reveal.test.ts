@@ -1,4 +1,4 @@
-import { act, createElement } from 'react'
+import { act, createElement, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SecretReveal } from '../src/components/SecretReveal'
 import { copyToClipboard } from '../src/lib/clipboard'
@@ -13,46 +13,83 @@ const cleanups: Array<() => void> = []
 afterEach(() => { cleanups.splice(0).forEach((cleanup) => cleanup()); vi.clearAllMocks() })
 
 const button = (root: ParentNode, label: string) =>
-    Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find((b) => b.textContent?.includes(label))!
+    Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find((b) => b.textContent?.includes(label))
+const click = async (element: HTMLElement) => { await act(async () => { element.click() }) }
+const reveal = (props: Record<string, unknown> = {}) =>
+    createElement(SecretReveal, { secret: 'oza_x_y', title: 'Push token', body: 'Shown only once.', ...props })
 
 describe('SecretReveal', () => {
-    it('shows the secret once, copies it and dismisses', async () => {
-        vi.mocked(copyToClipboard).mockResolvedValue(true)
-        const onDismiss = vi.fn()
-        const { container } = await renderWithProviders(
-            createElement(SecretReveal, { secret: 'oza_x_y', onDismiss }, createElement('p', null, 'extra hint')), cleanups)
+    it('shows the title, the secret, the warning and the hints', async () => {
+        const { container } = await renderWithProviders(createElement(SecretReveal, { secret: 'oza_x_y', title: 'Push token', body: 'Shown only once.' }, createElement('p', null, 'extra hint')), cleanups)
 
         expect(container.querySelector('[data-testid="secret-reveal"]')!.textContent).toBe('oza_x_y')
-        expect(container.textContent).toContain('secretReveal.body')
+        expect(container.textContent).toContain('Push token')
         expect(container.textContent).toContain('extra hint')
+    })
 
-        await act(async () => { button(container, 'secretReveal.copy').click() })
-        expect(copyToClipboard).toHaveBeenCalledWith('oza_x_y')
-        expect(container.textContent).toContain('secretReveal.copied')
+    it('makes only the warning a live region, with no buttons in it', async () => {
+        const { container } = await renderWithProviders(reveal({ onDismiss: vi.fn() }), cleanups)
 
-        await act(async () => { button(container, 'secretReveal.dismiss').click() })
+        const regions = container.querySelectorAll('[role="alert"], [role="status"], [aria-live]')
+        expect(regions).toHaveLength(1)
+        expect(regions[0].textContent).toBe('Shown only once.')
+        expect(regions[0].querySelector('button')).toBeNull()
+    })
+
+    it('names Copy after the value it copies', async () => {
+        const { container } = await renderWithProviders(reveal(), cleanups)
+
+        const copy = button(container, 'common.copy')!
+        const names = copy.getAttribute('aria-labelledby')!.split(' ').map((id) => document.getElementById(id)!.textContent)
+        expect(names).toEqual(['common.copy', 'Push token'])
+    })
+
+    it('copies the value shown now, also after a new secret replaced it, and reports each result', async () => {
+        vi.mocked(copyToClipboard).mockResolvedValueOnce(true).mockResolvedValueOnce(false)
+        function Host() {
+            const [secret, setSecret] = useState('first')
+            return createElement('div', null,
+                createElement(SecretReveal, { secret, title: 'Codes', body: 'Once.' }),
+                createElement('button', { type: 'button', onClick: () => setSecret('second') }, 'regenerate'))
+        }
+        const { container } = await renderWithProviders(createElement(Host), cleanups)
+
+        await click(button(container, 'common.copy')!)
+        expect(copyToClipboard).toHaveBeenLastCalledWith('first')
+        expect(pushToast).toHaveBeenLastCalledWith('common.copied', 'success')
+
+        await click(button(container, 'regenerate')!)
+        await click(button(container, 'common.copy')!)
+        expect(copyToClipboard).toHaveBeenLastCalledWith('second')
+        expect(pushToast).toHaveBeenLastCalledWith('common.copyFailed', 'error')
+        // The label never claims a copy, so a new or failed one cannot inherit a success.
+        expect(button(container, 'common.copy')!.textContent).toBe('common.copy')
+        expect(container.querySelector('[data-testid="secret-reveal"]')!.textContent).toBe('second')
+    })
+
+    it('offers a clear action on a page and none in a dialog', async () => {
+        const onDismiss = vi.fn()
+        const page = await renderWithProviders(reveal({ onDismiss }), cleanups)
+        await click(button(page.container, 'secretReveal.dismiss')!)
         expect(onDismiss).toHaveBeenCalledOnce()
+
+        const dialog = await renderWithProviders(reveal(), cleanups)
+        expect(button(dialog.container, 'secretReveal.dismiss')).toBeUndefined()
     })
 
-    it('says so when copying fails, and does not claim success', async () => {
-        vi.mocked(copyToClipboard).mockResolvedValue(false)
-        const { container } = await renderWithProviders(createElement(SecretReveal, { secret: 's', onDismiss: vi.fn() }), cleanups)
+    it('starts on Copy when the control that created the secret is gone', async () => {
+        const { container } = await renderWithProviders(reveal(), cleanups)
 
-        await act(async () => { button(container, 'secretReveal.copy').click() })
-
-        expect(pushToast).toHaveBeenCalledWith('secretReveal.copyFailed', 'error')
-        expect(container.textContent).not.toContain('secretReveal.copied')
+        expect(document.activeElement).toBe(button(container, 'common.copy'))
     })
 
-    it('lets a caller keep its own wording and test id', async () => {
-        const { container } = await renderWithProviders(createElement(SecretReveal, {
-            secret: 's', onDismiss: vi.fn(), testId: 'my-secret', title: 'T', body: 'B', labels: { copy: 'Kopieren', dismiss: 'Fertig' },
-        }), cleanups)
+    it('leaves focus alone when it is still somewhere', async () => {
+        const elsewhere = document.createElement('button')
+        document.body.append(elsewhere)
+        elsewhere.focus()
+        await renderWithProviders(reveal(), cleanups)
 
-        expect(container.querySelector('[data-testid="my-secret"]')).not.toBeNull()
-        expect(container.textContent).toContain('T')
-        expect(container.textContent).toContain('B')
-        expect(button(container, 'Kopieren')).toBeDefined()
-        expect(button(container, 'Fertig')).toBeDefined()
+        expect(document.activeElement).toBe(elsewhere)
+        elsewhere.remove()
     })
 })

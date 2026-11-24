@@ -1237,8 +1237,8 @@ the account's role everywhere.
   operator wants to set up ahead of use. The form asks for username, email,
   names and platform role only; there is no password field — `createUser`
   never sends one, so the server always generates it (§6.2). The response's
-  `generated_password` (when present) is shown once in a dismissible notice
-  with a copy button and is never requested from the server again.
+  `generated_password` (when present) is shown once in the shared `SecretReveal`
+  and is never requested from the server again.
 - **Actions:** *Edit* (username, email, names, **platform role** — labelled as
   such, with a hint that it applies in every community); menu: *Impersonate*
   (any active non-admin account — `canImpersonateAccount`), *Reset
@@ -1472,9 +1472,10 @@ one remains. "Next" requires a non-blank, unique (after trimming) meter ID on
 every row; on failure the banner names the problem and each offending row
 shows its own error. Step 2 offers "New person" or "Existing account" (#1009):
 the latter is a select of the non-admin accounts from `GET /auth/users/`, and
-hides the username, name and email fields. Step 5 shows the username and
-temporary password only for a new account; for an existing one it states that
-no password was created or changed.
+hides the username, name and email fields. For a new owner, step 5
+shows the username (with Copy) and the temporary password in `SecretReveal`.
+For an existing account it states that no password was created or changed. Done closes the
+wizard in either case.
 
 **Endpoint:** `POST /api/v1/zev/zevs/create-with-owner/` (admin only)
 

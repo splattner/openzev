@@ -49,6 +49,36 @@
   flex-wrap: wrap;
 }
 
+/* A value and the button that copies it, side by side; a long value wraps inside itself. */
+.copy-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.copy-row > code {
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+.copy-row > .button,
+.copy-row-actions {
+  flex: none;
+}
+
+/* Several buttons beside one value (Copy, Download) stack. */
+.copy-row-actions {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+}
+
 .grid-span-full {
   grid-column: 1 / -1;
 }

@@ -126,24 +126,18 @@ export function TokensSection({ onRevoke, onRotate }: Props) {
                 <SecretReveal
                     secret={fresh.secret}
                     testId="api-key-secret"
-                    onDismiss={() => setFresh(null)}
                     title={t('account.apiKeys.secretShownOnceTitle')}
                     body={t('account.apiKeys.secretShownOnceBody')}
-                    labels={{
-                        copy: t('account.apiKeys.copy'),
-                        copied: t('account.apiKeys.copied'),
-                        dismiss: t('account.apiKeys.dismissSecret'),
-                        copyFailed: t('account.apiKeys.copyFailed'),
-                    }}
+                    onDismiss={() => setFresh(null)}
                 />
             )}
             {fresh?.kind === 'analytics' && (
                 <SecretReveal
                     secret={fresh.secret}
                     testId="analytics-token-secret"
-                    onDismiss={() => setFresh(null)}
                     title={t('account.tokens.analytics.shownOnceTitle')}
                     body={t('account.tokens.analytics.shownOnceBody')}
+                    onDismiss={() => setFresh(null)}
                 >
                     <div style={{ display: 'grid', gap: '0.35rem' }}>
                         <strong>{t('account.tokens.analytics.usage')}</strong>
