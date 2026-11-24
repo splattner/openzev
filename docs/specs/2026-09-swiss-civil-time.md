@@ -274,27 +274,29 @@ shared by prefetch, preview and import; callers pass the meter id as `series_key
 
 Rules 3–4 only arise when `timestamp_timezone = Europe/Zurich`.
 
-**Daily profile** (daily branches of `preview_csv` and `_import_table_rows`):
+**Daily profile**
 
-1. `reader.day_window(date)` gives the row's civil day. Slot `i` is
-   `window.start + i × interval_minutes` in UTC arithmetic, so a Zurich row
-   starts at Swiss midnight and a `UTC` row at UTC midnight.
-2. After `_parse_daily_values` succeeds and the row is not empty,
-   `_fit_daily_values(values, window, interval_minutes, reader.is_local)` fits
-   the values to the day. `UTC` rows, and intervals that do not tile the day,
-   pass through unchanged. For Zurich, with `L` the day's slot count (92, 96 or
-   100 for 15-minute data) and `n = values_count`:
+1. The row spans midnight to midnight in the declared zone. Slot `i` is
+   `window.start + i × interval_minutes` in UTC arithmetic. An out-of-range
+   UTC bound, or a slot timestamp beyond the supported range, produces a row
+   error in preview and upload.
+2. A row with all blank interval values is rejected. `UTC` rows and intervals
+   that do not tile the day skip fitting. For Zurich, `L` is the day's slot
+   count (92, 96 or 100 for 15-minute data), and `n` is the number of interval
+   columns read. The importer reads `values_count` columns by default. If
+   `L > values_count` and the row contains at least `L` interval columns,
+   the importer reads `L` columns.
    - `n > L`: trailing empty values are dropped down to `L`. If still too many
      on a DST-start day and the surplus is exactly one hour, the slots of the
      missing hour (positions `2h/interval` to `3h/interval`, the 9th–12th value
      for 15-minute data) are dropped when all empty or `0`. Still too many →
      row error `"{date} has {L} intervals in Swiss time (DST start), but the row has {n} values."`
      (`(DST end)` or no suffix depending on the day's length).
-   - `L > n ≥ 24 h / interval` (a 25-hour day given an ordinary day's values):
+   - `L > n ≥ floor(24 h / interval)` (96–99 quarter-hour columns on a 25-hour day):
      row error `"{date} has {L} intervals in Swiss time (DST end), but the row has {n} values."`
-   - `n < 24 h / interval`: kept as is. Partial days stay allowed.
-   A file from a DST-aware exporter with 100 columns sets `values_count=100`;
-   its four trailing columns are empty on ordinary days and dropped.
+   - `n < floor(24 h / interval)`: kept as is on any day. Partial days stay allowed.
+   Individual intervals may be blank. In a 100-column file with
+   `values_count=100`, the four trailing blanks on ordinary days are dropped.
 3. The existing-data prefetch (`_prefetch_daily_existing(..., reader)`) collects
    the rows' `DayWindow`s and merges adjacent ones (`_contiguous_day_ranges`,
    which now takes windows and merges `start <= previous end`), then runs one
