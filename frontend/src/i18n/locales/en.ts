@@ -1939,7 +1939,7 @@ export const en = {
             issues: {
                 meteringNoPoints: 'No metering points assigned',
                 metering: 'Metering data missing for {{missing}} of {{total}} points',
-                conflict: 'Overlaps locked invoice {{number}}',
+                conflict: 'Invoice {{number}} blocks generation',
                 pdf: 'PDF failed',
                 delivery: 'Email delivery failed',
                 noEmail: 'No email address: send it yourself and mark it as sent',
@@ -2093,6 +2093,8 @@ export const en = {
             messages: {
                 generated: 'Invoice generated.',
                 generateFailed: 'Failed to generate invoice.',
+                notReplaceableIssued: 'Invoice {{number}} has been issued and cannot be regenerated.',
+                notReplaceablePartial: 'Invoice {{number}} covers more than this period. Regenerate its full period instead.',
                 dynamicPriceGap: '“{{tariff}}” has no dynamic price at {{timestamp}}. Refresh the price source and try again.',
                 invalidDynamicTariff: "“{{tariff}}” has an incompatible dynamic source. Check its product and energy type before generating invoices.",
                 pdfGenerated: 'PDF generated.',
@@ -4108,7 +4110,7 @@ export const en = {
                     tariffsTodo: 'No energy tariff configured',
                     tariffsWarn: '{{days}} of {{total}} day(s) without an energy tariff',
                     generatedTodo: 'Invoices still missing for {{missing}} of {{total}} participant(s)',
-                    conflictsWarn: '{{count}} participant(s) blocked by locked invoices: {{names}}',
+                    conflictsWarn: '{{count}} participant(s) blocked by overlapping invoices: {{names}}',
                     correctionsWarn_one: '{{count}} invoice needs review after a metering correction: {{invoices}}',
                     correctionsWarn_other: '{{count}} invoices need review after metering corrections: {{invoices}}',
                     approvedTodo: '{{count}} invoice(s) awaiting approval',

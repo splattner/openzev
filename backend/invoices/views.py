@@ -26,7 +26,7 @@ from .serializers import (
     RecordPaymentSerializer, RefundCreditSerializer,
 )
 from . import access_tokens
-from .engine import DynamicTariffError, generate_invoice, preflight_dynamic_prices
+from .engine import DynamicTariffError, InvoiceNotReplaceableError, generate_invoice, preflight_dynamic_prices
 from .pdf import InvoicePdfSupersededError, save_invoice_pdf
 from .replacement import replace_invoice
 from .tasks import (
@@ -433,7 +433,7 @@ class InvoiceViewSet(
                     {"error": f"Allocation error during invoice generation: {exc}"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            if isinstance(exc, DynamicTariffError):
+            if isinstance(exc, (DynamicTariffError, InvoiceNotReplaceableError)):
                 return Response(exc.as_dict(), status=status.HTTP_409_CONFLICT)
             return Response(
                 {"error": "Invoice generation failed. The invoice may already exist in a non-regenerable state."},

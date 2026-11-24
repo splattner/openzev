@@ -33,7 +33,7 @@ import {
     sendAllInvoices,
     sendInvoiceEmail,
 } from '../../lib/api/invoices'
-import { apiErrorPayload, dynamicPriceGapPayload, formatApiError } from '../../lib/api/errors'
+import { apiErrorPayload, dynamicPriceGapPayload, formatApiError, invoiceNotReplaceablePayload } from '../../lib/api/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { downloadBlob } from '../../lib/downloadBlob'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
@@ -153,7 +153,10 @@ export function useInvoiceActions({
             })
         } else {
             setTariffProblem(null)
-            pushToast(formatApiError(error, fallback), 'error')
+            const blocker = invoiceNotReplaceablePayload(error)
+            pushToast(blocker
+                ? t(blocker.reason === 'issued' ? 'pages.invoices.messages.notReplaceableIssued' : 'pages.invoices.messages.notReplaceablePartial', { number: blocker.invoice_number })
+                : formatApiError(error, fallback), 'error')
         }
     }
 

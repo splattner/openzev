@@ -5,9 +5,9 @@ import {
     faClipboardCheck,
     faEnvelope,
     faLink,
-    faLock,
     faMoneyBillWave,
     faReceipt,
+    faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
 import { invoiceStepReasonText } from './invoiceRowText'
@@ -34,8 +34,8 @@ const STEP_ICONS: Record<InvoiceProgressStep, IconDefinition> = {
 }
 
 function StepIcon({ step, state, reason }: { step: InvoiceProgressStep; state: InvoiceStepState; reason?: InvoiceStepReason }) {
-    // A blocked invoice step is locked by another invoice, not merely late.
-    return <ProgressIcon icon={<FontAwesomeIcon icon={reason === 'conflict' ? faLock : STEP_ICONS[step]} fixedWidth />} state={state} />
+    // Another invoice blocks the invoice step; it is not merely late.
+    return <ProgressIcon icon={<FontAwesomeIcon icon={reason === 'conflict' ? faTriangleExclamation : STEP_ICONS[step]} fixedWidth />} state={state} />
 }
 
 type InvoiceRowProgressProps = {

@@ -1930,7 +1930,7 @@ export const it = {
             issues: {
                 meteringNoPoints: 'Nessun punto di misura assegnato',
                 metering: 'Dati di misurazione mancanti per {{missing}} di {{total}} punti',
-                conflict: 'Si sovrappone alla fattura bloccata {{number}}',
+                conflict: 'La fattura {{number}} blocca la generazione',
                 pdf: 'PDF non riuscito',
                 delivery: 'Invio e-mail non riuscito',
                 noEmail: 'Nessun indirizzo e-mail: consegnarla personalmente e segnarla come inviata',
@@ -2082,6 +2082,8 @@ export const it = {
             messages: {
                 generated: 'Fattura generata.',
                 generateFailed: 'Generazione della fattura non riuscita.',
+                notReplaceableIssued: 'La fattura {{number}} è già stata emessa e non può essere rigenerata.',
+                notReplaceablePartial: 'La fattura {{number}} copre più di questo periodo. Rigeneri invece l’intero periodo.',
                 dynamicPriceGap: 'Manca un prezzo dinamico per «{{tariff}}» alle {{timestamp}}. Aggiorni la fonte dei prezzi e riprovi.',
                 invalidDynamicTariff: "La fonte dinamica di «{{tariff}}» non è compatibile. Verificare il prodotto e il tipo di energia prima di generare le fatture.",
                 pdfGenerated: 'PDF generato.',
@@ -4097,7 +4099,7 @@ export const it = {
                     tariffsTodo: 'Nessuna tariffa energetica configurata',
                     tariffsWarn: '{{days}} dei {{total}} giorni senza tariffa energetica',
                     generatedTodo: 'Fatture ancora mancanti per {{missing}} di {{total}} partecipante/i',
-                    conflictsWarn: '{{count}} partecipante/i bloccato/i da fatture vincolate: {{names}}',
+                    conflictsWarn: '{{count}} partecipante/i bloccato/i da fatture sovrapposte: {{names}}',
                     correctionsWarn_one: '{{count}} fattura da rivedere dopo una correzione di misura: {{invoices}}',
                     correctionsWarn_other: '{{count}} fatture da rivedere dopo correzioni di misura: {{invoices}}',
                     approvedTodo: '{{count}} fattura/e in attesa di approvazione',

@@ -116,3 +116,16 @@ export function dynamicPriceGapPayload(error: unknown): DynamicPriceGapPayload |
   if (typeof payload.tariff_name !== 'string' || typeof payload.missing_at !== 'string') return null
   return { code: 'dynamic_price_gap', tariff_name: payload.tariff_name, missing_at: payload.missing_at }
 }
+
+export interface InvoiceNotReplaceablePayload {
+  code: 'invoice_not_replaceable'
+  reason: 'issued' | 'partial_overlap'
+  invoice_number: string
+}
+
+export function invoiceNotReplaceablePayload(error: unknown): InvoiceNotReplaceablePayload | null {
+  const payload = apiErrorPayload(error)
+  if (payload?.code !== 'invoice_not_replaceable') return null
+  if ((payload.reason !== 'issued' && payload.reason !== 'partial_overlap') || typeof payload.invoice_number !== 'string') return null
+  return { code: 'invoice_not_replaceable', reason: payload.reason, invoice_number: payload.invoice_number }
+}

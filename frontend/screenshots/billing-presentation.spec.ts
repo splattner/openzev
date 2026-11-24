@@ -205,7 +205,7 @@ for (const scope of ['viewer', 'disabled-manager'] as const) {
     await expect(page.locator('.invoice-progress-covered')).toHaveCount(2)
     await expect(page.locator('.invoice-progress-covered').first()).toContainText('Already billed R-1')
     await expect(page.getByRole('button', { name: 'Review conflict', exact: true })).toHaveCount(1)
-    await expect(page.locator('.invoice-row-issues').getByText('Overlaps locked invoice R-1', { exact: true })).toBeVisible()
+    await expect(page.locator('.invoice-row-issues').getByText('Invoice R-1 blocks generation', { exact: true })).toBeVisible()
     await expect(page.getByText('CH-MISSING (3 missing days)')).toBeVisible()
     await expect(page.locator('main .invoice-batch-actions button')).toHaveCount(1)
     await expect(page.getByRole('button', { name: 'Download all PDFs (1)', exact: true })).toBeEnabled()

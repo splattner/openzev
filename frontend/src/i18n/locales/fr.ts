@@ -1930,7 +1930,7 @@ export const fr = {
             issues: {
                 meteringNoPoints: 'Aucun point de mesure attribué',
                 metering: 'Données de mesure manquantes pour {{missing}} des {{total}} points',
-                conflict: 'Chevauche la facture verrouillée {{number}}',
+                conflict: 'La facture {{number}} bloque la génération',
                 pdf: 'Échec du PDF',
                 delivery: 'Échec de l’envoi de l’e-mail',
                 noEmail: 'Aucune adresse e-mail : remettez-la vous-même et marquez-la comme envoyée',
@@ -2082,6 +2082,8 @@ export const fr = {
             messages: {
                 generated: 'Facture générée.',
                 generateFailed: 'Échec de la génération de la facture.',
+                notReplaceableIssued: 'La facture {{number}} a déjà été émise et ne peut pas être régénérée.',
+                notReplaceablePartial: 'La facture {{number}} couvre plus que cette période. Régénérez plutôt toute sa période.',
                 dynamicPriceGap: 'Il manque un prix dynamique pour « {{tariff}} » à {{timestamp}}. Actualisez la source de prix et réessayez.',
                 invalidDynamicTariff: "La source dynamique de « {{tariff}} » est incompatible. Vérifiez le produit et le type d’énergie avant de générer les factures.",
                 pdfGenerated: 'PDF généré.',
@@ -4097,7 +4099,7 @@ export const fr = {
                     tariffsTodo: 'Aucun tarif d\'énergie configuré',
                     tariffsWarn: '{{days}} des {{total}} jour(s) sans tarif d\'énergie',
                     generatedTodo: 'Factures encore manquantes pour {{missing}} des {{total}} participant(s)',
-                    conflictsWarn: '{{count}} participant(s) bloqué(s) par des factures verrouillées : {{names}}',
+                    conflictsWarn: '{{count}} participant(s) bloqué(s) par des factures qui se chevauchent : {{names}}',
                     correctionsWarn_one: '{{count}} facture à revoir après une correction de comptage : {{invoices}}',
                     correctionsWarn_other: '{{count}} factures à revoir après des corrections de comptage : {{invoices}}',
                     approvedTodo: '{{count}} facture(s) en attente d\'approbation',

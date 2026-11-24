@@ -282,6 +282,26 @@ class GenerationEligibilityTests(TestCase):
             },
         )
 
+    def test_blocked_row_names_an_issued_blocker_before_a_partial_draft(self):
+        make_invoice(
+            self.zev, self.participant, InvoiceStatus.DRAFT,
+            period=(date(2025, 12, 1), date(2026, 1, 31)),
+        )
+        paid = make_invoice(
+            self.zev, self.participant, InvoiceStatus.PAID,
+            period=(date(2026, 2, 1), date(2026, 2, 28)),
+        )
+        row = self._rows()[self.participant.full_name]
+        self.assertIsNone(row["invoice"])
+        self.assertEqual(
+            row["generation_eligibility"],
+            {
+                "state": "blocked",
+                "invoice_id": str(paid.id),
+                "invoice_number": paid.invoice_number,
+            },
+        )
+
     def test_fully_settled_row_is_covered_with_first_covering_invoice(self):
         first = make_invoice(
             self.zev, self.participant, InvoiceStatus.PAID,
@@ -326,6 +346,18 @@ class GenerationEligibilityTests(TestCase):
         self.assertEqual(row["generation_eligibility"]["state"], "blocked")
         self.assertEqual(
             row["generation_eligibility"]["invoice_id"], str(paid.id)
+        )
+
+    def test_draft_reaching_past_the_period_blocks_the_row(self):
+        draft = make_invoice(
+            self.zev, self.participant, InvoiceStatus.DRAFT,
+            period=(date(2026, 3, 1), date(2026, 4, 30)),
+        )
+        row = self._rows()[self.participant.full_name]
+        self.assertIsNone(row["invoice"])
+        self.assertEqual(
+            row["generation_eligibility"],
+            {"state": "blocked", "invoice_id": str(draft.id), "invoice_number": draft.invoice_number},
         )
 
     def test_every_blocked_row_is_protected_past_the_cockpit_truncation(self):

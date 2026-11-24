@@ -614,8 +614,8 @@ Generation holds its locks until the surrounding transaction ends, in this order
 
 Pricing and numbering may still serialize on shared dynamic-price sources and the ZEV row.
 
-- An `approved`, `sent` or `paid` invoice overlapping the requested inclusive period for the same participant → **raise `ValueError`**.
-- After successfully creating the replacement, delete overlapping drafts and never-approved cancellations (`approved_at` null) through `reading_impact.settle_regeneration`. Keep issued cancellations with their numbers next to the new draft (ADR 0037). `_refuse_locked_regeneration` locks overlaps and checks issued status before pricing.
+- An `approved`, `sent` or `paid` invoice overlapping the requested inclusive period for the same participant → **raise `InvoiceNotReplaceableError`** (a `ValueError`); so does a never-approved overlapping invoice the period does not fully cover ([invoice lifecycle §4.4](2026-03-invoice-lifecycle-and-communication.md#44-regeneration-rules)).
+- After successfully creating the replacement, delete overlapping drafts and never-approved cancellations (`approved_at` null) through `reading_impact.settle_regeneration`. Keep issued cancellations with their numbers next to the new draft (ADR 0037). `_replaceable_overlapping_invoice_ids` locks overlaps and applies `replacement_blocker` before pricing.
 
 ### 4.1 Collect metering points
 
@@ -1245,9 +1245,9 @@ After the invoice row exists (step 8) and only when `total_chf > 0`, `generate_i
 queries because PostgreSQL cannot lock rows under an aggregate), and creates one `CreditApplication`
 per credit with money remaining until `total_chf` is covered or the credits run out. The sum goes to
 `credit_applied_chf`. Line items, `subtotal_chf`, `vat_chf` and `total_chf` are untouched, so tariff
-grouping and the allocation reconciliation hold. Regeneration deletes replaceable drafts first
-(`_discard_replaceable_invoices`), whose applications cascade away, so the replacement sees the credit
-as free. Specified in `2026-10-payments-and-credits.md` §4.7.
+grouping and the allocation reconciliation hold. Regeneration deletes the replaced drafts
+(`reading_impact.settle_regeneration`) before applying credits to the replacement, so their applications
+cascade away and the replacement sees the credit as free. Specified in `2026-10-payments-and-credits.md` §4.7.
 
 ---
 

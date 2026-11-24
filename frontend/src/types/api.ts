@@ -1807,7 +1807,7 @@ export interface ReadinessStepDetailData {
     missing?: number
     missing_participants?: string[]
     more_missing?: number
-    /** generation_conflicts warn: participants blocked by locked overlap. */
+    /** generation_conflicts warn: participants blocked by overlapping invoices. */
     conflict_count?: number
     conflicts?: ReadinessConflict[]
     more_conflicts?: number
@@ -1824,7 +1824,7 @@ export interface ReadinessStepDetailData {
     more_unbilled?: number
 }
 
-/** One participant blocked by locked overlapping invoices. */
+/** One participant blocked by overlapping invoices. */
 export interface ReadinessConflict {
     participant_id: string
     participant_name: string

@@ -114,11 +114,10 @@ def pass_through_total(lines: list[ChargeLine]) -> Decimal:
 def locked_invoice_for(zev, day: date):
     """An issued invoice of the ZEV that already covers ``day``.
 
-    The rule is the ZEV's, not the bearers': once any invoice of a period is
-    past draft and not cancelled (the status test of regeneration, see
-    ``engine.locked_overlapping_invoices``), the period takes no new charge and
-    the charges dated in it stay as they were. A period is then billed from
-    one set of charges, however far its invoices have got.
+    The rule is the ZEV's, not the bearers': once any invoice covering the day
+    is approved, sent or paid, the period takes no new charge and the charges
+    dated in it stay as they were, so the period is billed from one set of
+    charges.
     """
     return (
         Invoice.objects.filter(zev=zev, period_start__lte=day, period_end__gte=day)
