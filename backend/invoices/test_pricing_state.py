@@ -234,6 +234,22 @@ def test_base_total_accumulates_only_when_supplied():
     assert entry["quantity"] == Decimal("4")
 
 
+def test_a_zero_base_records_no_sign():
+    """A CHF 0 grid base is neither positive nor negative, so it must not
+    count as an opposite sign and suppress the line's blended percentage."""
+    zev = factories.ZevFactory()
+    tariff = percentage_tariff(zev)
+    accumulator = ItemAccumulator()
+
+    accumulator.add(tariff=tariff, quantity=Decimal("2"), total=Decimal("0.1"), unit="kWh",
+                    base_total=Decimal("0.4"))
+    accumulator.add(tariff=tariff, quantity=Decimal("2"), total=Decimal("0"), unit="kWh",
+                    base_total=Decimal("0"))
+
+    entry, = list(accumulator)
+    assert entry["base_signs"] == {True}
+
+
 def test_the_unit_of_the_first_add_wins():
     zev = factories.ZevFactory()
     tariff = energy_tariff(zev)

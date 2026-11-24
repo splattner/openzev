@@ -16,7 +16,7 @@ from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCa
 from testing import factories
 
 from .band_labels import band_description, translations_for
-from .engine import DynamicPriceGapError, generate_invoice, preflight_dynamic_prices
+from .engine import DynamicPriceGapError, _build_description, generate_invoice, preflight_dynamic_prices
 
 pytestmark = pytest.mark.django_db
 
@@ -274,3 +274,79 @@ class TestBandItemisation:
         assert len(items) == 1
         assert "Ø" not in items[0].description
         assert "90%" in items[0].description
+
+
+def _blend_tariff(zev):
+    """50% before 10:00, 70% after."""
+    tariff = Tariff.objects.create(
+        zev=zev, name="Blend", category=TariffCategory.LEVIES,
+        billing_mode=BillingMode.PERCENTAGE_OF_ENERGY, energy_type=EnergyType.GRID,
+        valid_from=date(2026, 1, 1),
+    )
+    TariffPeriod.objects.create(
+        tariff=tariff, period_type=PeriodType.LOW, percentage=Decimal("50.00"),
+        time_from=time(0, 0), time_to=time(10, 0),
+    )
+    TariffPeriod.objects.create(
+        tariff=tariff, period_type=PeriodType.HIGH, percentage=Decimal("70.00"),
+        time_from=time(10, 0), time_to=time(23, 59, 59),
+    )
+    return tariff
+
+
+class TestBlendedPercentageWithNonPositiveBase:
+    def test_negative_grid_base_shows_a_positive_blend(self):
+        participant, consumption, _production = _participant_with_meters(
+            itemize_tariff_bands=False, invoice_language="de",
+        )
+        _grid_tariff(participant.zev, "-0.20000")
+        _blend_tariff(participant.zev)
+        _read(consumption, 8, "1.0")
+        _read(consumption, 12, "1.0")
+
+        invoice = generate_invoice(participant, date(2026, 1, 1), date(2026, 1, 31))
+        item = invoice.items.get(description__startswith="Blend")
+
+        # raw base -0.40, billed -0.24 -> 60%, not -60%
+        assert item.description == "Blend (Ø 60% von CHF -0.2/kWh)"
+        assert item.total_chf == Decimal("-0.24")
+
+    @pytest.mark.parametrize(("noon_price", "total"), [
+        ("-0.20000", "-0.04"),  # base 0.00: no ratio exists
+        ("-0.19000", "-0.03"),  # base +0.01: the ratio would read 330%
+    ])
+    def test_mixed_sign_grid_bases_omit_the_blend(self, noon_price, total):
+        participant, consumption, _production = _participant_with_meters(
+            itemize_tariff_bands=False, invoice_language="de",
+        )
+        grid = Tariff.objects.create(
+            zev=participant.zev, name="Grid", category=TariffCategory.ENERGY,
+            billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,
+            valid_from=date(2026, 1, 1),
+        )
+        TariffPeriod.objects.create(
+            tariff=grid, period_type=PeriodType.LOW, price_chf_per_kwh=Decimal("0.20000"),
+            time_from=time(0, 0), time_to=time(10, 0),
+        )
+        TariffPeriod.objects.create(
+            tariff=grid, period_type=PeriodType.HIGH, price_chf_per_kwh=Decimal(noon_price),
+            time_from=time(10, 0), time_to=time(23, 59, 59),
+        )
+        _blend_tariff(participant.zev)
+        _read(consumption, 8, "1.0")
+        _read(consumption, 12, "1.0")
+
+        invoice = generate_invoice(participant, date(2026, 1, 1), date(2026, 1, 31))
+        item = invoice.items.get(description__startswith="Blend")
+
+        assert item.description == "Blend"
+        assert item.total_chf == Decimal(total)
+
+    def test_community_line_without_a_blend_keeps_the_marker(self):
+        tariff = _blend_tariff(factories.ZevFactory())
+
+        description = _build_description(
+            tariff, date(2026, 1, 1), date(2026, 1, 31), Decimal("2"), "de", bucket="shared",
+        )
+
+        assert description == "Blend (Gemeinschaftsanteil)"

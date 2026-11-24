@@ -650,6 +650,7 @@ class ItemAccumulator:
                 "total": Decimal("0"),
                 "unit": unit,
                 "base_total": Decimal("0"),
+                "base_signs": set(),
                 "bucket": bucket,
                 "group_key": group_key,
                 "period": period if split else None,
@@ -658,6 +659,8 @@ class ItemAccumulator:
         entry["total"] += total
         if base_total is not None:
             entry["base_total"] += base_total
+            if base_total:
+                entry["base_signs"].add(base_total > 0)
 
     def __iter__(self):
         return iter(self._entries.values())
@@ -1237,8 +1240,10 @@ def _build_description(
             if len(band_percentages) <= 1:
                 pct = next(iter(band_percentages), Decimal("0"))
                 avg_prefix = ""
+            elif effective_percentage is None:
+                return f"{tariff.name} ({marker})" if community else tariff.name
             else:
-                pct = effective_percentage if effective_percentage is not None else Decimal("0")
+                pct = effective_percentage
                 avg_prefix = f"{t['pct_average_prefix']} "
         # Format: remove trailing zeros (50.00 → 50, 33.50 → 33.5)
         pct_str = f"{pct:f}".rstrip("0").rstrip(".")
@@ -1542,12 +1547,17 @@ def _build_item_payloads(
             # The blended percentage a multi-band, unitemised percentage line
             # actually billed at — derived from what was billed before
             # grossing, not from the (VAT-inclusive) rounded total, so it
-            # reads as the tariff's own rate rather than a VAT artefact.
+            # reads as the tariff's own rate rather than a VAT artefact. Its
+            # magnitude, so credits and negative bases stay positive; None when
+            # the bases had both signs (+0.20 at 50% with -0.19 at 70% reads
+            # 330%, no average of the bands) or sum to zero.
             effective_percentage = (
-                (abs(Decimal(entry["total"])) / raw_base_total * Decimal("100")).quantize(
+                (abs(Decimal(entry["total"]) / raw_base_total) * Decimal("100")).quantize(
                     Decimal("0.01"), rounding=ROUND_HALF_UP
                 )
-                if raw_base_total and entry["tariff"].billing_mode == BillingMode.PERCENTAGE_OF_ENERGY
+                if raw_base_total
+                and len(entry["base_signs"]) < 2
+                and entry["tariff"].billing_mode == BillingMode.PERCENTAGE_OF_ENERGY
                 else None
             )
             payloads.append({
@@ -1621,7 +1631,7 @@ def _price_energy(acc, tariffs, energy_type, quantity, ts, day, *, sign, bucket=
             quantity=quantity,
             total=sign * (quantity * effective_price),
             unit="kWh",
-            # base_total is a magnitude for the printed base rate, not a credit.
+            # Keeps the grid base's sign, whether charge or credit.
             base_total=quantity * grid_base,
             bucket=bucket,
             period=period,

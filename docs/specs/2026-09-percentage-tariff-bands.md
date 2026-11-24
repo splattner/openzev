@@ -165,9 +165,13 @@ resolves a non-zero percentage at that timestamp (`_resolve_tariff_band`). This
 matches the engine exactly.
 
 **`_build_item_payloads`**: each payload gains `effective_percentage`, computed
-as `abs(raw entry total, before grossing) / base_total × 100`, quantised to
-0.01. It is `None` when `base_total` is 0 or the tariff is not a percentage
-tariff.
+as `abs(raw entry total before grossing / base_total) × 100`, quantised to
+0.01: the ratio's magnitude, so neither a credit nor a negative grid base
+prints a negative blend. It is `None` when the tariff is not a percentage
+tariff, when `base_total` is 0, or when the line's per-interval grid bases had
+both signs (`ItemAccumulator` keeps the set of non-zero `base_total` signs per
+entry as `base_signs`). Only bases of one sign make the ratio an average of the
+band rates; mixed signs can cancel to any value, including none at all.
 
 **`_build_description`** for `PERCENTAGE_OF_ENERGY`:
 
@@ -176,9 +180,10 @@ tariff.
 | itemised by band (`period` set) | `period.percentage` | `"{name} – {band} ({pct}% {pct_of} {base}/kWh{suffix})"`, where `band` comes from `band_description` and the dash follows the energy-line convention |
 | not itemised, all non-zero bands of the tariff share one percentage (0 % bands bill nothing and add no quantity, so they are ignored) | that percentage | unchanged: `"{name} ({pct}% {pct_of} {base}/kWh{suffix})"` |
 | not itemised, non-zero bands differ | `effective_percentage` | `"{name} (Ø {pct}% {pct_of} {base}/kWh{suffix})"` |
+| not itemised, non-zero bands differ, `effective_percentage` is `None` | none | `"{name}"`, or `"{name} ({community_marker})"` on a community line |
 
-Without a known base rate the same three rows drop the ` {pct_of} {base}/kWh`
-part, as today. Percentages are formatted as today, with trailing zeros stripped.
+The ` {pct_of} {base}/kWh` part is shown only when a row prints a percentage
+and the base rate is known, as today. Percentages are formatted as today, with trailing zeros stripped.
 `_build_description` receives `effective_percentage` as a new keyword argument.
 
 ### 5.3 Readiness (`invoices/readiness.py`)
@@ -298,6 +303,9 @@ label, and the "≈ CHF …/kWh" effective hint, in `de`, `fr`, `it` and `en`.
 - itemisation on: two lines named after their bands, and each line's rounded totals add up to the group total
 - itemisation off, bands differ: one line with `Ø` and the blended percentage
 - itemisation off, bands 0 % and 90 %: one line at `90%`, without `Ø`
+- itemisation off, negative grid base (1 kWh each at 50 % and 70 % of CHF −0.20, billed −0.24 on a base of −0.40): `Ø 60%`
+- itemisation off, grid bases of both signs (+0.20 with −0.20 or −0.19): the tariff name alone, totals CHF −0.04 and −0.03 unchanged
+- a community line without a blend keeps its marker: `"Blend (Gemeinschaftsanteil)"`
 - single flat band: description identical to today's format
 - `preflight_dynamic_prices` does not require the grid base at timestamps where every percentage band is 0 %
 
