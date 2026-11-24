@@ -41,7 +41,7 @@ name it, and the ZEV's VAT treatment stated on the face of the document.
 | Backend — wording | `invoices/tariff_overview_translations.py`: de/fr/it/en |
 | Backend — template | `templates/invoices/tariff_overview_pdf.html`, on `pdf/shared_pdf_base.html` |
 | Backend — API | `GET /api/v1/invoices/invoices/tariff-overview/` |
-| Backend — shared helper | `band_recurrence()` in `invoices/band_labels.py`; `display_grid_base_summary()` in `invoices/tariff_pricing.py`, shared with the contract |
+| Backend — shared helpers | `tariffs.display_pricing.display_grid_base_summary()` supplies the representative grid base. `invoices.tariff_pricing.percentage_band_rows()` and `invoices.band_labels.band_recurrence()` build the document rows and labels. |
 | Frontend | Download button in `TariffToolbar`; a scope menu while any version is out of force |
 | Docs | `docs/user-guide/07-tariff-configuration.md` |
 
@@ -95,6 +95,7 @@ Built by `invoices/tariff_overview.py`; never serialised over the API.
 | `validity` | `str` | `"01.01.2026 – 31.12.2026"`, or `tr["valid_open"]` formatted with `valid_from` |
 | `billing_mode_label` | `str` | Localised `BillingMode` label, from this document's own translations |
 | `is_current` | `bool` | In force on `as_of`. Always `True` when `scope="valid"` |
+| `grid_base_note` | `str` | Localised note for expired and future percentage versions. Labels a numeric amount as illustrative and gives the grid reference date. Other rows have an empty note. |
 | `notes` | `str` | `Tariff.notes`, printed as a muted line when non-empty |
 | `price_rows` | `list[PriceRow]` | At least one; a static tariff with no configured price is skipped, while a dynamic tariff with no fetched price gets an explicit unavailable row |
 | `inline_price` | `PriceRow \| None` | `price_rows[0]` when the tariff has exactly one price (its label blanked when redundant, §8.1), else `None`; the template renders it on the tariff's own row |
@@ -163,16 +164,20 @@ wrong by the size of the ZEV.
 ### 6.1 Percentage-of-energy tariffs
 
 The contract and overview derive static grid display prices as flat → HT → NT
-→ first remaining band, through `invoices/tariff_pricing.py`.
+→ first remaining band, through `tariffs.display_pricing`.
 The engine's `_price_energy` instead sums `_get_tariff_price(t, ts)` over the
 active grid tariffs, resolved per reading timestamp. On a single-band grid
 tariff the two agree; on a multi-band one they do not.
 
-Both documents call `display_grid_base_summary` on the same set of grid
-tariffs. Its `GridBaseSummary` contains `price_chf_per_kwh` and `dynamic_status`;
-`has_effective_price` keeps their unavailable/zero/negative handling aligned.
-Dynamic status selects the translated footnote, and unavailable amounts use
-the contract vocabulary's `tariff_none` placeholder in both documents.
+Both documents use the grid tariffs in force on the document date. Under
+`scope="all"`, rows for expired and future percentage versions give the grid
+reference date beside the version's validity and label any numeric price as
+illustrative.
+
+A static base at or below zero prints a bare percentage. An available dynamic
+base prints a numeric price, including zero or negative amounts. Dynamic status
+selects the translated footnote, and unavailable amounts use the contract
+vocabulary's `tariff_none` placeholder in both documents.
 
 **Which tariffs make up the base:** `energy_type == GRID` and
 `billing_mode == ENERGY`, active on the reference date. **Category is not part
@@ -509,7 +514,7 @@ enforces them across all four locales.
 | `test_scope_all_includes_superseded_versions` | Both versions' prices in the text |
 | `test_unknown_scope_is_400` | |
 
-**`TariffOverviewContentTests`** (17 tests, via `PdfReader.extract_text()`):
+**`TariffOverviewContentTests`** (18 tests)
 
 | Test | Asserts |
 |---|---|
@@ -525,6 +530,7 @@ enforces them across all four locales.
 | `test_prices_are_printed_in_rappen` | `22.50`, not `0.22500` |
 | `test_shared_fee_names_its_split` | Split wording and `split_key` present |
 | `test_percentage_row_matches_the_contract_figure` | Identical effective price in both documents |
+| `test_all_versions_labels_expired_percentage_price_as_illustrative` | The expired row labels the amount as illustrative and shows the grid reference date. A future row without a grid base shows just the reference date note. |
 | `test_percentage_base_spans_every_grid_category` | A grid sheet split across `ENERGY`/`GRID_FEES`/`LEVIES` gives 18.78, not the 8.84 an `ENERGY`-only base yields |
 | `test_percentage_row_matches_the_contract_across_grid_categories` | The parity above, on that same multi-category sheet — the single-tariff case agrees under either predicate and cannot see the divergence |
 | `test_multiband_grid_base_adds_the_footnote` | Footnote text present; absent for a single-band base |

@@ -1,17 +1,7 @@
-"""Tariff overview PDF: every tariff of a ZEV, as of a date, for printing.
+"""Tariff overview PDF for a ZEV on a given date.
 
-Every other participant-facing document a ZEV produces — invoice, annual
-statement, financial summary, participation contract — has a printable form.
-The tariffs did not: they existed only as rows on the Tariffs page. This is a
-projection of what ``Tariff`` and ``TariffPeriod`` already store; nothing new
-is computed here except the percentage-of-energy effective price, which goes
-through ``tariff_pricing`` so this document and the participation contract
-cannot print two different answers for the same tariff.
-
-Unlike the invoice, contract and annual statement, this is not a customisable
-``PdfTemplate`` — see ``docs/specs/2026-09-tariff-overview-pdf.md`` §10 for why.
-
-See ``docs/specs/2026-09-tariff-overview-pdf.md`` for the full design.
+Shares the representative grid price with the participation contract.
+See ``docs/specs/2026-09-tariff-overview-pdf.md``.
 """
 from datetime import date
 from decimal import Decimal
@@ -20,6 +10,8 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 
 from accounts.models import AppSettings
+from tariffs.display_pricing import GridBaseSummary, display_grid_base_summary
+from tariffs.dynamic.pricing import summarize_dynamic_tariff
 from tariffs.models import BillingMode, EnergyType, SplitKey, TariffCategory
 from tariffs.pricing import is_active
 from zev.models import VatMode
@@ -29,13 +21,7 @@ from .dates import format_date_value
 from .pdf_render import render_pdf
 from .pdf_translations import INVOICE_TRANSLATIONS
 from .tariff_overview_translations import TARIFF_OVERVIEW_TRANSLATIONS
-from .tariff_pricing import (
-    GridBaseSummary,
-    display_grid_base_summary,
-    grid_base_is_multiband,
-    percentage_band_rows,
-)
-from tariffs.dynamic.pricing import summarize_dynamic_tariff
+from .tariff_pricing import grid_base_is_multiband, percentage_band_rows
 
 TARIFF_OVERVIEW_TEMPLATE = "invoices/tariff_overview_pdf.html"
 
@@ -236,6 +222,8 @@ def _build_tariff_row(
     tariff, tr: dict, band_tr: dict, date_pattern: str, as_of: date,
     grid_base: GridBaseSummary, multiband_base: bool,
 ) -> dict | None:
+    is_current = is_active(tariff, as_of)
+    grid_base_note = ""
     if tariff.billing_mode == BillingMode.ENERGY:
         price_rows = _price_rows_for_energy_tariff(
             tariff, tr, band_tr, as_of, date_pattern
@@ -245,6 +233,11 @@ def _build_tariff_row(
             # than emit a header with an empty table underneath.
             return None
     elif tariff.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY:
+        if not is_current:
+            note_key = "illustrative_grid_price" if grid_base.has_effective_price else "grid_reference_date"
+            grid_base_note = tr[note_key].format(
+                date=format_date_value(grid_base.reference_date, date_pattern)
+            )
         price_rows = _price_row_for_percentage_tariff(
             tariff, tr, band_tr, grid_base, multiband_base
         )
@@ -269,7 +262,8 @@ def _build_tariff_row(
         "name": tariff.name,
         "validity": _validity_display(tariff, tr, date_pattern),
         "billing_mode_label": tr["billing_modes"].get(tariff.billing_mode, tariff.get_billing_mode_display()),
-        "is_current": is_active(tariff, as_of),
+        "is_current": is_current,
+        "grid_base_note": grid_base_note,
         "notes": tariff.notes,
         "price_rows": price_rows,
         "inline_price": inline_price,

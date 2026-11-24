@@ -502,9 +502,10 @@ the pre-existing static gap it deliberately leaves alone.
 
 ### 9.4 Printed documents (tariff overview PDF, participation contract)
 
-`backend/tariffs/dynamic/pricing.py`, `invoices/tariff_pricing.py`, and
-`tariff_overview.py`. Documents and management screens have no consumption
-profile from which to select a live price, so they share one display policy:
+`tariffs.dynamic.pricing` computes dynamic averages and
+`tariffs.display_pricing` uses them in representative grid bases. Documents
+and management screens have no consumption profile from which to select a live
+price, so they share one display policy:
 
 - intersect the tariff's validity with the trailing `DYNAMIC_DISPLAY_DAYS = 30` window ending on
   the document/reference date;
@@ -523,21 +524,14 @@ summary and prints the matching dynamic-average/partial/unavailable note. The
 tariff API exposes direct source averages as `dynamic_price_summary`.
 Static display fallback is flat → HT → NT → first band.
 
-Percentage tariffs additionally expose `percentage_base_summary`: decimal-string
-or null `price_chf_per_kwh`, `dynamic_status` (complete/partial/unavailable or
-null for an entirely static base), and ISO `reference_date`; other tariff modes
-return null. Today is clamped to the percentage version's validity. Both grid
-version selection and every component's average use that date, matching the
-document helper's calculation. No grid tariffs yields a zero static base;
-unavailable dynamic input yields null. The frontend consumes this result
-directly from each tariff version, without an additional client-side map,
-recalculating temporal selection, or adding differently dated averages.
+The [tariff API's reference-date rule](2026-03-tariffs-and-billing-engine.md#312-dynamic-tariffs)
+uses the percentage version's validity. The all-versions PDF illustrates expired
+and future versions using the grid tariffs in force on the document date.
+An empty grid base yields `"0"` in the API. A missing dynamic price yields null.
 
-`prepare_tariff_display_summaries` batches direct summaries and percentage bases.
-`summarize_requests` uses stable caller keys, here `(tariff id, reference date)`.
-Disjoint windows are merged per
-source and sliced by bisection, with one source query even for multiple
-percentage reference dates; intervening years are not loaded.
+List and series read price points at most once per source across all reference
+dates. Overlapping windows are merged and gaps between disjoint windows are
+excluded from the query.
 
 Invoices still use exact interval prices. A month's dynamic readings accumulate
 into one line, whose derived `unit_price_chf` is the consumption-weighted
@@ -927,13 +921,13 @@ accepts version 1 static archives and legacy adapter-based dynamic descriptors.
 | `invoices/test_dynamic_evidence.py` | Frozen provenance after tariff mutation/deletion; legacy-refund refusal; migration backfill, interval-overlap, and exact-URL capability preflights; PostgreSQL barriers verify concurrent clear/overwrite waits for committed evidence or proceeds after rollback; equivalent billed-resolution no-op; price-use-timestamp bulk preflight including static-only scan avoidance, unused tariff types, non-zero percentage bases, and zero-percentage exclusion; UTC permissions; bounded migration batches |
 | `invoices/test_dynamic_pricing.py` | `DynamicSeries` bisection, `TariffResolver.price_at` (static and dynamic), the gap refusal, end-to-end `generate_invoice` (consumption, negative prices, percentage base, feed-in) |
 | `invoices/test_readiness.py::DynamicTariffPricingCoverageTests` | Full/partial/no coverage, type-masking, percentage-tariff coupling, DST, static→dynamic series versioning, and coverage checked regardless of category (a dynamic tariff filed under `grid_fees`) |
-| `invoices/test_dynamic_tariff_pricing.py` | Duration weighting, bounded/persistent-key batch summaries, historical percentage dates with one source query, flat/HT/NT/band fallback, unavailable-wins ordering, and static multi-band flags |
+| `invoices/test_dynamic_tariff_pricing.py` | Duration weighting, bounded batches, version-specific dates, off-page grid lookup, flat/HT/NT/band fallback, nonpositive and unavailable bases, and static multi-band flags |
 | `invoices/test_tariff_overview.py::TariffOverviewDynamicTariffTests` | Unfetched tariff prints an unavailable row, fetched average with its footnote, percentage-tariff footnote and amount |
 | `tariffs/test_dynamic_components.py` | Per-version aggregate composition, recursive v2 expansion, `dso` excludes electricity, `integrated` certain/possible split, plain/unknown types empty |
 | `tariffs/test_vse_import.py` | Dynamic grid candidate is importable, no-URL and storage-refund blocks, the missing-product warning, version-aware aggregate warnings (preview names certain + possible-extra, apply upgrades to the probed version's exact list), `is_free` correctness, source get-or-create + probe + version-aware reuse after probing, real probe-point initialization with successful status/timestamps, unreachable-URL error, post-commit initial-backfill enqueueing only after a successful new-source tariff write, auto-detection of the probed API version (not hardcoded v1.0.5), and a new source's dropped-unit warnings reaching the apply result |
 | `tariffs/test_dynamic_source_api.py` | Authenticated role access, global list and picker fields |
 | `tariffs/test_dynamic_source_management_api.py` | Discovery (components carry the versioned expansion), served `aggregated_tariff_types` on the source list, probed creation/reuse (and the probe's dropped-unit warnings reaching the response and audit metadata), API-version validation, admin editing, scoped history/stats/limits, queue audit, permissions, guarded clear (label only, mistyped label refused), guarded delete (unused source removed with its points and audited, still-linked source refused with 409, mistyped/absent label refused, owner refused, refused while the fetch lock is held), and capability re-checking (corrects a wrongly-detected `supports_range`, reports dropped units, admin-only, refused while the fetch lock is held, a fetch failure leaves identity untouched) |
-| `tariffs/test_dynamic_source_link_api.py` | Historical percentage-base parity on detail/series; linking through the ordinary tariff API: create with a source, mismatched-energy-type 400, fee-tariff-cannot-link 400, existing-band refusal, dynamic source on duplicated/new versions, `dynamic_source` on the series endpoint, and the evidence-preservation guard (deleting/repointing/clearing a billed dynamic tariff's source refused; unbilled ones unaffected; setting a source for the first time unaffected) |
+| `tariffs/test_dynamic_source_link_api.py` | List, series and detail return identical percentage bases for historical and scheduled versions, including unavailable coverage and an empty grid base. Also covers linking through the ordinary tariff API, validation, version copying and billed-source evidence guards. |
 
 CI runs the whole suite on both SQLite and PostgreSQL. The evidence/rollback
 barrier tests run on PostgreSQL only: SQLite cannot verify row-lock behavior.

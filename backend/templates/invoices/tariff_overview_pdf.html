@@ -269,7 +269,11 @@
                     <tr class="tariff-header-row{% if forloop.counter0|divisibleby:2 %} even{% endif %}{% if not tariff.is_current %} superseded{% endif %}{% if tariff.inline_price %} inline{% endif %}">
                         <td class="tariff-name">
                             {{ tariff.name }}
-                            <span class="tariff-subtitle">{{ tariff.billing_mode_label }} · {{ tariff.validity }}{% if tariff.inline_price.label %} · {{ tariff.inline_price.label }}{% endif %}{% if tariff.inline_price.footnote_index %}<span class="footnote-marker">{{ tariff.inline_price.footnote_index }}</span>{% endif %}</span>
+                            <span class="tariff-subtitle">
+                                {{ tariff.billing_mode_label }} · {{ tariff.validity }}
+                                {% if tariff.grid_base_note %}· {{ tariff.grid_base_note }}{% endif %}
+                                {% if tariff.inline_price.label %}· {{ tariff.inline_price.label }}{% endif %}{% if tariff.inline_price.footnote_index %}<span class="footnote-marker">{{ tariff.inline_price.footnote_index }}</span>{% endif %}
+                            </span>
                         </td>
                         {% if tariff.inline_price %}
                         <td class="price-recurrence">{{ tariff.inline_price.recurrence }}</td>

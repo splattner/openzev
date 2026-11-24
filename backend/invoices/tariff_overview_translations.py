@@ -20,6 +20,8 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
             "aufgeschlagen, da sie in den bezogenen Vorleistungen bereits enthalten ist."
         ),
         "valid_open": "ab {date}",
+        "illustrative_grid_price": "Beispielpreis mit Netztarifen vom {date}",
+        "grid_reference_date": "Stichtag für Netztarife {date}",
         "valid_span": "{start} – {end}",
         "no_tariffs": "Für dieses Datum sind keine Tarife konfiguriert.",
         "unit_rp": "Rp./kWh",
@@ -75,6 +77,8 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
             "car elle est déjà comprise dans les prestations en amont."
         ),
         "valid_open": "dès le {date}",
+        "illustrative_grid_price": "Prix indicatif selon les tarifs du réseau au {date}",
+        "grid_reference_date": "Date de référence des tarifs du réseau {date}",
         "valid_span": "{start} – {end}",
         "no_tariffs": "Aucun tarif n'est configuré pour cette date.",
         "unit_rp": "cts/kWh",
@@ -130,6 +134,8 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
             "poiché è già inclusa nelle prestazioni a monte."
         ),
         "valid_open": "dal {date}",
+        "illustrative_grid_price": "Prezzo indicativo basato sulle tariffe di rete del {date}",
+        "grid_reference_date": "Data di riferimento delle tariffe di rete {date}",
         "valid_span": "{start} – {end}",
         "no_tariffs": "Per questa data non sono configurate tariffe.",
         "unit_rp": "ct/kWh",
@@ -186,6 +192,8 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
             "already included in the upstream services purchased."
         ),
         "valid_open": "from {date}",
+        "illustrative_grid_price": "Illustrative price using grid rates on {date}",
+        "grid_reference_date": "Grid rate reference date {date}",
         "valid_span": "{start} – {end}",
         "no_tariffs": "No tariffs are configured for this date.",
         "unit_rp": "Rp./kWh",

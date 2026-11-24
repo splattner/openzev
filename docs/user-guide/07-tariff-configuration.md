@@ -1025,7 +1025,8 @@ Metering) — the same grouping and order as an invoice's line items.
   participant is billed.
 - **All versions, including superseded and future ones** adds the tariff
   versions not in force today, shown greyed out with their full validity span
-  instead of "from …".
+  instead of "from …". For expired or future percentage tariffs, any price
+  shown is illustrative and uses the grid rates on the document date.
 
 There is no date picker (yet) — the overview always reflects today. Only the
 community's managers and viewers, and admins, can download it; there is nothing on this document a

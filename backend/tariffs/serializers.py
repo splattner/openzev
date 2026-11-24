@@ -1,8 +1,10 @@
 from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema_field
 from config.ui_notices import notice_data
+from .display_pricing import TariffDisplaySummaries, build_tariff_display_summaries
 from .dynamic.adapters import DynamicApiVersion
 from .dynamic.diagnostics import normalize_fetch_diagnostics
 from .dynamic.models import DynamicTariffSource
@@ -187,36 +189,28 @@ class TariffSerializer(TariffValidationMixin, serializers.ModelSerializer):
         many=True, write_only=True, required=False, allow_empty=False,
     )
 
+    def _display_summaries(self, obj) -> TariffDisplaySummaries:
+        """A supplied batch must cover every tariff version being serialized."""
+        batch = self.context.get("display_summaries")
+        if batch is not None:
+            return batch
+
+        tariffs = [obj]
+        if obj.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY:
+            tariffs.extend(Tariff.objects.filter(
+                zev_id=obj.zev_id, billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,
+            ).prefetch_related("periods"))
+        return build_tariff_display_summaries(tariffs, as_of=timezone.localdate())
+
     def get_percentage_base_summary(self, obj):
         if obj.billing_mode != BillingMode.PERCENTAGE_OF_ENERGY:
             return None
-        if not hasattr(obj, "_prefetched_percentage_base"):
-            from django.utils import timezone
-            from invoices.tariff_pricing import prepare_tariff_display_summaries
-            from .models import EnergyType
-
-            grids = list(Tariff.objects.filter(
-                zev_id=obj.zev_id, billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,
-            ).prefetch_related("periods"))
-            prepare_tariff_display_summaries([*grids, obj], as_of=timezone.localdate())
-        return obj._prefetched_percentage_base
+        return self._display_summaries(obj).percentage_bases[obj.pk].as_dict()
 
     def get_dynamic_price_summary(self, obj):
         if not obj.dynamic_source_id:
             return None
-        # list_series precomputes one query per shared source via
-        # prepare_tariff_display_summaries; detail routes fall through
-        # to the single-tariff query.
-        precomputed = getattr(obj, "_prefetched_dynamic_summary", None)
-        if precomputed is not None:
-            return precomputed.as_dict()
-        from django.utils import timezone
-
-        from .dynamic.pricing import summarize_dynamic_tariff
-
-        return summarize_dynamic_tariff(
-            obj, as_of=timezone.localdate()
-        ).as_dict()
+        return self._display_summaries(obj).dynamic_prices[obj.pk].as_dict()
 
     def _raise_validation_error_from_model(self, exc: DjangoValidationError):
         raise model_validation_error(exc) from exc
