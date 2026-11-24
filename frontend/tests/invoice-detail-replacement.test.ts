@@ -36,6 +36,7 @@ vi.mock('../src/lib/api/invoices', () => ({
 const base: Invoice = {
     id: '1', invoice_number: 'R-2', zev: 'z1', zev_name: 'Muster ZEV', participant: 'p1', participant_name: 'Anna Consumer',
     period_start: '2026-01-01', period_end: '2026-01-31', status: 'draft', total_chf: '10.00', pdf_url: null,
+    allowed_actions: ['approve', 'delete'],
 }
 
 async function renderDetail(invoice: Invoice) {

@@ -8,11 +8,11 @@ import { formatApiError } from '../../lib/api/errors'
 import { useToast } from '../../lib/toast'
 import type { Invoice } from '../../types/api'
 import { CorrectInvoiceModal, type CorrectInvoiceValues } from './CorrectInvoiceModal'
-import { appliedCreditChf, canAdjustInvoice, canCorrectInvoice, creditableChf } from './invoiceCredits'
+import { appliedCreditChf, creditableChf } from './invoiceCredits'
+import { isAllowed } from './invoiceStatus'
 
-export function InvoiceCorrectionButton({ invoice, canManage, onChanged }: {
+export function InvoiceCorrectionButton({ invoice, onChanged }: {
     invoice: Invoice
-    canManage: boolean
     onChanged: (invoice: Invoice) => void
 }) {
     const { t } = useTranslation()
@@ -27,7 +27,7 @@ export function InvoiceCorrectionButton({ invoice, canManage, onChanged }: {
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoiceDetail.credits.correctFailed')), 'error'),
     })
-    if (!canCorrectInvoice(invoice, canManage)) return null
+    if (!isAllowed(invoice, 'correct')) return null
     return (
         <>
             <button type="button" className={invoice.needs_data_review ? 'button button-primary' : 'button button-secondary'} onClick={() => setOpen(true)}>
@@ -39,7 +39,7 @@ export function InvoiceCorrectionButton({ invoice, canManage, onChanged }: {
                 isPending={mutation.isPending}
                 creditableChf={creditableChf(invoice).toFixed(2)}
                 creditAppliedChf={appliedCreditChf(invoice).toFixed(2)}
-                canAdjust={canAdjustInvoice(invoice, canManage)}
+                canAdjust={isAllowed(invoice, 'adjust')}
                 onClose={() => setOpen(false)}
                 onSubmit={(values) => mutation.mutate(values)}
             />

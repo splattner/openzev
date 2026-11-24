@@ -15,7 +15,7 @@ from allocation.validity import active_during, business_tz, period_window
 from zev.models import Participant, MeteringPointAssignment
 from metering.models import MeterReading
 from .engine import replacement_blocker
-from .models import EmailLog, Invoice, InvoiceReadingImpact, InvoiceStatus
+from .models import Credit, EmailLog, Invoice, InvoiceReadingImpact, InvoiceStatus
 from .readiness import _spans_cover
 from .serializers import InvoiceSerializer
 
@@ -52,6 +52,7 @@ def compute_period_overview(*, zev, period_start: date_type, period_end: date_ty
         period_end=period_end,
     ).select_related("participant__party", "zev").order_by("-created_at", "-id")
     invoice_rows = invoice_rows.prefetch_related(
+        Prefetch("credits", queryset=Credit.objects.select_related("zev")),
         "items", "email_logs", "payments", "credits__applications__invoice", "credit_applications__credit__source_invoice",
         Prefetch(
             "reading_impacts", to_attr="open_reading_impacts",

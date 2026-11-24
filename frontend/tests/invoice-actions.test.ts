@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getLatestEmailLog } from '../src/features/invoices/emailLogs'
-import { hasDeletePermission } from '../src/features/invoices/useInvoiceActions'
-import type { Invoice } from '../src/types/api'
+import { isAllowed, nextInvoiceWorkflowAction } from '../src/features/invoices/invoiceStatus'
+import type { Credit, Invoice, InvoiceAction } from '../src/types/api'
 
 describe('invoice action helpers', () => {
   it('returns the newest email log by created_at', () => {
@@ -35,23 +35,21 @@ describe('invoice action helpers', () => {
     expect(getLatestEmailLog({} as Invoice)).toBeNull()
   })
 
-  it('allows deleting only draft, cancelled, or admin invoices', () => {
-    const sentInvoice = { status: 'sent' } as Invoice
-    const draftInvoice = { status: 'draft' } as Invoice
-    const cancelledInvoice = { status: 'cancelled' } as Invoice
+  it('takes the next workflow step from the actions the server allows', () => {
+    const next = (allowed: InvoiceAction[]) => nextInvoiceWorkflowAction({ allowed_actions: allowed })
 
-    expect(hasDeletePermission(sentInvoice, 'participant')).toBe(false)
-    expect(hasDeletePermission(draftInvoice, 'participant')).toBe(true)
-    expect(hasDeletePermission(cancelledInvoice, 'participant')).toBe(true)
-    expect(hasDeletePermission(sentInvoice, 'admin')).toBe(true)
+    expect(next(['approve', 'delete'])).toBe('approve')
+    expect(next(['mark_sent', 'send_email'])).toBe('send-email')
+    expect(next(['send_email', 'mark_paid', 'record_payment'])).toBe('mark-paid')
+    // A viewer, a disabled ZEV or a settled invoice: nothing to move on.
+    expect(next([])).toBeNull()
+    expect(next(['correct', 'adjust'])).toBeNull()
   })
 
-  it('keeps issued and paid invoices (#388)', () => {
-    const issuedCancelled = { status: 'cancelled', approved_at: '2026-02-01T08:00:00Z' } as Invoice
-    const paid = { status: 'paid', paid_chf: '42.00' } as Invoice
-
-    expect(hasDeletePermission(issuedCancelled, 'user')).toBe(false)
-    expect(hasDeletePermission(issuedCancelled, 'admin')).toBe(true)
-    expect(hasDeletePermission(paid, 'admin')).toBe(false)
+  it('offers nothing when an older backend sends no allowed_actions', () => {
+    const legacy = { status: 'draft' } as unknown as Invoice
+    expect(nextInvoiceWorkflowAction(legacy)).toBeNull()
+    expect(isAllowed(legacy, 'delete')).toBe(false)
+    expect(isAllowed({ status: 'open' } as unknown as Credit, 'refund')).toBe(false)
   })
 })

@@ -166,7 +166,6 @@ export function InvoicesContent() {
         selectedZevId,
         period,
         rows,
-        userRole: user?.role,
         accountId: user?.id,
         canWrite: canWriteSelectedCommunity,
         canGenerate: wholePeriod,

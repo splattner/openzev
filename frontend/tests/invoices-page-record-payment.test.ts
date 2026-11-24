@@ -48,9 +48,10 @@ const invoice: Invoice = {
     id: 'i1', invoice_number: 'INV-9', zev: '42', zev_name: 'Review ZEV', participant: 'p1', participant_name: 'Anna',
     period_start: '2026-01-01', period_end: '2026-01-31', status: 'sent', total_chf: '100.00',
     paid_chf: '25.00', outstanding_chf: '75.00', amount_due_chf: '100.00', pdf_url: null, email_logs: [],
+    allowed_actions: ['send_email', 'mark_paid', 'record_payment', 'correct', 'adjust'],
 }
 const settledInvoice: Invoice = {
-    ...invoice, status: 'paid', paid_chf: '100.00', outstanding_chf: '0.00',
+    ...invoice, status: 'paid', paid_chf: '100.00', outstanding_chf: '0.00', allowed_actions: ['correct', 'adjust'],
 }
 const rows: InvoicePeriodParticipantRow[] = [{
     participant_id: 'p1', participant_name: 'Anna', metering_data_complete: true, metering_points_total: 1,

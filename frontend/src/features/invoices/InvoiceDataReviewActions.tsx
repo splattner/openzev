@@ -13,7 +13,7 @@ import { useWriteScope } from '../../lib/useWriteScope'
 import { useManagedZev } from '../../lib/managedZev'
 import type { Invoice } from '../../types/api'
 import { InvoiceCorrectionButton } from './InvoiceCorrectionButton'
-import { canCorrectInvoice } from './invoiceCredits'
+import { isAllowed } from './invoiceStatus'
 import { InvoiceEnergyChanges } from './InvoiceEnergyChanges'
 
 export function InvoiceDataReviewActions({ invoice, canManage, onChanged }: {
@@ -72,8 +72,8 @@ export function InvoiceDataReviewActions({ invoice, canManage, onChanged }: {
         },
     })
     if (!canManage) return null
-    if (canCorrectInvoice(invoice, canManage)) {
-        return <div className="actions-row actions-row-end"><InvoiceCorrectionButton invoice={invoice} canManage={canManage} onChanged={onChanged} /></div>
+    if (isAllowed(invoice, 'correct')) {
+        return <div className="actions-row actions-row-end"><InvoiceCorrectionButton invoice={invoice} onChanged={onChanged} /></div>
     }
     if (!canReplace && !canGenerate) return null
     const operation = canReplace ? 'replace' : 'generate'

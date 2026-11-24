@@ -4,14 +4,15 @@ import uuid
 import zipfile
 from datetime import date as date_type
 
-from django.db.models import Count, OuterRef, Prefetch, Subquery, Sum
+from django.db import transaction
+from django.db.models import Count, Exists, F, OuterRef, Prefetch, Subquery, Sum
 from django.utils import timezone
 from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.http import FileResponse, HttpResponse
+from django.http import FileResponse, Http404, HttpResponse
 from accounts.permissions import HasZevAccess
 from config.http import content_disposition, sanitize_filename
 from allocation.errors import AllocationError
@@ -19,7 +20,7 @@ from allocation.validity import active_during
 from zev.models import Zev, Participant
 from zev import access
 from zev.scoping import ZevScopedQuerySetMixin, assert_zev_not_disabled
-from .models import Credit, CreditStatus, Invoice, InvoicePdfStatus, InvoiceReadingImpact, InvoiceStatus, EmailLog, Payment
+from .models import Credit, CreditApplication, CreditStatus, Invoice, InvoicePdfStatus, InvoiceReadingImpact, InvoiceStatus, EmailLog, Payment
 from .serializers import (
     CorrectInvoiceSerializer, CreditSerializer, InvoiceCalculationSerializer, InvoiceListSerializer, InvoiceSerializer, GenerateInvoiceSerializer,
     GenerateZevInvoicesSerializer, MarkPaidSerializer, PaymentSerializer,
@@ -41,8 +42,8 @@ from .workflow import (
     InvoiceWorkflowError,
     approve_invoice,
     cancel_invoice,
-    can_delete_invoice,
     correct_invoice,
+    delete_refusal,
     delete_payment,
     mark_invoice_paid,
     mark_invoice_sent,
@@ -187,6 +188,8 @@ class InvoiceViewSet(
         # generation instantiates the view without an action.
         if getattr(self, "action", None) != "list":
             queryset = queryset.prefetch_related(
+                # Credits carry their ZEV for their own allowed_actions (one joined query).
+                Prefetch("credits", queryset=Credit.objects.select_related("zev")),
                 "items", "email_logs", "payments", "credits__applications__invoice",
                 "credit_applications__credit__source_invoice",
                 Prefetch(
@@ -220,12 +223,23 @@ class InvoiceViewSet(
                 .annotate(_open_count=Count("id"))
                 .values("_open_count")
             )
+            # ``allowed_actions`` reads credited_sum/uses_credit beside paid_sum.
+            credited = (
+                Credit.objects.filter(source_invoice=OuterRef("pk"))
+                .order_by()
+                .values("source_invoice")
+                .annotate(total=Sum(F("amount_chf") - F("rounding_chf")))
+                .values("total")
+            )
             queryset = queryset.annotate(
                 last_email_status=Subquery(latest_log.values("status")[:1]),
                 last_email_log_id=Subquery(latest_log.values("id")[:1]),
                 paid_sum=Subquery(paid[:1]),
                 open_data_impact_count=Subquery(open_impacts),
-
+                credited_sum=Subquery(credited[:1]),
+                uses_credit=Exists(
+                    CreditApplication.objects.filter(invoice=OuterRef("pk"), released_at__isnull=True)
+                ),
             )
         return self.scope_queryset(queryset)
 
@@ -310,74 +324,57 @@ class InvoiceViewSet(
         except ValueError:
             raise ValidationError({field_name: ["Must be YYYY-MM-DD."]})
 
+    # destroy's refusals (``workflow.delete_refusal``): audit summary suffix, error, HTTP status.
+    _DELETE_REFUSALS = {
+        "scope": (" due to tenant scope.", "Permission denied.", status.HTTP_403_FORBIDDEN),
+        "credits": (": credit notes issued.", "Invoices with credit notes cannot be deleted.", status.HTTP_400_BAD_REQUEST),
+        "payments": (
+            ": payments recorded.", "Invoices with recorded payments cannot be deleted.", status.HTTP_400_BAD_REQUEST,
+        ),
+        "status": (
+            " due to status guard.", "Only draft or cancelled invoices that were never approved can be deleted.",
+            status.HTTP_400_BAD_REQUEST,
+        ),
+    }
+
     def destroy(self, request, *args, **kwargs):
         # get_object() already 404s for anyone who does not manage the ZEV (the
-        # write-scoped queryset); this stays as the audited, explicit refusal.
+        # write-scoped queryset); the guards then run on the locked row, like
+        # every workflow transition, so a concurrent approval or payment is seen.
         invoice = self.get_object()
-        if not access.can_manage(request.user, invoice.zev):
+        with transaction.atomic():
+            try:
+                locked = Invoice.objects.select_for_update(of=("self",)).select_related("zev").get(pk=invoice.pk)
+            except Invoice.DoesNotExist:
+                # A concurrent delete committed between get_object() and the lock.
+                raise Http404
+            refusal = delete_refusal(locked, request.user)
+            if refusal is None:
+                invoice_number = _invoice_target_display(locked)
+                self.perform_destroy(locked)
+        if refusal == "disabled":
+            return _deny_if_zev_disabled(request, locked, action_type="invoice.delete", denied_verb="invoice deletion")
+        if refusal is not None:
+            summary, error, http_status = self._DELETE_REFUSALS[refusal]
             _record_invoice_event(
                 request=request,
                 action_type="invoice.delete",
-                summary=f"Denied invoice deletion for {_invoice_target_display(invoice)} due to tenant scope.",
+                summary=f"Denied invoice deletion for {_invoice_target_display(locked)}{summary}",
                 status=AuditEventStatus.DENIED,
-                invoice=invoice,
+                invoice=locked,
+                changes={"status": {"before": locked.status, "after": locked.status}} if refusal == "status" else None,
             )
-            return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
-        denial = _deny_if_zev_disabled(request, invoice, action_type="invoice.delete", denied_verb="invoice deletion")
-        if denial is not None:
-            return denial
-        if invoice.credits.exists():
-            _record_invoice_event(
-                request=request,
-                action_type="invoice.delete",
-                summary=f"Denied invoice deletion for {_invoice_target_display(invoice)}: credit notes issued.",
-                status=AuditEventStatus.DENIED,
-                invoice=invoice,
-            )
-            return Response(
-                {"error": "Invoices with credit notes cannot be deleted."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if invoice.payments.exists():
-            _record_invoice_event(
-                request=request,
-                action_type="invoice.delete",
-                summary=f"Denied invoice deletion for {_invoice_target_display(invoice)}: payments recorded.",
-                status=AuditEventStatus.DENIED,
-                invoice=invoice,
-            )
-            return Response(
-                {"error": "Invoices with recorded payments cannot be deleted."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if not request.user.is_admin and not can_delete_invoice(invoice):
-            _record_invoice_event(
-                request=request,
-                action_type="invoice.delete",
-                summary=f"Denied invoice deletion for {_invoice_target_display(invoice)} due to status guard.",
-                status=AuditEventStatus.DENIED,
-                invoice=invoice,
-                changes={"status": {"before": invoice.status, "after": invoice.status}},
-            )
-            return Response(
-                {"error": "Only draft or cancelled invoices that were never approved can be deleted."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        invoice_number = _invoice_target_display(invoice)
-        invoice_id = str(invoice.pk)
-        participant_id = str(invoice.participant_id)
-        zev_id = str(invoice.zev_id)
-        response = super().destroy(request, *args, **kwargs)
+            return Response({"error": error}, status=http_status)
         _record_invoice_event(
             request=request,
             action_type="invoice.delete",
             summary=f"Deleted invoice {invoice_number}.",
-            target_id=invoice_id,
+            target_id=str(invoice.pk),
             target_display=invoice_number,
-            changes={"status": {"before": invoice.status, "after": "deleted"}},
-            metadata={"participant_id": participant_id, "zev_id": zev_id},
+            changes={"status": {"before": locked.status, "after": "deleted"}},
+            metadata={"participant_id": str(locked.participant_id), "zev_id": str(locked.zev_id)},
         )
-        return response
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=["post"], url_path="generate",
             permission_classes=[IsAuthenticated, HasZevAccess])

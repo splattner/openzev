@@ -12,7 +12,7 @@ import { useToast } from '../../lib/toast'
 import type { Credit, Invoice } from '../../types/api'
 import { InvoiceCorrectionButton } from './InvoiceCorrectionButton'
 import { Badge } from '../../components/Badge'
-import { canCorrectInvoice, canRefundCredit } from './invoiceCredits'
+import { isAllowed } from './invoiceStatus'
 import { RefundCreditModal, type RefundCreditValues } from './RefundCreditModal'
 
 /**
@@ -22,12 +22,10 @@ import { RefundCreditModal, type RefundCreditValues } from './RefundCreditModal'
  */
 export function InvoiceCreditsCard({
     invoice,
-    canManage,
     onChanged,
     onCreditChanged,
 }: {
     invoice: Invoice
-    canManage: boolean
     /** Called with the invoice the server returned after a correction. */
     onChanged: (invoice: Invoice) => void
     /** Called after a credit note was refunded, so the caller can reload what shows it. */
@@ -48,7 +46,8 @@ export function InvoiceCreditsCard({
         statusCol: row => row.status,
         reasonCol: row => row.reason,
     })
-    const canCorrect = canCorrectInvoice(invoice, canManage) && !invoice.needs_data_review
+    // While corrections await review, the review notice offers the correction instead.
+    const canCorrect = isAllowed(invoice, 'correct') && !invoice.needs_data_review
 
     const refundMutation = useMutation({
         mutationFn: (values: RefundCreditValues) => refundCredit((refunding as Credit).id, values),
@@ -72,7 +71,7 @@ export function InvoiceCreditsCard({
                 <h3 id="invoice-credits-title">{t('pages.invoiceDetail.credits.title')}</h3>
                 {canCorrect ? (
                     <div className="actions-row actions-row-wrap">
-                        <InvoiceCorrectionButton invoice={invoice} canManage={canManage} onChanged={onChanged} />
+                        <InvoiceCorrectionButton invoice={invoice} onChanged={onChanged} />
                     </div>
                 ) : null}
             </div>
@@ -136,7 +135,7 @@ export function InvoiceCreditsCard({
                                                         : t('pages.invoiceDetail.credits.pdfPending')}
                                                 </span>
                                             )}
-                                            {canRefundCredit(credit, canManage) ? (
+                                            {isAllowed(credit, 'refund') ? (
                                                 <button
                                                     type="button"
                                                     className="button button-secondary button-compact button-icon"

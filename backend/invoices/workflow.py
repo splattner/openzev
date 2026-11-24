@@ -55,6 +55,7 @@ from django.utils import timezone
 
 from inbox import producers as inbox_producers
 from notifications import producers as notification_producers
+from zev import access
 from zev.models import VatMode
 
 from .models import (
@@ -604,3 +605,108 @@ def can_delete_invoice(invoice: Invoice) -> bool:
         invoice.status in (InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED)
         and invoice.approved_at is None
     )
+
+
+def _received(invoice: Invoice) -> tuple[bool, Decimal]:
+    """Whether payments exist, and their sum: annotation, else prefetch, else query."""
+    if "paid_sum" in invoice.__dict__:
+        return invoice.paid_sum is not None, invoice.paid_sum or Decimal("0")
+    payments = getattr(invoice, "_prefetched_objects_cache", {}).get("payments")
+    if payments is not None:
+        return bool(payments), sum((p.amount_chf for p in payments), Decimal("0"))
+    total = Payment.objects.filter(invoice_id=invoice.pk).aggregate(total=Sum("amount_chf"))["total"]
+    return total is not None, total or Decimal("0")
+
+
+def _credited(invoice: Invoice) -> tuple[bool, Decimal]:
+    """Whether credit notes were issued for the invoice, and what they credit
+    (as :func:`credited_chf`): annotation, else prefetch, else query."""
+    if "credited_sum" in invoice.__dict__:
+        return invoice.credited_sum is not None, invoice.credited_sum or Decimal("0")
+    credits = getattr(invoice, "_prefetched_objects_cache", {}).get("credits")
+    if credits is not None:
+        return bool(credits), sum((c.amount_chf - c.rounding_chf for c in credits), Decimal("0"))
+    total = Credit.objects.filter(source_invoice_id=invoice.pk).aggregate(
+        total=Sum(F("amount_chf") - F("rounding_chf"))
+    )["total"]
+    return total is not None, total or Decimal("0")
+
+
+def _uses_credit(invoice: Invoice) -> bool:
+    """Whether unreleased credit is set against the invoice: annotation, else prefetch, else query."""
+    if "uses_credit" in invoice.__dict__:
+        return invoice.uses_credit
+    applications = getattr(invoice, "_prefetched_objects_cache", {}).get("credit_applications")
+    if applications is not None:
+        return any(a.released_at is None for a in applications)
+    return CreditApplication.objects.filter(invoice_id=invoice.pk, released_at__isnull=True).exists()
+
+
+def _may_write(user, zev) -> bool:
+    """A manager of the ZEV, which must be enabled unless the user is an admin."""
+    return access.can_manage(user, zev) and (user.is_admin or zev.disabled_at is None)
+
+
+def _delete_blocker(invoice: Invoice, user, *, has_credits: bool, has_payments: bool) -> str | None:
+    """Credit notes and payments block admins too; the status guard does not (ADR 0037)."""
+    if has_credits:
+        return "credits"
+    if has_payments:
+        return "payments"
+    if not user.is_admin and not can_delete_invoice(invoice):
+        return "status"
+    return None
+
+
+def delete_refusal(invoice: Invoice, user) -> str | None:
+    """Why ``user`` may not delete the locked ``invoice`` row (``scope``,
+    ``disabled``, ``credits``, ``payments``, ``status``), or ``None``.
+    ``allowed_actions`` offers ``delete`` by the same :func:`_delete_blocker`."""
+    if not access.can_manage(user, invoice.zev):
+        return "scope"
+    if not user.is_admin and invoice.zev.disabled_at is not None:
+        return "disabled"
+    return _delete_blocker(
+        invoice, user,
+        has_credits=Credit.objects.filter(source_invoice_id=invoice.pk).exists(),
+        has_payments=Payment.objects.filter(invoice_id=invoice.pk).exists(),
+    )
+
+
+def allowed_actions(invoice: Invoice, user) -> list[str]:
+    """Return the invoice actions offered to this user.
+
+    An offer, not the authorization: every write endpoint rechecks. ``send_email``
+    is offered only for an approved or sent invoice, though the endpoint checks
+    no status.
+    """
+    if not _may_write(user, invoice.zev):
+        return []
+    status = invoice.status
+    has_payments, received = _received(invoice)
+    has_credits, credited = _credited(invoice)
+    due = amount_due(invoice)
+    actions = []
+    if status == InvoiceStatus.DRAFT:
+        actions.append("approve")
+    if status == InvoiceStatus.APPROVED:
+        actions += ["mark_sent", "send_email"]
+    if status == InvoiceStatus.SENT:
+        actions += ["send_email", "mark_paid"]
+        if due > 0 and due - received > 0:
+            actions.append("record_payment")
+    # correct_invoice: paid, or sent with money received; never a payout.
+    if (status == InvoiceStatus.PAID or (status == InvoiceStatus.SENT and received > 0)) and invoice.total_chf > 0:
+        if received - credited > 0:
+            actions += ["correct", "adjust"]
+        elif _uses_credit(invoice):
+            actions.append("correct")
+    if _delete_blocker(invoice, user, has_credits=has_credits, has_payments=has_payments) is None:
+        actions.append("delete")
+    return actions
+
+
+def credit_allowed_actions(credit: Credit, user) -> list[str]:
+    """``["refund"]`` while something remains of the credit and ``user`` may
+    write to its ZEV (:func:`refund_credit` and the refund view's guards)."""
+    return ["refund"] if _may_write(user, credit.zev) and credit.remaining() > 0 else []

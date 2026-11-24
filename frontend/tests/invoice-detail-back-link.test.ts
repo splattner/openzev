@@ -41,6 +41,7 @@ vi.mock('../src/lib/api/invoices', () => ({
             status: 'sent',
             total_chf: '10.00',
             pdf_url: null,
+            allowed_actions: ['send_email', 'mark_paid', 'record_payment'],
         }),
     ),
     fetchInvoicePdfBlob: vi.fn(async () => { throw new Error('PDF unavailable') }),
@@ -104,12 +105,17 @@ describe('InvoiceDetailPage return link', () => {
     })
 
     it.each([
-        ['draft', 'pages.invoices.approve'], ['approved', 'pages.invoices.sendEmail'], ['sent', 'pages.invoices.markPaid'],
-    ])('offers one next action for %s and none in a disabled invoice community', async (status, label) => {
+        ['draft', 'pages.invoices.approve', ['approve', 'delete']],
+        ['approved', 'pages.invoices.sendEmail', ['mark_sent', 'send_email']],
+        ['sent', 'pages.invoices.markPaid', ['send_email', 'mark_paid', 'record_payment']],
+    ] as const)('offers one next action for %s and none in a disabled invoice community', async (status, label, allowed) => {
         for (const disabled of [false, true]) {
             mockRole('manager', disabled)
             const inv = await fetchInvoice('1')
-            vi.mocked(fetchInvoice).mockResolvedValueOnce({ ...inv, status, payments: [], needs_data_review: false })
+            // The server allows a manager of a disabled community nothing.
+            vi.mocked(fetchInvoice).mockResolvedValueOnce({
+                ...inv, status, payments: [], needs_data_review: false, allowed_actions: disabled ? [] : [...allowed],
+            })
             const container = await renderDetail()
             const primary = container.querySelectorAll('button.button-primary')
             expect(primary).toHaveLength(disabled ? 0 : 1)
@@ -232,7 +238,7 @@ describe('InvoiceDetailPage return link', () => {
         vi.mocked(fetchInvoice).mockResolvedValueOnce({
             id: '1', invoice_number: 'NEW', zev: 'z1', zev_name: 'Muster ZEV', participant: 'p1', participant_name: 'Anna',
             period_start: '2026-01-01', period_end: '2026-01-31', status: 'draft', total_chf: '10.00',
-            total_grid_kwh: '4.0001', total_local_kwh: '1.0000', pdf_url: null,
+            total_grid_kwh: '4.0001', total_local_kwh: '1.0000', pdf_url: null, allowed_actions: ['approve', 'delete'],
         })
         const container = await renderDetail([{ pathname: '/billing/invoices/1', state: {
             recalculation: { invoiceId: '1', before: { invoice_number: 'OLD', total_chf: before, total_grid_kwh: '4.0000', total_local_kwh: '1.0000' } },

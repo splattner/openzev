@@ -44,6 +44,7 @@ import { InvoicesContent } from '../src/pages/InvoicesPage'
 const invoice: Invoice = {
     id: 'i1', invoice_number: 'INV-1', zev: '42', zev_name: 'Review ZEV', participant: 'p1', participant_name: 'Anna',
     period_start: '2026-01-01', period_end: '2026-01-31', status: 'sent', total_chf: '10.00', pdf_url: '/stored.pdf',
+    allowed_actions: ['send_email', 'mark_paid', 'record_payment'],
 }
 const rows: InvoicePeriodParticipantRow[] = [
     // Sent invoice with a stored PDF.
@@ -59,7 +60,10 @@ const rows: InvoicePeriodParticipantRow[] = [
         participant_kind: 'person', participant_name_addition: '', participant_valid_from: '2026-01-01',
         participant_valid_to: null, party_id: 'party-1', metering_point_labels: [],
         metering_points_with_data: 1, missing_meter_ids: [], generation_eligibility: null,
-        invoice: { ...invoice, id: 'i2', invoice_number: 'INV-2', participant: 'p2', participant_name: 'Beat', status: 'draft', pdf_url: null },
+        invoice: {
+            ...invoice, id: 'i2', invoice_number: 'INV-2', participant: 'p2', participant_name: 'Beat', status: 'draft', pdf_url: null,
+            allowed_actions: ['approve', 'delete'],
+        },
     },
     // Nothing generated yet, but eligible: the recommended batch action's target.
     {
@@ -150,7 +154,7 @@ describe('invoices page filters', () => {
         act(() => segment(container, 'pages.invoices.filters.drafts').click())
         await waitForCondition(() => names(container).length === 1, 'the filtered rows')
         api.overview.mockResolvedValue({ rows: rows.map((row) => row.participant_id === 'p2'
-            ? { ...row, invoice: { ...row.invoice!, status: 'approved' } } : row) })
+            ? { ...row, invoice: { ...row.invoice!, status: 'approved', allowed_actions: ['mark_sent', 'send_email'] } } : row) })
         await act(async () => { await client.invalidateQueries() })
         await waitForCondition(() => container.querySelector('tbody') === null, 'the empty filter state')
         expect(container.textContent).toContain('pages.invoices.filters.noMatches')

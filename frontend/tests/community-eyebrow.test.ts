@@ -78,6 +78,7 @@ vi.mock('../src/lib/api/invoices', () => ({
         status: 'sent',
         total_chf: '42.00',
         pdf_url: null,
+        allowed_actions: [],
     }),
     fetchInvoicePdfBlob: () => Promise.reject(new Error('no pdf')),
     generateInvoicePdf: () => Promise.resolve({}),

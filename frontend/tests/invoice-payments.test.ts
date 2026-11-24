@@ -34,6 +34,7 @@ const invoice: Invoice = {
     id: 'i1', invoice_number: 'INV-1', zev: 'z1', zev_name: 'Community A', participant: 'p1', participant_name: 'Anna',
     period_start: '2026-02-01', period_end: '2026-02-28', status: 'sent', total_chf: '100.00',
     paid_chf: '0.00', outstanding_chf: '100.00', payments: [],
+    allowed_actions: ['send_email', 'mark_paid', 'record_payment'],
 }
 
 const row: InvoicePeriodParticipantRow = {
@@ -114,7 +115,9 @@ describe('InvoicePaymentsCard', () => {
     })
 
     it('offers only mark-paid for a payout invoice', async () => {
-        const { container, root } = await renderCard({ ...invoice, total_chf: '-40.00', outstanding_chf: '-40.00' })
+        const { container, root } = await renderCard({
+            ...invoice, total_chf: '-40.00', outstanding_chf: '-40.00', allowed_actions: ['send_email', 'mark_paid'],
+        })
         expect(byText(container, 'pages.invoiceDetail.payments.record')).toBeUndefined()
         expect(byText(container, 'pages.invoices.markPaid')).toBeTruthy()
         act(() => root.unmount())
@@ -122,7 +125,7 @@ describe('InvoicePaymentsCard', () => {
     })
 
     it('stays read-only for a viewer and hides an empty card', async () => {
-        const { container, root } = await renderCard(invoice, false)
+        const { container, root } = await renderCard({ ...invoice, allowed_actions: [] }, false)
         expect(container.querySelector('section')).toBeNull()
         act(() => root.unmount())
         container.remove()

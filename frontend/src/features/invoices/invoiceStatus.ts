@@ -3,6 +3,7 @@
  * approved or sent but is not yet settled (paid/cancelled/draft).
  */
 import { todayBusinessIso } from '../../lib/dates'
+import type { Invoice } from '../../types/api'
 
 const OPEN_INVOICE_STATUSES: readonly string[] = ['approved', 'sent']
 
@@ -45,10 +46,17 @@ export function paymentState(
   return invoice.due_date && invoice.due_date < today ? 'overdue' : 'due'
 }
 
-export function nextInvoiceWorkflowAction(invoice: { status: string }): 'approve' | 'send-email' | 'mark-paid' | null {
-  if (invoice.status === 'draft') return 'approve'
-  if (invoice.status === 'approved') return 'send-email'
-  if (invoice.status === 'sent') return 'mark-paid'
+export function isAllowed<A extends string>(item: { allowed_actions?: readonly A[] }, action: NoInfer<A>): boolean {
+  // Missing while an older backend serves this frontend (separate Helm images): offer nothing.
+  return (item.allowed_actions ?? []).includes(action)
+}
+
+/** The step that moves the invoice on, among those the server allows. */
+export function nextInvoiceWorkflowAction(invoice: Pick<Invoice, 'allowed_actions'>): 'approve' | 'send-email' | 'mark-paid' | null {
+  if (isAllowed(invoice, 'approve')) return 'approve'
+  // A sent invoice may also be emailed again; settling it comes first.
+  if (isAllowed(invoice, 'mark_paid')) return 'mark-paid'
+  if (isAllowed(invoice, 'send_email')) return 'send-email'
   return null
 }
 

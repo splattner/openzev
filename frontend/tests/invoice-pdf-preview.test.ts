@@ -48,6 +48,7 @@ const invoice = {
     total_feed_in_kwh: '10',
     access_link: null,
     pdf_url: '/media/invoices/invoice.pdf',
+    allowed_actions: [],
 }
 
 async function renderInvoiceDetail() {
