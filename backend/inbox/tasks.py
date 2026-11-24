@@ -46,8 +46,11 @@ def send_document_email_task(self, document_id: str) -> bool:
     try:
         return send_document_email(document)
     except Exception as exc:
-        logger.warning("Emailing document %s failed: %s", document_id, type(exc).__name__)
+        error_class = type(exc).__name__
+        logger.warning("Emailing document %s failed: %s", document_id, error_class)
         if self.request.retries >= self.max_retries:
             record_email_failure(document, exc)
             return False
-        raise self.retry(exc=exc, countdown=60)
+
+    # Celery logs retry exceptions. Leave out the original error text and exception chain.
+    raise self.retry(exc=RuntimeError(error_class), countdown=60)

@@ -4,6 +4,7 @@ from unittest import mock
 
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import OperationalError
 from django.test import TestCase
 from rest_framework.test import APIClient
 
@@ -139,6 +140,25 @@ class SendTaskTests(DocumentEmailBase):
         self.assertEqual((event.status, event.target_id), (AuditEventStatus.SUCCESS, str(document.pk)))
         self.assertNotIn("anna@example.com", str(event.metadata_json) + event.summary)
 
+    def test_audit_failure_does_not_retry_send(self):
+        document = self.document()
+        with (
+            # Put the address in the exception text to check that the log omits it.
+            mock.patch("inbox.emails._audit", side_effect=OperationalError(self.anna.email)) as audit,
+            mock.patch.object(send_document_email_task, "retry", side_effect=AssertionError("Unexpected retry")),
+            self.assertLogs("inbox.emails", level="ERROR") as logs,
+        ):
+            sent = send_document_email_task.run(str(document.pk))
+
+        self.assertTrue(sent)
+        self.assertEqual([message.to for message in mail.outbox], [[self.anna.email]])
+        audit.assert_called_once()
+        self.assertFalse(self.emailed_audit().exists())
+        log = "\n".join(logs.output)
+        self.assertIn(str(document.pk), log)
+        self.assertIn("OperationalError", log)
+        self.assertNotIn(self.anna.email, log)
+
     def test_a_withdrawn_document_is_not_emailed(self):
         document = self.document()
         withdraw(document, self.owner)
@@ -173,3 +193,47 @@ class SendTaskTests(DocumentEmailBase):
         self.assertEqual(event.status, AuditEventStatus.FAILED)
         self.assertEqual(event.metadata_json["error"], "OSError")
         self.assertNotIn("anna@example.com", str(event.metadata_json) + event.summary)
+
+    def test_a_zero_send_result_retries_and_audits_failure(self):
+        document = self.document()
+        with mock.patch("inbox.emails.EmailMessage.send", return_value=0) as send:
+            sent = send_document_email_task.apply(args=(str(document.pk),)).get()
+
+        self.assertFalse(sent)
+        self.assertEqual(send.call_count, send_document_email_task.max_retries + 1)
+        self.assertEqual(mail.outbox, [])
+        event = self.emailed_audit().get()
+        self.assertEqual(event.status, AuditEventStatus.FAILED)
+        self.assertEqual(event.metadata_json["error"], "DocumentEmailNotSent")
+
+    def test_celery_retry_logs_omit_the_send_error_text(self):
+        document = self.document()
+        with (
+            mock.patch("inbox.emails.EmailMessage.send", side_effect=[OSError(self.anna.email), 1]),
+            self.assertLogs("celery.app.trace", level="INFO") as logs,
+        ):
+            sent = send_document_email_task.apply(args=(str(document.pk),)).get()
+
+        self.assertTrue(sent)
+        log = "\n".join(logs.output)
+        self.assertIn("OSError", log)
+        self.assertNotIn(self.anna.email, log)
+
+    def test_failure_audit_logs_omit_both_error_messages(self):
+        document = self.document()
+        with (
+            mock.patch("inbox.emails.EmailMessage.send", side_effect=OSError(self.anna.email)),
+            mock.patch("inbox.emails._audit", side_effect=OperationalError("database unavailable")),
+            self.assertLogs("inbox.emails", level="ERROR") as logs,
+        ):
+            sent = send_document_email_task.apply(
+                args=(str(document.pk),), retries=send_document_email_task.max_retries,
+            ).get()
+
+        self.assertFalse(sent)
+        self.assertFalse(self.emailed_audit().exists())
+        log = "\n".join(logs.output)
+        self.assertIn(str(document.pk), log)
+        self.assertIn("OperationalError", log)
+        self.assertNotIn("database unavailable", log)
+        self.assertNotIn(self.anna.email, log)
