@@ -1203,8 +1203,8 @@ status with effective dates on the party (#515). Invoices issued before
 
 **`inclusive`** is for a ZEV that is not VAT-registered but buys in costs that
 carry VAT it cannot reclaim. Tariff prices stay net in storage. At invoice
-time, each line whose tariff *bears input VAT* has its raw total multiplied by
-`1 + rate` before rounding, so the derived unit price is gross too. No VAT line
+time, each positive line whose tariff *bears input VAT* has its raw total multiplied by
+`1 + rate` before rounding (a credit carries no input VAT), so the derived unit price is gross too. No VAT line
 appears — a non-registered issuer must not show one — but the amounts billed
 are gross. The VAT thus folded in is summed into `Invoice.embedded_vat_chf`
 for the operator's own records (annual statement, bookkeeping); it is never

@@ -367,7 +367,11 @@ class TestDynamicInvoiceGeneration:
         # Grid: 10 * 0.20 = 2.00. Levy: 50% of 0.20 * 10 = 1.00. Total 3.00.
         assert invoice.subtotal_chf == Decimal("3.00")
 
-    def test_feed_in_export_is_credited_at_the_fetched_price(self):
+    @pytest.mark.parametrize(("price", "expected_amount"), [
+        ("0.17700", "-1.42"),
+        ("-0.05430", "0.43"),
+    ])
+    def test_feed_in_export_uses_the_signed_fetched_price(self, price, expected_amount):
         participant = factories.ParticipantFactory(valid_from=date(2026, 1, 1))
         zev = participant.zev
         consumption_mp = factories.MeteringPointFactory(zev=zev)
@@ -385,7 +389,7 @@ class TestDynamicInvoiceGeneration:
             request_mode="exact_url", supports_range=False,
             url="https://api.bkw.ch/api/dyntariffs/v1/Tariffs/energyreturn",
         )
-        store(source, datetime(2026, 1, 15, 12, 0, tzinfo=UTC), "0.17700")
+        store(source, datetime(2026, 1, 15, 12, 0, tzinfo=UTC), price)
         dynamic_tariff(
             zev, source, name="Feed-in (dynamic)", category=TariffCategory.ENERGY,
             energy_type=EnergyType.FEED_IN,
@@ -398,8 +402,8 @@ class TestDynamicInvoiceGeneration:
 
         invoice = generate_invoice(participant, date(2026, 1, 1), date(2026, 1, 31))
 
-        # A credit: 8 kWh exported at 0.177 CHF/kWh.
-        assert invoice.subtotal_chf == Decimal("-1.42")
+        assert invoice.items.get(item_type="feed_in").total_chf == Decimal(expected_amount)
+        assert invoice.subtotal_chf == Decimal(expected_amount)
 
     def test_feed_in_export_is_credited_at_the_minimum_when_the_fetched_price_is_lower(self):
         participant = factories.ParticipantFactory(valid_from=date(2026, 1, 1))
