@@ -377,7 +377,7 @@ class SeededVatLookupTests(TestCase):
 
     def test_lookup_boundaries_against_seeded_table(self):
         from accounts.models import VatRate
-        from invoices.engine import _active_vat_rate
+        from tariffs.pricing import invoice_vat_rate
 
         cases = [
             (datetime.date(2017, 12, 31), None, Decimal("0")),
@@ -390,15 +390,15 @@ class SeededVatLookupTests(TestCase):
             with self.subTest(day=day):
                 active = VatRate.active_for_day(day)
                 self.assertEqual(active.rate if active else None, expected_rate)
-                self.assertEqual(_active_vat_rate(day), expected_engine_rate)
+                self.assertEqual(invoice_vat_rate(day), expected_engine_rate)
 
     def test_missing_rate_falls_back_to_zero(self):
         from accounts.models import VatRate
-        from invoices.engine import _active_vat_rate
+        from tariffs.pricing import invoice_vat_rate
 
         clear_vat_rates()
         self.assertIsNone(VatRate.active_for_day(datetime.date(2026, 9, 11)))
-        self.assertEqual(_active_vat_rate(datetime.date(2026, 9, 11)), Decimal("0"))
+        self.assertEqual(invoice_vat_rate(datetime.date(2026, 9, 11)), Decimal("0"))
 
 
 class SchemaLeftFullyMigratedTests(TransactionTestCase):

@@ -406,8 +406,9 @@ published document is checked before it is trusted.
 
 `backend/invoices/engine.py`. Price resolution funnels through
 `TariffResolver.price_at(tariff, ts) -> (price, period)`, the *only* place a
-tariff's price is read — static or dynamic. A dynamic tariff resolves via
-`_DynamicSeries` (a sorted, bisected view of one source's stored points) and
+tariff's price is read — static or dynamic; the rule itself is
+`tariffs.pricing.price_at`. A dynamic tariff resolves via
+`tariffs.pricing.DynamicSeries` (a sorted, bisected view of one source's stored points) and
 always returns `period=None`: a 15-minute series must never itemise per
 reading, or a month's invoice would run to thousands of lines.
 
@@ -420,7 +421,7 @@ All four of the engine's price-resolution points read from `price_at`:
 | Personal feed-in credit | Export compensation |
 | Community feed-in credit | Export compensation, shared allocation |
 
-`_DynamicSeries` loads only intervals overlapping the invoice period, once per
+`DynamicSeries` loads only intervals overlapping the invoice period, once per
 source per participant transaction. Before pricing, `generate_invoice` locks
 all applicable dynamic source rows in primary-key order. Storage, clearing, and
 deletion use the same row locks; the cache lease remains fetch/maintenance
@@ -924,7 +925,7 @@ accepts version 1 static archives and legacy adapter-based dynamic descriptors.
 | `tariffs/test_dynamic_tariff_link.py` | `Tariff.clean()` rules, capability validation, static→dynamic series versioning, PROTECT retention, no dynamic price bands |
 | `zev/test_transfer.py::DynamicTariffTransferTests` | Natural-key match, recreation on a fresh instance, static tariffs unaffected |
 | `invoices/test_dynamic_evidence.py` | Frozen provenance after tariff mutation/deletion; legacy-refund refusal; migration backfill, interval-overlap, and exact-URL capability preflights; PostgreSQL barriers verify concurrent clear/overwrite waits for committed evidence or proceeds after rollback; equivalent billed-resolution no-op; price-use-timestamp bulk preflight including static-only scan avoidance, unused tariff types, non-zero percentage bases, and zero-percentage exclusion; UTC permissions; bounded migration batches |
-| `invoices/test_dynamic_pricing.py` | `_DynamicSeries` bisection, `TariffResolver.price_at` (static and dynamic), the gap refusal, end-to-end `generate_invoice` (consumption, negative prices, percentage base, feed-in) |
+| `invoices/test_dynamic_pricing.py` | `DynamicSeries` bisection, `TariffResolver.price_at` (static and dynamic), the gap refusal, end-to-end `generate_invoice` (consumption, negative prices, percentage base, feed-in) |
 | `invoices/test_readiness.py::DynamicTariffPricingCoverageTests` | Full/partial/no coverage, type-masking, percentage-tariff coupling, DST, static→dynamic series versioning, and coverage checked regardless of category (a dynamic tariff filed under `grid_fees`) |
 | `invoices/test_dynamic_tariff_pricing.py` | Duration weighting, bounded/persistent-key batch summaries, historical percentage dates with one source query, flat/HT/NT/band fallback, unavailable-wins ordering, and static multi-band flags |
 | `invoices/test_tariff_overview.py::TariffOverviewDynamicTariffTests` | Unfetched tariff prints an unavailable row, fetched average with its footnote, percentage-tariff footnote and amount |

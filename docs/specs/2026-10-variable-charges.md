@@ -133,7 +133,7 @@ No bearer (`n == 0`, or `Σw == 0`) yields no line for anybody and is reported b
 
 ### 4.3 Engine integration (`invoices/engine.py`)
 
-`ItemAccumulator` is keyed by tariff (group key, `_tariff_bears_input_vat`, sort order, item type
+`ItemAccumulator` is keyed by tariff (group key, `bears_input_vat`, sort order, item type
 and description all read the tariff), so charges do **not** go through it. Instead:
 
 1. After `_build_item_payloads(...)`, `generate_invoice` reads

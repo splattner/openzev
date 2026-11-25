@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.test import TestCase
 
 from accounts.models import UserRole, VatRate
-from invoices.engine import _tariff_bears_input_vat, generate_invoice
+from invoices.engine import generate_invoice
 from invoices.models import InvoiceItem
 from invoices.test_helpers import make_participant, make_user, make_zev
 from metering.models import MeterReading, QuarantinedReading, ReadingDirection, ReadingResolution
@@ -264,32 +264,6 @@ class InvoiceVatRateSelectionTests(TestCase):
         self.assertEqual(invoice.vat_chf, Decimal("0.00"))
         self.assertEqual(invoice.total_chf, invoice.subtotal_chf)
         self.assertIsNone(invoice.embedded_vat_chf)
-
-
-class TariffBearsInputVatTests(TestCase):
-    """Which tariff costs a non-registered ZEV pays non-recoverable VAT on."""
-
-    def _tariff(self, category, energy_type=None):
-        return Tariff(category=category, energy_type=energy_type)
-
-    def test_grid_energy_bears_vat(self):
-        self.assertTrue(
-            _tariff_bears_input_vat(self._tariff(TariffCategory.ENERGY, EnergyType.GRID))
-        )
-
-    def test_grid_fees_levies_metering_bear_vat(self):
-        for category in (TariffCategory.GRID_FEES, TariffCategory.LEVIES, TariffCategory.METERING):
-            self.assertTrue(_tariff_bears_input_vat(self._tariff(category)), category)
-
-    def test_local_energy_does_not_bear_vat(self):
-        self.assertFalse(
-            _tariff_bears_input_vat(self._tariff(TariffCategory.ENERGY, EnergyType.LOCAL))
-        )
-
-    def test_feed_in_does_not_bear_vat(self):
-        self.assertFalse(
-            _tariff_bears_input_vat(self._tariff(TariffCategory.ENERGY, EnergyType.FEED_IN))
-        )
 
 
 class InvoiceVatInclusiveModeTests(TestCase):

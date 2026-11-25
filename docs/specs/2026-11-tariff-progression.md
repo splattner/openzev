@@ -110,8 +110,8 @@ No model, field, migration or serializer-for-a-model change. Read-only use of
 Everything is computed by `invoices/tariff_progression.py::build_progression(zev,
 energy_type, date_from, date_to)`, next to `tariff_pricing.py`. It uses
 `tariffs.periods.resolve_band` (the one band-resolution rule, shared with the
-engine), `invoices.engine._tariff_bears_input_vat` (the one input-VAT classifier;
-imported, not copied; open point 3) and `tariffs.series.series_key`.
+engine), `tariffs/pricing.py` (billing spec §4.4: `is_active`, `is_active_during`, `daily_vat_rate`, `with_input_vat`,
+`percentage_base`, `floored`) and `tariffs.series.series_key`.
 
 ### 5.1 Which tariffs
 
@@ -221,7 +221,7 @@ month) covers every day of it, and an hourly price that straddles a band edge
 counts in both bands. Stored prices are therefore loaded by overlap with the
 range, not by start: a quarter that began before the range still applies. A feed-in
 tariff's `minimum_price_chf_per_kwh` floor is applied to each stored price before
-averaging, as the engine applies it per lookup.
+averaging (`tariffs.pricing.floored`), as the engine applies it per lookup.
 
 - **Component:** `band_period_id` is `null`, `dynamic` is `true`, `coverage` is the
   share of the slot's hours that have a stored price (0 to 1); `net`/`gross` follow
@@ -242,7 +242,8 @@ averaging, as the engine applies it per lookup.
 ### 5.5 VAT: net and gross
 
 `gross` is `null` everywhere when `vat_mode = not_registered`. Otherwise `rate`
-is `VatRate.active_for_day(interval.from).rate`, or 0 when none is active
+is `tariffs.pricing.daily_vat_rate(rates, interval.from)` over the `VatRate` rows
+read once, the rate active on that day, or 0 when none is active
 (then `gross == net`). The rate is constant within an interval because VAT
 boundaries are breakpoints.
 
@@ -250,7 +251,7 @@ boundaries are breakpoints.
 |---|---|---|
 | `not_registered` | the price as entered, which is final | `null` |
 | `registered` | the price as entered (net) | `net × (1 + rate)` for every component |
-| `inclusive` | the published price | bearing tariff (`_tariff_bears_input_vat`): `net × (1 + rate)`; other: `net`. A percentage line that does **not** bear VAT uses the **gross** grid base: `pct × gross_base`; one that does bear VAT uses the net base, then `× (1 + rate)` (never both) |
+| `inclusive` | the published price | `with_input_vat(tariff, net, rate)`: bearing tariff (`bears_input_vat`): `net × (1 + rate)`; other: `net`. A percentage line takes `percentage_base`: one that does **not** bear VAT uses the **gross** grid base: `pct × gross_base`; one that does bear VAT uses the net base, then `× (1 + rate)` (never both) |
 
 where, for `inclusive`, `gross_base = Σ band price × (1 + rate)` over the grid
 tariffs that bear input VAT (`+ price` for those that do not), the engine's
@@ -260,7 +261,8 @@ values, then rounded (§5.10), never gross applied to a rounded net.
 Differences from invoicing, stated so nobody expects them to vanish:
 
 - The engine uses the rate in force on an invoice's **`period_end`** for the whole
-  invoice; the progression uses the rate in force **on the day**. An invoice that
+  invoice (`invoice_vat_rate`); the progression uses the rate in force **on the
+  day** (`daily_vat_rate`). An invoice that
   spans a rate change is billed at one rate; the chart shows the step on the day.
 - Under `registered`, VAT is charged on `vat_base_chf`, which excludes producer
   credits. This is a per-invoice base, not a per-kWh price, so the view shows the
@@ -668,7 +670,7 @@ own. Tariffs are built with `factories.TariffFactory` and `TariffPeriodFactory`.
 | `test_inclusive_takes_a_share_of_the_gross_grid_base` | Net 0.15, gross 0.16215 |
 | `test_inclusive_never_grosses_a_bearing_percentage_twice` | Net base, then grossed once |
 
-**`TestDynamic`** (18 tests): `test_a_dynamic_tariff_is_averaged_per_month`;
+**`TestDynamic`** (19 tests): `test_a_dynamic_tariff_is_averaged_per_month`;
 `test_months_are_breakpoints_only_while_the_tariff_is_in_force`;
 `test_the_mean_is_added_to_the_static_components`;
 `test_a_price_valid_for_a_quarter_covers_every_month_of_it` (one stored point
@@ -679,16 +681,19 @@ coverage 1.0000 in each);
 `test_a_quarter_not_yet_published_is_reported_as_no_data` (an unpublished next
 quarter is `dynamic_no_data`, not silently zero);
 `test_an_hourly_price_across_a_band_edge_is_split_by_overlap` (high band
-07:30-20:30 against hourly prices, compared with a brute-force average of the
-engine's `_DynamicSeries.price_at`);
+07:30-20:30 against hourly prices, compared with a brute-force average of
+`tariffs.pricing.price_at` over the source's `DynamicSeries`);
 `test_the_mean_matches_the_engine_prices_in_every_slot` (seeds a month of prices
 that depend on hour and weekday and compares each slot's mean with a brute-force
-average of the engine's `_DynamicSeries.price_at` over every quarter-hour);
+average of `tariffs.pricing.price_at` over the source's `DynamicSeries` at every
+quarter-hour);
 `test_a_month_without_prices_is_reported_and_not_priced`;
 `test_a_month_without_prices_leaves_the_static_components_in_place`;
 `test_a_gap_in_the_fetched_prices_is_partial`;
 `test_a_month_with_a_clock_change_is_complete`;
 `test_a_feed_in_floor_applies_to_each_interval`;
+`test_tariffs_sharing_a_source_keep_their_own_floor` (two feed-in tariffs on one
+source, floors 0.05 and 0.08, each averaged with its own floor);
 `test_a_percentage_takes_its_share_of_the_dynamic_grid_mean`;
 `test_a_percentage_follows_the_dynamic_mean_in_each_slot`;
 `test_a_percentage_is_blocked_when_the_dynamic_base_has_no_data`;
@@ -806,8 +811,8 @@ Decided:
 
 Open:
 
-3. **`_tariff_bears_input_vat`.** Imported from the engine as is; promote it to a
-   public name in the same PR if importing a private function is unwelcome.
+3. **`_tariff_bears_input_vat`.** Resolved: promoted to
+   `tariffs.pricing.bears_input_vat`, which the engine and this view both call.
 4. **Registered feed-in.** Feed-in is grossed like every other component under
    `registered` because the credit reduces the VAT base (#969, still open there).
    If #969 changes that, this view follows.

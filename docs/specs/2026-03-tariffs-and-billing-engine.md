@@ -226,7 +226,7 @@ reads through `OrderBy` expressions to the column they sort on).
 The frontend sorts again for display, by season first
 (`features/tariffs/recurrence.ts`, `seasonSortKey`).
 
-**Period matching rules** (evaluated per-timestamp, `tariffs.periods.resolve_band`, which `invoices/engine.py:_resolve_tariff_band` delegates to; `TariffResolver` memoises the result per tariff and per wall-clock month, weekday and time of day, the only inputs the rule reads).
+**Period matching rules** (evaluated per-timestamp, `tariffs.periods.resolve_band`, which `tariffs.pricing.price_at` prices a static tariff with; `TariffResolver` memoises the result per tariff and per wall-clock month, weekday and time of day, the only inputs the rule reads).
 Months, weekdays and hours describe the **Swiss wall clock**: `resolve_band`
 first converts an aware `ts` (the ORM returns UTC) with
 `allocation.validity.wall_clock`, so HT 06:00–22:00 means 06:00 in Zurich in
@@ -738,6 +738,23 @@ Shared kWh accumulate into the same `total_local_kwh` / `total_grid_kwh` / `tota
 
 ### 4.4 Consumer energy pricing (per timestamp)
 
+The pricing rules live in `backend/tariffs/pricing.py`, shared by the engine
+and the views that show a price (tariff progression, tariff overview, readiness,
+feasibility prefill):
+
+| Function | Rule |
+|---|---|
+| `is_active(item, day)` | `valid_from <= day <= valid_to`; `valid_to = None` is open-ended |
+| `is_active_during(item, start, end)` | in force on at least one day of `start..end` |
+| `invoice_vat_rate(period_end)` | the invoice's one rate (§4.8) |
+| `daily_vat_rate(rates, day)` | the rate on `day`, for day-by-day views only (`2026-11-tariff-progression.md` §5.5) |
+| `bears_input_vat(tariff)` | §4.8 classifier |
+| `with_input_vat(tariff, net, rate)` | `net × (1 + rate)` if the tariff bears input VAT, else `net` |
+| `percentage_base(tariff, net_base, gross_base)` | net base if the percentage tariff bears input VAT, else gross (§4.8) |
+| `DynamicSeries` | a source's stored points; `price_at(ts)` by bisection, `None` for a gap |
+| `floored(tariff, price)` | `max(price, minimum_price_chf_per_kwh)` when a minimum is set |
+| `price_at(tariff, ts, *, series=None, band=…)` | `(price, band)`: dynamic from `series`, floored, no band, `None` price for a gap; static by its band at `ts` (or the `band` the caller passed, `None` included), `0` without one |
+
 After computing `r_local` and `r_grid` for a reading at timestamp `ts`:
 
 #### 4.4.1 Standard energy tariffs (`billing_mode = energy`)
@@ -759,7 +776,7 @@ design (data model, migration from the single-percentage shape, engine,
 documents, transfer archive, frontend).
 
 1. **Grid base price sum** = sum of `price_chf_per_kwh` at `ts` for all tariffs where `billing_mode = energy` AND `energy_type = grid` AND active at `civil_date(ts)`.
-2. For each percentage tariff with at least one band, resolve the band at `ts` (`TariffResolver.percentage_at`, delegating to `invoices.engine._resolve_tariff_band` / `tariffs.periods.resolve_band`). When the resolved band's percentage is non-zero and the tariff's `energy_type` matches (a zero-percent band produces no line and does not resolve the grid base):
+2. For each percentage tariff with at least one band, resolve the band at `ts` (`TariffResolver.percentage_at`, the same memoised `tariffs.periods.resolve_band` as `price_at`). When the resolved band's percentage is non-zero and the tariff's `energy_type` matches (a zero-percent band produces no line and does not resolve the grid base):
    - `effective_price = grid_base_price_sum × (band.percentage / 100)`
    - Accumulate: `quantity` kWh at `quantity × effective_price` CHF, keyed by the resolved band so §4.7a can itemise it like an energy band.
    - Also track `base_total = quantity × grid_base_price_sum` (used for description rendering and `effective_percentage`, the blended rate an unitemised multi-band line actually billed at).
@@ -786,7 +803,7 @@ synchronously at the reading timestamps and energy types the engine can actually
 price; workers still validate under locks. See ADR 0019 and the dynamic tariff spec §4.4.
 
 1. Resolve the price for `(tariff, ts)` from the tariff's `DynamicTariffSource`
-   series (`engine.TariffResolver.price_at`) instead of from `TariffPeriod`
+   series (`engine.TariffResolver.price_at`, through `tariffs.pricing.price_at`) instead of from `TariffPeriod`
    period matching. The lookup is a bisect over the source's stored
    `(valid_from, valid_to, price)` intervals overlapping the invoice period,
    loaded once per source per invoice transaction. `generate_invoice` first
@@ -1131,7 +1148,7 @@ after it is changed.
 
 `zev.vat_mode` selects one of three treatments. In all three, the rate — where
 one is needed — is `VatRate.active_for_day(period_end).rate` (or 0 if no rate is
-active). `VatRate` records have non-overlapping `[valid_from, valid_to]`
+active), `tariffs.pricing.invoice_vat_rate(period_end)`. `VatRate` records have non-overlapping `[valid_from, valid_to]`
 windows, and the rate active on `period_end` applies to the whole invoice.
 
 | `vat_mode` | `vat_rate` on invoice | `vat_chf` | line totals | `embedded_vat_chf` |
@@ -1192,7 +1209,7 @@ are gross. The VAT thus folded in is summed into `Invoice.embedded_vat_chf`
 for the operator's own records (annual statement, bookkeeping); it is never
 shown on the participant invoice.
 
-A tariff **bears input VAT** when its category is `grid_fees`, `levies` or
+A tariff **bears input VAT** (`tariffs.pricing.bears_input_vat`) when its category is `grid_fees`, `levies` or
 `metering`, or its category is `energy` and its `energy_type` is `grid`. Local
 (solar) energy and the feed-in credit do not: the ZEV pays no input VAT on its
 own production, and the feed-in credit is money paid out, not a purchased cost.
@@ -1202,7 +1219,8 @@ means "x % of what the participant would otherwise pay for grid power". Under
 `inclusive` that is the grid price *with* VAT, so the percentage base is
 `Σ price × (1 + rate)` over the active grid `energy` tariffs that bear input VAT
 (the same classifier and the same `period_end` rate as the grossing above), not
-the net sum. Consequences, all in `_price_energy`:
+the net sum. Consequences, all in `_price_energy` (the base choice is
+`tariffs.pricing.percentage_base`):
 
 - The local line itself still gets no VAT added (local energy bears none); only
   its base changes, and `base_rate` — the "65% von CHF 0.3084/kWh" in the line
@@ -1340,16 +1358,16 @@ one.
 `GET /api/v1/tariffs/tariffs/progression/?zev_id=&energy_type=[&from=&to=]`
 (`TariffViewSet.progression`, read-only, view access to the ZEV, 404 otherwise)
 adds up every per-kWh tariff of one energy type over time with the engine's own
-rules: band resolution by `tariffs.periods.resolve_band`, a percentage tariff as
-a share of the grid bands in force at the same time (`_price_energy`), and VAT by
-`zev.vat_mode` with the input-VAT classifier of §4.8 (`registered` grosses every
+rules (`tariffs.pricing`, §4.4): band resolution by `tariffs.periods.resolve_band`,
+a percentage tariff as a share of the grid bands in force at the same time
+(`percentage_base`), and VAT by `zev.vat_mode` with the input-VAT classifier of §4.8 (`registered` grosses every
 component, `inclusive` only the tariffs that bear input VAT, `not_registered`
 has no gross). It returns one line per time-of-use slot, category subtotals and
 the fixed fees listed separately; a dynamic tariff is included as the
 duration-weighted mean of its fetched prices per slot and calendar month, with
 missing or partial months reported. It
-uses the VAT rate in force on each day, where an invoice uses the rate on its
-`period_end`. Specified in `2026-11-tariff-progression.md`; computed in
+uses the VAT rate in force on each day (`daily_vat_rate`), where an invoice uses
+the rate on its `period_end` (`invoice_vat_rate`). Specified in `2026-11-tariff-progression.md`; computed in
 `invoices/tariff_progression.py`.
 
 ### Frontend tariff screen and write forms
@@ -1917,12 +1935,20 @@ values after refusal.
 | Test case | Validates |
 |---|---|
 | `InvoiceVatRateSelectionTests` | `registered`: rate resolved at `period_end`, VAT line added; missing rate → 0% (class clears the migration-installed defaults and owns its history) |
-| `TariffBearsInputVatTests` | classifier: grid energy / grid fees / levies / metering bear VAT; local energy and feed-in do not |
 | `InvoiceVatInclusiveModeTests` | `inclusive`: VAT-bearing lines grossed by `1 + rate`, `embedded_vat_chf` recorded, no VAT line; no active rate → prices unchanged; `not_registered` bills verbatim (class clears the migration-installed defaults) |
 | `ProducerCreditVatRegisteredTests` (`invoices/test_engine_vat_producer_credit.py`, 6 tests) | #957, `registered`: VAT on the ZEV's supplies (100.00 fee − 40.00 credit → VAT 8.10, total 68.10); consumer unchanged; a participant with only local producer credits owes no VAT; a producer who exports still gets negative VAT from the feed-in credit (#969); `shared_producer_credit` also kept out of the base; a negative fee line still reduces the base |
 | `PercentageBaseInclusiveVatTests`, `PercentageBaseOtherVatModesTests` (`invoices/test_engine_percentage_inclusive_vat.py`) | #1173: `inclusive` local 65 % line bills 0.14053/kWh (base 0.2162 with VAT, 28.11 on 200 kWh), no VAT added to it, producer credit nets the charge to zero, a VAT-bearing percentage levy is grossed once (2.16); `not_registered` keeps the net base (26.00; levy 2.00) |
 | `ProducerCreditVatNotRegisteredTests`, `ProducerCreditVatInclusiveTests` | no VAT base recorded, no VAT, credit nets off verbatim (inclusive: fee grossed, credit not) |
 | `InvoiceSeededVatHistoryTests` (5 tests, seeded via the real migration function) | `registered` 2023 → VAT 0.77/total 10.77 and 2024 → 0.81/10.81 on CHF 10.00 net; `inclusive` 2023/2024 gross 10.77/10.81 with embedded 0.77/0.81 and zero explicit VAT; cross-year period ending 2024 uses `0.0810` for the whole invoice; `not_registered` ignores seeds (10.00, null embedded); pre-2018 periods use the zero fallback in `registered` and `inclusive` |
+
+### Backend (`tariffs/test_pricing.py`) — pricing rules (§4.4, 16 tests)
+
+| Test class | Validates |
+|---|---|
+| `TestActivity` (3) | `is_active` both ends inclusive, open end never expires; `is_active_during` counts a one-day overlap at either end |
+| `TestVatRate` (3) | `invoice_vat_rate` and `daily_vat_rate` across the 2023/2024 change; 0 when no rate is in force |
+| `TestInputVat` (3) | `bears_input_vat` classifier (grid energy, grid fees, levies and metering bear VAT; local energy and feed-in do not); `with_input_vat` grosses only a bearing tariff; `percentage_base` net for a bearing percentage tariff, gross otherwise |
+| `TestPriceAt` (7) | dynamic price raised to the floor; negative price stands without one; a gap is `None`; a dynamic tariff needs its series; a static tariff priced by its band, `0` without one; a `band=None` the caller passed is not resolved again |
 
 ### Backend (`zev/tests.py`) — VAT-mode validation
 

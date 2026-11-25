@@ -131,12 +131,9 @@ def is_catch_all(period) -> bool:
 
 
 def resolve_band(periods, ts: datetime):
-    """The band among ``periods`` that prices a tariff at ``ts``, or ``None``.
+    """Resolve the energy or percentage band for a timestamp, or ``None`` without bands.
 
-    The single resolution rule for both energy and percentage bands — see
-    ``invoices.engine._resolve_tariff_band``, which delegates here so a static
-    tariff's price is resolved in exactly one place regardless of billing
-    mode. ``periods`` is any iterable of ``TariffPeriod``-like rows (already
+    ``periods`` is any iterable of ``TariffPeriod``-like rows (already
     fetched, not re-queried).
 
     Months, weekdays and hours describe the Swiss wall clock, so an aware

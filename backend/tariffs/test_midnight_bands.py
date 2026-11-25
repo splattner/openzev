@@ -12,9 +12,9 @@ from decimal import Decimal
 
 from django.test import SimpleTestCase, TestCase
 
-from invoices.engine import _resolve_tariff_band
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
 from tariffs.periods import in_window, resolve_band
+from tariffs.pricing import price_at
 from testing.helpers import make_user, create_managed_zev
 from accounts.models import UserRole
 
@@ -102,6 +102,6 @@ class EngineUsesWrappedWindowsTests(TestCase):
             price_chf_per_kwh=Decimal("0.20"), time_from=time(22), time_to=time(6),
         )
 
-        self.assertEqual(_resolve_tariff_band(tariff, _at(2)).price_chf_per_kwh, Decimal("0.20000"))
-        self.assertEqual(_resolve_tariff_band(tariff, _at(23)).price_chf_per_kwh, Decimal("0.20000"))
-        self.assertEqual(_resolve_tariff_band(tariff, _at(12)).price_chf_per_kwh, Decimal("0.30000"))
+        self.assertEqual(price_at(tariff, _at(2))[0], Decimal("0.20000"))
+        self.assertEqual(price_at(tariff, _at(23))[0], Decimal("0.20000"))
+        self.assertEqual(price_at(tariff, _at(12))[0], Decimal("0.30000"))

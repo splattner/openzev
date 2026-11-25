@@ -117,7 +117,8 @@ operations in order).
 ### 5.1 Band resolution
 
 Percentage bands are resolved by the **same** function as energy bands,
-`invoices.engine._resolve_tariff_band(tariff, ts)`, with no special case:
+`tariffs.periods.resolve_band(tariff.periods.all(), ts)` (through
+`tariffs.pricing.price_at` and the engine's memo), with no special case:
 
 - Month first, then a flat band short-circuits. Otherwise the timed band whose
   weekdays contain `ts.weekday()` and whose window contains `ts.time()` (`in_window`, which wraps windows past midnight since #837).
@@ -133,7 +134,7 @@ into `_percentage` when it has at least one band (`len(tariff.periods.all()) > 0
 with periods prefetched as today). This replaces `and tariff.percentage`.
 
 **New `TariffResolver.percentage_at(tariff, ts) -> tuple[Decimal, TariffPeriod | None]`**:
-`period = _resolve_tariff_band(tariff, ts)`. It returns `(period.percentage, period)`,
+`period` is the tariff's band at `ts` (`resolve_band`, memoised). It returns `(period.percentage, period)`,
 or `(Decimal("0"), None)` when the tariff has no band.
 
 **`_price_energy`** (the energy part is unchanged):
@@ -161,7 +162,7 @@ they use the band that matches the timestamp without further changes.
 of energy type local or grid that have at least one band (prefetch periods on
 the queryset). A timestamp needs the grid base when some such tariff is active
 on that day, applies to an energy type billed at that timestamp, **and**
-resolves a non-zero percentage at that timestamp (`_resolve_tariff_band`). This
+resolves a non-zero percentage at that timestamp (`resolve_band`). This
 matches the engine exactly.
 
 **`_build_item_payloads`**: each payload gains `effective_percentage`, computed
@@ -199,7 +200,7 @@ returns one dict per band of the tariff, in `Meta.ordering`:
 
 - **Tariff overview PDF** (`invoices/tariff_overview.py`, `_price_row_for_percentage_tariff` → returns a list of rows, like the energy-band path does): one row per band. `label` = `"{band label} · {pct} % × {grid} Rp./kWh"`, `recurrence` = band recurrence, and `amount`, `unit` and `footnote` follow today's three cases per band. For a tariff with a **single flat band** the row is identical to today's output.
 - **Contract PDF** (`invoices/contract_pdf.py`): one row per band, using the same row shape energy-band rows already have (band label and recurrence in the row), plus today's `rate_rp`, `rate_description`, `pct`, `rate_note`. A single flat band gives exactly today's row. Template changes in `templates/.../contract` are only needed if the percentage row does not yet render the band label.
-- **Feasibility prefill** (`feasibility/prefill.py::_percentage_of_energy_sum`): sums `average_percentage(tariff)` per active tariff. **New `tariffs.periods.average_percentage(tariff) -> Decimal`**: a time-weighted mean of the band percentages over one reference non-leap year (2025) in 15-minute steps, resolving each step with the same rules as §5.1. The resolver itself moves to `tariffs/periods.py` as `resolve_band(periods, ts)`, and `invoices.engine._resolve_tariff_band` delegates to it, so there is still exactly one resolution rule. The result is `Decimal("0")` without bands, quantised to 0.01. The value is an estimate by time, not by energy, and the feasibility calculator already works on estimates.
+- **Feasibility prefill** (`feasibility/prefill.py::_percentage_of_energy_sum`): sums `average_percentage(tariff)` per active tariff. **New `tariffs.periods.average_percentage(tariff) -> Decimal`**: a time-weighted mean of the band percentages over one reference non-leap year (2025) in 15-minute steps, resolving each step with the same rules as §5.1. The resolver itself moves to `tariffs/periods.py` as `resolve_band(periods, ts)`, which the engine and `tariffs.pricing.price_at` call, so there is still exactly one resolution rule. The result is `Decimal("0")` without bands, quantised to 0.01. The value is an estimate by time, not by energy, and the feasibility calculator already works on estimates.
 
 ### 5.5 API contracts
 

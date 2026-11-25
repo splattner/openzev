@@ -20,9 +20,9 @@ from django.db.models.functions import Least
 from allocation.validity import active_on
 from allocation.split import local_pool_kwh
 from metering.models import MeterReading, ReadingDirection
-from invoices.engine import _active_vat_rate, _tariff_bears_input_vat
 from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory
 from tariffs.periods import average_percentage
+from tariffs.pricing import invoice_vat_rate, with_input_vat
 from zev.models import MeteringPointAssignment, MeteringPointType, Participant, VatMode, Zev
 
 from . import defaults
@@ -62,8 +62,9 @@ def _representative_price(tariff: Tariff) -> Decimal | None:
 def _grid_vat_rate(zev: Zev, today: dt.date) -> Decimal:
     """The VAT folded into a participant's grid prices: non-zero only for a
     ZEV on ``VatMode.INCLUSIVE``, the one mode whose invoices bill the grid
-    lines with VAT included (the engine grosses the same lines)."""
-    return _active_vat_rate(today) if zev.vat_mode == VatMode.INCLUSIVE else Decimal("0")
+    lines with VAT included (the engine grosses the same lines), at the rate an
+    invoice ending today would use."""
+    return invoice_vat_rate(today) if zev.vat_mode == VatMode.INCLUSIVE else Decimal("0")
 
 
 def _flat_energy_price_sum(
@@ -97,7 +98,7 @@ def _flat_energy_price_sum(
     for tariff in qs:
         price = _representative_price(tariff)
         if price is not None:
-            total += price * (1 + vat_rate) if _tariff_bears_input_vat(tariff) else price
+            total += with_input_vat(tariff, price, vat_rate)
             found = True
     return total if found else None
 

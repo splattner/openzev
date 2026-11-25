@@ -8,7 +8,6 @@ Algorithm:
 4. Price local/grid energy consumption and producer compensation per timestamp (HT/NT aware).
 5. Build invoice totals and line items.
 """
-import bisect
 import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
@@ -22,7 +21,6 @@ from django.utils import timezone
 
 from billiard.exceptions import SoftTimeLimitExceeded
 
-from accounts.models import VatRate
 from allocation.read_model import (
     CONSUMPTION,
     CONSUMPTION_METER_TYPES,
@@ -35,10 +33,19 @@ from allocation.validity import active_during, civil_date, period_window, wall_c
 from allocation.split import split_consumption, split_production
 from allocation.windows import AssignmentWindows
 from zev.models import AllocationMode, Zev, Participant, MeteringPoint, MeteringPointAssignment, VatMode
-from tariffs.dynamic.models import DynamicPricePoint
 from tariffs.dynamic.evidence import fetch_sources, record_invoice_evidence
 from tariffs.models import BillingMode, EnergyType, SplitKey, Tariff, TariffCategory, TariffPeriod
 from tariffs.periods import resolve_band
+from tariffs.pricing import (
+    DynamicSeries,
+    bears_input_vat,
+    invoice_vat_rate,
+    is_active,
+    is_active_during,
+    percentage_base,
+    price_at,
+    with_input_vat,
+)
 from metering.models import MeterReading, ReadingDirection
 from .band_labels import band_description, translations_for as band_translations_for
 from .document_parties import build_issuer, build_recipient
@@ -81,7 +88,7 @@ class InvoiceGenerationContext:
     # first use and shared by the whole batch (#924).
     _charge_lines: "dict[UUID, list[ChargeLine]] | None" = field(default=None, repr=False)
     # Valid only while the current invoice holds the source locks.
-    _dynamic_series_cache: "dict[UUID, _DynamicSeries]" = field(default_factory=dict, repr=False)
+    _dynamic_series_cache: "dict[UUID, DynamicSeries]" = field(default_factory=dict, repr=False)
 
     def issuer(self, zev: Zev) -> dict:
         if self._issuer is None:
@@ -94,12 +101,12 @@ class InvoiceGenerationContext:
             self._charge_lines = charge_lines_by_participant(zev, period_start, period_end)
         return self._charge_lines.get(participant_id, [])
 
-    def dynamic_series(self, source_id: UUID) -> "_DynamicSeries":
+    def dynamic_series(self, source_id: UUID) -> DynamicSeries:
         series = self._dynamic_series_cache.get(source_id)
         if series is None:
             _zev_id, period_start, period_end = self.scope
             start, end = period_window(period_start, period_end)
-            series = self._dynamic_series_cache[source_id] = _DynamicSeries.load(
+            series = self._dynamic_series_cache[source_id] = DynamicSeries.load(
                 source_id, start=start, end=end
             )
         return series
@@ -421,14 +428,14 @@ def preflight_dynamic_prices(zev, period_start, period_end):
         and len(tariff.periods.all()) > 0
     ]
     def _bills_nonzero_percentage_at(tariff, timestamp) -> bool:
-        band = _resolve_tariff_band(tariff, timestamp)
+        band = resolve_band(tariff.periods.all(), timestamp)
         return band is not None and bool(band.percentage)
 
     grid_base_required = {
         timestamp for timestamp, energy_types in requirements.items()
         if any(
             tariff.energy_type in energy_types
-            and _tariff_is_active(tariff, civil_date(timestamp))
+            and is_active(tariff, civil_date(timestamp))
             and _bills_nonzero_percentage_at(tariff, timestamp)
             for tariff in percentage_tariffs
         )
@@ -438,61 +445,19 @@ def preflight_dynamic_prices(zev, period_start, period_end):
     for tariff in dynamic_tariffs:
         series = series_by_source.get(tariff.dynamic_source_id)
         if series is None:
-            series = series_by_source[tariff.dynamic_source_id] = _DynamicSeries.load(
+            series = series_by_source[tariff.dynamic_source_id] = DynamicSeries.load(
                 tariff.dynamic_source_id, start=start, end=end,
             )
         for timestamp, energy_types in sorted(requirements.items()):
-            if not _tariff_is_active(tariff, civil_date(timestamp)):
+            if not is_active(tariff, civil_date(timestamp)):
                 continue
             directly_priced = tariff.energy_type in energy_types
-            percentage_base = (
+            needed_for_base = (
                 tariff.energy_type == EnergyType.GRID
                 and timestamp in grid_base_required
             )
-            if (directly_priced or percentage_base) and series.price_at(timestamp) is None:
+            if (directly_priced or needed_for_base) and series.price_at(timestamp) is None:
                 raise DynamicPriceGapError(tariff=tariff, missing_at=timestamp)
-
-
-class _DynamicSeries:
-    """A dynamic tariff source's stored prices, sorted and ready to bisect.
-
-    Loaded once per ``InvoiceGenerationContext`` — see
-    ``InvoiceGenerationContext.dynamic_series`` — rather than once per
-    participant, since a batch run shares one context across a whole
-    ZEV-period.
-    """
-
-    def __init__(self, points: list[tuple[datetime, datetime, Decimal]]):
-        self._points = points  # sorted by valid_from
-        self._starts = [valid_from for valid_from, _valid_to, _price in points]
-
-    @classmethod
-    def load(
-        cls,
-        source_id: UUID,
-        *,
-        start: datetime | None = None,
-        end: datetime | None = None,
-    ) -> "_DynamicSeries":
-        rows = DynamicPricePoint.objects.filter(source_id=source_id)
-        if start is not None and end is not None:
-            rows = rows.filter(valid_from__lt=end, valid_to__gt=start)
-        elif start is not None or end is not None:
-            raise ValueError("start and end must be provided together.")
-        rows = rows.order_by("valid_from").values_list(
-            "valid_from", "valid_to", "price_chf_per_kwh"
-        )
-        return cls(list(rows))
-
-    def price_at(self, ts: datetime) -> Decimal | None:
-        """The stored price whose interval covers ``ts``, or None for a gap."""
-        index = bisect.bisect_right(self._starts, ts) - 1
-        if index < 0:
-            return None
-        valid_from, valid_to, price = self._points[index]
-        if valid_from <= ts < valid_to:
-            return price
-        return None
 
 
 class TariffResolver:
@@ -530,12 +495,12 @@ class TariffResolver:
         key = (bucket, energy_type, day)
         if key not in self._active_cache:
             self._active_cache[key] = [
-                tariff for tariff in buckets.get(energy_type, []) if _tariff_is_active(tariff, day)
+                tariff for tariff in buckets.get(energy_type, []) if is_active(tariff, day)
             ]
         return self._active_cache[key]
 
     def _band(self, tariff: Tariff, ts: datetime) -> "TariffPeriod | None":
-        """``_resolve_tariff_band``, memoised on what the resolution reads.
+        """``tariffs.periods.resolve_band``, memoised on what the resolution reads.
 
         The pricing loops resolve a band for every reading, and band
         resolution depends only on the wall-clock month, weekday and time of
@@ -546,7 +511,7 @@ class TariffResolver:
         try:
             return self._band_cache[key]
         except KeyError:
-            band = self._band_cache[key] = _resolve_tariff_band(tariff, ts)
+            band = self._band_cache[key] = resolve_band(tariff.periods.all(), ts)
             return band
 
     def energy(self, energy_type: str, day: date) -> list[Tariff]:
@@ -560,10 +525,8 @@ class TariffResolver:
     def price_at(self, tariff: Tariff, ts: datetime) -> tuple[Decimal, "TariffPeriod | None"]:
         """The price at ``ts``, and the band that set it for a static tariff.
 
-        This is the one funnel every pricing call site reads from, static or
-        dynamic — see ``_resolve_tariff_band`` below for
-        why a static tariff's resolution must stay in exactly one place. A
-        dynamic tariff never has a period to report: a 15-minute series would
+        Priced by ``tariffs.pricing.price_at``. A dynamic tariff never has a
+        period to report: a 15-minute series would
         turn one line into thousands if it itemised per reading.
 
         A static tariff with no matching band bills ``Decimal("0")``, the
@@ -578,19 +541,18 @@ class TariffResolver:
                 raise ValueError(
                     "TariffResolver needs a generation_context to price a dynamic tariff."
                 )
-            price = self._context.dynamic_series(tariff.dynamic_source_id).price_at(ts)
+            price, _ = price_at(
+                tariff, ts, series=self._context.dynamic_series(tariff.dynamic_source_id),
+            )
             if price is None:
                 raise DynamicPriceGapError(tariff=tariff, missing_at=ts)
-            if tariff.minimum_price_chf_per_kwh is not None:
-                price = max(price, tariff.minimum_price_chf_per_kwh)
             return price, None
-        period = self._band(tariff, ts)
-        return (period.price_chf_per_kwh if period is not None else Decimal("0")), period
+        return price_at(tariff, ts, band=self._band(tariff, ts))
 
     def percentage_at(self, tariff: Tariff, ts: datetime) -> tuple[Decimal, "TariffPeriod | None"]:
         """The percentage-of-energy tariff's band percentage at ``ts``, and the band.
 
-        Resolved through the same ``_resolve_tariff_band`` funnel as
+        Resolved through the same ``resolve_band`` memo as
         ``price_at`` — a percentage tariff is bucketed by band exactly like an
         energy tariff (§5.1), there is no separate rule for it. ``(0, None)``
         for a tariff with no band.
@@ -680,10 +642,6 @@ ENERGY_TYPE_SORT_ORDER = {
 }
 
 
-def _tariff_is_active(tariff: Tariff, day: date) -> bool:
-    return tariff.valid_from <= day and (tariff.valid_to is None or tariff.valid_to >= day)
-
-
 @lru_cache(maxsize=1 << 17)
 def _band_key(ts: datetime) -> tuple:
     """The parts of ``ts`` that ``resolve_band`` reads, on the Swiss wall clock.
@@ -696,23 +654,6 @@ def _band_key(ts: datetime) -> tuple:
     return local.month, local.weekday(), local.time()
 
 
-def _resolve_tariff_band(tariff: Tariff, ts: datetime):
-    """The band that prices ``tariff`` at ``ts``, or None when it has none.
-
-    This is the live static-price seam: ``TariffResolver`` uses the returned
-    band both for its value and for invoice-line itemisation. The actual
-    resolution rule lives in ``tariffs.periods.resolve_band`` — shared with
-    ``average_percentage`` — so it stays in exactly one place regardless of
-    billing mode.
-    """
-    return resolve_band(tariff.periods.all(), ts)
-
-
-def _active_vat_rate(period_end: date) -> Decimal:
-    active_rate = VatRate.active_for_day(period_end)
-    return Decimal(active_rate.rate) if active_rate else Decimal("0")
-
-
 def _resolve_vat_rate(zev: Zev, period_end: date) -> Decimal:
     """The rate charged *on top of* the subtotal — REGISTERED only.
 
@@ -721,28 +662,7 @@ def _resolve_vat_rate(zev: Zev, period_end: date) -> Decimal:
     """
     if zev.vat_mode != VatMode.REGISTERED:
         return Decimal("0")
-    return _active_vat_rate(period_end)
-
-
-# Categories a non-registered ZEV pays non-recoverable VAT on: the grid
-# operator bills Netznutzung, SDL, the Netzzuschlag, the cantonal/communal
-# levies and the metering charge with VAT, and grid energy is bought from a
-# supplier with VAT. The ZEV's own local (solar) energy and the feed-in
-# credit it pays participants carry no input VAT.
-_VAT_BEARING_CATEGORIES = frozenset({
-    TariffCategory.GRID_FEES,
-    TariffCategory.LEVIES,
-    TariffCategory.METERING,
-})
-
-
-def _tariff_bears_input_vat(tariff: Tariff) -> bool:
-    """Whether this tariff's cost reaches an unregistered ZEV carrying VAT."""
-    if tariff.category in _VAT_BEARING_CATEGORIES:
-        return True
-    if tariff.category == TariffCategory.ENERGY:
-        return tariff.energy_type == EnergyType.GRID
-    return False
+    return invoice_vat_rate(period_end)
 
 
 def _month_start(day: date) -> date:
@@ -1509,7 +1429,7 @@ def _build_item_payloads(
         grossed_flags = [
             bool(gross_rate)
             and Decimal(entry["total"]) > 0
-            and _tariff_bears_input_vat(entry["tariff"])
+            and bears_input_vat(entry["tariff"])
             for entry in entries
         ]
         raw_totals = [
@@ -1599,7 +1519,6 @@ def _price_energy(acc, tariffs, energy_type, quantity, ts, day, *, sign, bucket=
     # A dynamic grid tariff flows into the percentage base through the same
     # funnel a direct energy line uses, so a levy charged as a % of the grid
     # rate follows the fetched series for free.
-    vat_factor = Decimal("1") + tariffs.input_vat_rate
     net_base = Decimal("0")
     gross_base = Decimal("0")
     for t in tariffs.energy(EnergyType.GRID, day):
@@ -1607,14 +1526,14 @@ def _price_energy(acc, tariffs, energy_type, quantity, ts, day, *, sign, bucket=
         net_base += price
         # The same classifier the engine grosses lines with, so the base is
         # exactly what a participant would otherwise be billed.
-        gross_base += price * vat_factor if _tariff_bears_input_vat(t) else price
+        gross_base += with_input_vat(t, price, tariffs.input_vat_rate)
     for tariff, pct, period in pct_prices:
         # A percentage line that itself bears input VAT is grossed afterwards
         # in _build_item_payloads, so its base stays net here (grossing both
         # would apply the VAT twice). The usual line (local energy) is never
         # grossed, so it takes the grossed base. Credits (sign=-1) take the
         # same base, so a producer's credit and the charges still net to zero.
-        grid_base = net_base if _tariff_bears_input_vat(tariff) else gross_base
+        grid_base = percentage_base(tariff, net_base, gross_base)
         effective_price = grid_base * (pct / Decimal("100"))
         acc.add(
             tariff=tariff,
@@ -1703,7 +1622,7 @@ def generate_invoice(
     dynamic_tariffs = [
         tariff for tariff in tariffs_list
         if tariff.dynamic_source_id
-        and _overlaps(tariff.valid_from, tariff.valid_to, period_start, period_end)
+        and is_active_during(tariff, period_start, period_end)
     ]
     dynamic_source_ids = {tariff.dynamic_source_id for tariff in dynamic_tariffs}
     sources = fetch_sources(dynamic_source_ids, lock=not preview)
@@ -1716,7 +1635,7 @@ def generate_invoice(
     generation_context._dynamic_series_cache.clear()
     # INCLUSIVE folds non-recoverable VAT into the line totals; the other
     # modes leave prices untouched here (REGISTERED adds a line below).
-    gross_rate = _active_vat_rate(period_end) if zev.vat_mode == VatMode.INCLUSIVE else Decimal("0")
+    gross_rate = invoice_vat_rate(period_end) if zev.vat_mode == VatMode.INCLUSIVE else Decimal("0")
     tariffs = TariffResolver(tariffs_list, generation_context, input_vat_rate=gross_rate)
     # ─── 7. Per-reading HT/NT-aware pricing with timestamp allocation ─────
     local_kwh_acc = Decimal("0")

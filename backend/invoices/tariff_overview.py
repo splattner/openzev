@@ -21,6 +21,7 @@ from django.utils import timezone
 
 from accounts.models import AppSettings
 from tariffs.models import BillingMode, EnergyType, SplitKey, TariffCategory
+from tariffs.pricing import is_active
 from zev.models import VatMode
 
 from .band_labels import band_description, band_recurrence, translations_for
@@ -71,19 +72,11 @@ DYNAMIC_FOOTNOTE = {
 }
 
 
-def _is_active(tariff, as_of: date) -> bool:
-    if tariff.valid_from > as_of:
-        return False
-    if tariff.valid_to is not None and tariff.valid_to < as_of:
-        return False
-    return True
-
-
 def _select_tariffs(zev, as_of: date, scope: str) -> list:
     tariffs = list(zev.tariffs.prefetch_related("periods").all())
     if scope == "all":
         return tariffs
-    return [t for t in tariffs if _is_active(t, as_of)]
+    return [t for t in tariffs if is_active(t, as_of)]
 
 
 def _validity_display(tariff, tr: dict, date_pattern: str) -> str:
@@ -276,7 +269,7 @@ def _build_tariff_row(
         "name": tariff.name,
         "validity": _validity_display(tariff, tr, date_pattern),
         "billing_mode_label": tr["billing_modes"].get(tariff.billing_mode, tariff.get_billing_mode_display()),
-        "is_current": _is_active(tariff, as_of),
+        "is_current": is_active(tariff, as_of),
         "notes": tariff.notes,
         "price_rows": price_rows,
         "inline_price": inline_price,
@@ -306,7 +299,7 @@ def _grid_base(tariffs: list, as_of: date) -> tuple[GridBaseSummary, bool]:
         t for t in tariffs
         if t.energy_type == EnergyType.GRID
         and t.billing_mode == BillingMode.ENERGY
-        and _is_active(t, as_of)
+        and is_active(t, as_of)
     ]
     return (
         display_grid_base_summary(grid_tariffs, as_of=as_of),

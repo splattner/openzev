@@ -19,6 +19,7 @@ from metering.models import MeterReading
 from tariffs.dynamic.fetch import coverage_gaps
 from tariffs.dynamic.models import DynamicTariffSource
 from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory
+from tariffs.pricing import is_active
 from zev.models import PARTY_NAME_FIELDS, MeteringPoint, MeteringPointAssignment, Participant
 from zev.iban import is_valid_iban
 
@@ -254,10 +255,6 @@ class StepResult:
     detail_data: dict = field(default_factory=dict)
 
 
-def _tariff_active_on(tariff: Tariff, day: date) -> bool:
-    return tariff.valid_from <= day and (tariff.valid_to is None or tariff.valid_to >= day)
-
-
 def _load_energy_tariffs(zev) -> list[Tariff]:
     """Energy-mode and percentage tariffs with their price bands.
 
@@ -352,12 +349,12 @@ def _uncovered_tariff_days(
         covered = {
             t.energy_type
             for t in energy_tariffs
-            if _tariff_active_on(t, day) and _tariff_is_priced_on(t, day, dynamic_uncovered)
+            if is_active(t, day) and _tariff_is_priced_on(t, day, dynamic_uncovered)
         }
         pct_active = [
             t
             for t in pct_tariffs
-            if _tariff_active_on(t, day) and len(t.periods.all()) > 0
+            if is_active(t, day) and len(t.periods.all()) > 0
         ]
         # A percentage tariff prices its own type through the grid rate: when
         # the grid is priced it covers its type, otherwise the grid itself
