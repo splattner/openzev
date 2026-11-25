@@ -317,12 +317,11 @@ overlap is reported before a partial one. The engine raises
 `409` with `{code: "invoice_not_replaceable", reason, invoice_number, error}`
 (`reason` ∈ `issued` | `partial_overlap`, `error` the English message), which
 the invoice list shows as a translated toast, and batch generation records the
-message as the participant's failure. For participants without a usable exact-period invoice,
-readiness (`generation_conflicts`, §5.6a) and the period overview
-(`generation_eligibility`, §5.5) apply the same rule. A row whose exact-period
-invoice is a live draft gets no eligibility, so its **Regenerate** action is
-still offered when another overlap blocks it; the engine then refuses with the
-`409` above. See the
+message as the participant's failure. Readiness (`generation_conflicts`, §5.6a)
+applies the same rule to participants without an invoice; the period overview
+(`generation_eligibility`, §5.5) also applies it to rows whose exact-period
+invoice is a draft or cancelled. A draft therefore counts as generated in
+readiness even when its row is blocked for regeneration. See the
 [billing-engine guard rails](2026-03-tariffs-and-billing-engine.md#40-guard-rails)
 for the lock order coordinating generation with approval and community restore.
 
@@ -722,11 +721,16 @@ loads the related party. These are the participant's current data, not the
 recipient copy frozen on an issued invoice; the PDF keeps the billed copy.
 
 **Generation eligibility:** `generation_eligibility` is `null` while the row's
-newest exact-period invoice is live (not cancelled). Otherwise, from the
-participant's invoices of other periods overlapping this one: `covered` when
-sent/paid ones cover every day (naming the first), else `blocked` when
+newest exact-period invoice is issued (approved, sent or paid). Otherwise (none,
+draft or cancelled), from the participant's invoices of other periods
+overlapping this one: `covered` when sent/paid ones cover every day (naming the first), else `blocked` when
 `replacement_blocker` refuses one (§4.4; naming an issued blocker before a
-partial one, then the first by start date), else `eligible`.
+partial one, then the first by start date), else `eligible`. On a draft row it
+chooses between **Regenerate** (`eligible`), **Review conflict** (`blocked`) and
+**View covering invoice** (`covered`). The Generate all count, and the rows the
+page watches for new invoices, are the rows without a live invoice whose
+eligibility is `eligible`; the task itself regenerates every participant active
+in the period (`generate-all`, §5.2), so it also replaces their drafts.
 
 **Metering completeness logic:**
 
@@ -1599,7 +1603,7 @@ visibility, restored access, and strict selection with a second membership.
 | `test_workflow.py` | `StaleInstanceConcurrencyTests` | §5.3 concurrency (#572): a stale-in-memory `cancel_invoice`/`approve_invoice`/`mark_invoice_sent` cannot undo a transition another already-loaded instance committed first (a `paid` invoice survives a stale cancel, a `cancelled` one survives a stale mark-sent/approve); a stale `record_email_delivery` never raises and never resurrects a status past cancellation, but still records `sent_at` and reports the row's real prior status; a second stale cancel is reported as "already cancelled", not the original status |
 | `test_workflow.py` | `test_concurrent_cancel_and_mark_paid_serialize_on_the_row_lock` (PostgreSQL only — CI's PostgreSQL leg) | §5.3 concurrency (#572): two genuinely overlapping transactions — one holding the invoice row lock, the other running real `mark_invoice_paid` — serialize on that lock (verified via `pg_blocking_pids`) rather than racing; the second sees the first's committed `cancelled` status and correctly refuses |
 | `test_period_overview.py` | `InvoicePeriodOverviewTests` | §5.5: metering completeness, missing-day detection, partial-assignment windows, no-assignment exclusion, cross-ZEV permission denial, whom a row bills (`test_row_names_who_it_bills`: kind, name addition, participation dates and party; `test_meter_labels_use_location_or_meter_id`: location/ID fallback) |
-| `test_period_overview.py` | `GenerationEligibilityTests` | §5.5 generation eligibility: `eligible` without an invoice, none for a live exact-period invoice, `blocked` naming its destination (an issued blocker before a partial draft), `covered` naming the first covering invoice, draft overlaps the period covers stay eligible, a draft reaching past the period blocks, blocked rows protected past the cockpit truncation |
+| `test_period_overview.py` | `GenerationEligibilityTests` | §5.5 generation eligibility: `eligible` without an invoice, an exact-period draft `eligible`, `blocked` by an overlapping paid invoice (while readiness counts it as generated, no conflict) or `covered` by sent/paid invoices of other periods, none for an issued exact-period invoice, `blocked` naming its destination (an issued blocker before a partial draft), `covered` naming the first covering invoice, draft overlaps the period covers stay eligible, a draft reaching past the period blocks, blocked rows protected past the cockpit truncation |
 | `test_invoice_replacement.py` | `InvoiceReplacementTests` | `replaces` newest first and `replaced_by` pointing to the newest invoice, no `replaced_by` before a replacement exists, other periods and participants unrelated, the period-overview row invoice carrying `replaces`, and no extra query per replaced invoice in the overview (6 tests) |
 | `test_period_overview_unit.py` | `ComputePeriodOverviewTests` (10 tests) | §5.5 unit level: complete/incomplete participants, single missing day, exclusion without assignment, partial-assignment required-day windows and gaps, invoice period matching, row ordering, multiple-metering-point counts |
 | `test_readiness.py` | 22 test classes (108 tests) | §5.6a: cockpit period resolution, bulk parity and stable query count, exact historical periods, running-versus-ended lifecycle metadata, first-run/awaiting/caught-up states, structured step details, attention and RBAC |

@@ -78,9 +78,8 @@ def compute_period_overview(*, zev, period_start: date_type, period_end: date_ty
         if current is not invoice:
             current._same_period_invoices.append(invoice)
 
-    # Generation eligibility for rows without a usable exact-period invoice:
-    # overlaps are fetched once; full sent/paid coverage takes precedence over
-    # ``replacement_blocker``.
+    # One overlap query for rows without an issued exact-period invoice; full
+    # sent/paid coverage takes precedence over ``replacement_blocker``.
     overlap_by_pid: dict[int, list[tuple]] = {}
     for pid, ps, pe, status, inv_id, number, approved_at in (
         Invoice.objects.filter(
@@ -143,7 +142,7 @@ def compute_period_overview(*, zev, period_start: date_type, period_end: date_ty
             continue
 
         eligibility = None
-        if invoice is None or invoice.status == InvoiceStatus.CANCELLED:
+        if invoice is None or invoice.status in (InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED):
             overlaps = overlap_by_pid.get(participant.id, [])
             settled = [
                 (ps, pe) for ps, pe, status, _inv_id, _number, _approved_at in overlaps

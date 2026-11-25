@@ -48,6 +48,11 @@ import type { RecordPaymentValues } from './RecordPaymentModal'
 import type { ActionMenuItem } from '../../components/ActionMenu'
 import type { InvoicePeriodParticipantRow } from '../../types/api'
 
+/** Rows without a live invoice that may be generated: what Generate all counts and watches. */
+function isGenerationCandidate(row: InvoicePeriodParticipantRow): boolean {
+    return !liveInvoice(row) && row.generation_eligibility?.state === 'eligible'
+}
+
 /** Send all queues approved invoices that have a recipient. */
 function isSendable(row: InvoicePeriodParticipantRow): boolean {
     return row.invoice?.status === 'approved' && !!row.participant_email
@@ -285,7 +290,7 @@ export function useInvoiceActions({
             return {
                 scope,
                 queryKey: periodOverviewInvalidationKey,
-                participantIds: rows.filter(row => row.generation_eligibility?.state === 'eligible').map(row => row.participant_id),
+                participantIds: rows.filter(isGenerationCandidate).map(row => row.participant_id),
             }
         },
         onSuccess: (_result, _variables, queuedWork) => {
@@ -371,7 +376,7 @@ export function useInvoiceActions({
     const rowCounts = invoiceRowCounts(rows, getRowWork)
     const { invoices: invoiceCount, drafts: draftCount } = rowCounts
     const sendableCount = rows.filter(isSendable).length
-    const generationCandidateCount = rows.filter(row => row.generation_eligibility?.state === 'eligible').length
+    const generationCandidateCount = rows.filter(isGenerationCandidate).length
     const generationPending = generateMutation.isPending || generationParticipantIds.some(id =>
         !rows.some(row => row.participant_id === id && liveInvoice(row)))
 

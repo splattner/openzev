@@ -435,7 +435,7 @@ describe('recommendedBatchAction ordering', () => {
     participant_id: id,
     participant_email: `${id}@example.test`,
     invoice: managed({ id: `invoice-${id}`, status, pdf_url: null, email_logs: [], invoice_number: id }),
-    generation_eligibility: status === 'cancelled' ? ELIGIBLE : null,
+    generation_eligibility: ['draft', 'cancelled'].includes(status) ? ELIGIBLE : null,
   })
 
   it('recommends generation before approval when a participant has no invoice', () => {
@@ -484,6 +484,35 @@ describe('recommendedBatchAction ordering', () => {
     )
   })
 
+  it('does not count an eligible draft row as a generation candidate', () => {
+    expect(recommend([noInvoice('p1'), withStatus('p2', 'draft')])?.label).toBe(
+      'pages.invoices.batch.generateAllCount:1',
+    )
+    expect(mountRows([withStatus('p1', 'draft')]).batchMenuItems.map(item => item.key)).not.toContain('generate-all')
+  })
+
+  it('offers a draft row Regenerate when eligible, Review conflict when blocked, the covering invoice when covered', () => {
+    const eligible = withStatus('p1', 'draft')
+    const blockedDraft = {
+      ...withStatus('p2', 'draft'),
+      generation_eligibility: { state: 'blocked', invoice_id: 'inv-locked', invoice_number: 'T-1' },
+    }
+    const coveredDraft = {
+      ...withStatus('p3', 'draft'),
+      generation_eligibility: { state: 'covered', invoice_id: 'inv-cover', invoice_number: 'T-2' },
+    }
+    const result = mountRows([eligible, blockedDraft, coveredDraft])
+    const eligibleKeys = result.getRowMenuItems(eligible as any).map(item => item.key)
+    expect(eligibleKeys).toContain('generate-again')
+    expect(eligibleKeys).not.toContain('review-conflict')
+    const blockedKeys = result.getRowMenuItems(blockedDraft as any).map(item => item.key)
+    expect(blockedKeys).toContain('review-conflict')
+    expect(blockedKeys).not.toContain('generate-again')
+    const coveredItems = result.getRowMenuItems(coveredDraft as any)
+    expect(coveredItems.find(item => item.key === 'review-conflict')?.label).toBe('pages.invoices.viewCoveringInvoice')
+    expect(coveredItems.map(item => item.key)).not.toContain('generate-again')
+  })
+
   it('keeps batch operations without eligible targets out of the menu', () => {
     const result = mountRows([noInvoice('p1'), withStatus('p2', 'draft'), withStatus('p3', 'sent')])
     expect(result.batchMenuItems.map(item => item.key)).toEqual(['generate-all', 'approve-all', 'generate-all-pdfs'])
@@ -529,7 +558,7 @@ describe('recommendedBatchAction ordering', () => {
   })
 
   it('snapshots generation targets and starts watching them on acceptance', () => {
-    const hook = mountInstance([noInvoice('p1'), blocked('p2', 'locked')])
+    const hook = mountInstance([noInvoice('p1'), blocked('p2', 'locked'), withStatus('p3', 'draft')])
     const queued = hook.submit('generateAllMutation', { participant_count: 1 })
     expect((queued.context as { participantIds: string[] }).participantIds).toEqual(['p1'])
     queued.accept()
