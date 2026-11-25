@@ -732,7 +732,7 @@ gets wrong; a mode that was never offered is refused; an override on an energy
 candidate is refused rather than ignored.
 
 **`EnginePricingTests`** (3): the imported multilevel tariff is read back by
-`invoices.engine._resolve_tariff_band` — daytime at HT, night and evening at NT,
+`tariffs.pricing.price_at` — daytime at HT, night and evening at NT,
 and the boundaries at 06:59/07:00 and 20:59/21:00.
 
 **`RemoteFetchTests`** (10): a literal private address and `localhost` both

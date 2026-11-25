@@ -17,7 +17,7 @@ from rest_framework.test import APIClient
 from accounts.models import UserRole
 from invoices.band_labels import band_description, band_recurrence, band_window, translations_for
 from invoices.contract_translations import CONTRACT_TRANSLATIONS
-from invoices.engine import _resolve_tariff_band
+from tariffs import pricing
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
 from tariffs.periods import average_percentage, has_window, is_catch_all, resolve_band
 from testing.helpers import authenticate, create_managed_zev, make_user
@@ -184,7 +184,7 @@ class CatchAllEngineTests(TestCase):
             TariffPeriod.objects.create(tariff=tariff, **period)
 
         def price(ts):
-            return _resolve_tariff_band(tariff, ts).price_chf_per_kwh
+            return pricing.price_at(tariff, ts)[0]
 
         self.assertEqual(price(at(MONDAY, 12)), Decimal("0.29500"))
         self.assertEqual(price(at(MONDAY, 23)), Decimal("0.22500"))

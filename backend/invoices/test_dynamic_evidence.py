@@ -21,13 +21,13 @@ from tariffs.dynamic.models import DynamicTariffSource
 from tariffs.dynamic.services import clear_source_points
 from tariffs.dynamic.vse_v1 import PricePoint
 from tariffs.models import EnergyType, Tariff, TariffCategory
+from tariffs.pricing import DynamicSeries
 from testing import factories
 from zev.access import grant_manager
 
 from .engine import (
     DynamicPriceGapError,
     DynamicTariffError,
-    _DynamicSeries,
     generate_invoice,
     preflight_dynamic_prices,
 )
@@ -139,7 +139,7 @@ def test_invoice_price_read_blocks_concurrent_maintenance_until_evidence_commits
     participant, _tariff, source, point = setup_billing()
     read, release, writer_connected = Event(), Event(), Event()
     writer_pid = []
-    load = _DynamicSeries.load
+    load = DynamicSeries.load
 
     def paused_load(*args, **kwargs):
         result = load(*args, **kwargs)
@@ -151,7 +151,7 @@ def test_invoice_price_read_blocks_concurrent_maintenance_until_evidence_commits
 
     def bill():
         try:
-            with patch.object(_DynamicSeries, "load", side_effect=paused_load):
+            with patch.object(DynamicSeries, "load", side_effect=paused_load):
                 if rollback:
                     with pytest.raises(ValueError, match="Simulated pricing failure"):
                         generate_invoice(participant, date(2026, 1, 1), date(2026, 1, 31))

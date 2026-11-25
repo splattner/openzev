@@ -28,7 +28,7 @@ places, rate to four, and prices to five; rate and prices can be null.
 
 For a ZEV on `vat_mode = inclusive`, `retail_price_chf_per_kwh` and the grid base a
 percentage-of-energy `internal_energy_price_chf_per_kwh` is taken of are grossed:
-each flat grid tariff that bears input VAT (`_tariff_bears_input_vat`) is
+each flat grid tariff that bears input VAT (`tariffs.pricing.bears_input_vat`) is
 multiplied by `1 + rate`, the `VatRate` active today, as the invoice engine does
 (#1173). Other VAT modes use the net prices.
 

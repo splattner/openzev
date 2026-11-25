@@ -7,7 +7,7 @@ over time, the way the invoice engine would price a kWh:
   the engine;
 * a percentage-of-energy tariff is a share of the grid tariffs' bands *at the
   same time* (``invoices.engine._price_energy``);
-* VAT follows ``Zev.vat_mode`` and the engine's input-VAT classifier.
+* VAT follows ``Zev.vat_mode`` and ``tariffs.pricing``.
 
 The summed price depends on when the energy is used, so the year is cut into
 cells (month, weekday, part of the day). Cells where the same combination of
@@ -39,10 +39,16 @@ from allocation.validity import period_window, wall_clock
 from tariffs.dynamic.models import DynamicPricePoint
 from tariffs.models import BillingMode, EnergyType, TariffCategory
 from tariffs.periods import resolve_band
+from tariffs.pricing import (
+    daily_vat_rate,
+    floored,
+    is_active,
+    is_active_during,
+    percentage_base,
+    with_input_vat,
+)
 from tariffs.series import series_key, sort_versions
 from zev.models import VatMode
-
-from .engine import _tariff_bears_input_vat
 
 #: The most slots one interval may produce: 12 months times two bands, the most a
 #: single seasonal HT/NT tariff gives. Beyond it the chart would be unreadable.
@@ -95,10 +101,6 @@ def _quantised(value: Decimal, step: Decimal = _PRICE_STEP) -> Decimal:
 
 def _text(value: Decimal | None, step: Decimal = _PRICE_STEP) -> str | None:
     return None if value is None else str(_quantised(value, step))
-
-
-def _active_on(item, day: date) -> bool:
-    return item.valid_from <= day and (item.valid_to is None or item.valid_to >= day)
 
 
 def _clock(value: time) -> str:
@@ -238,7 +240,7 @@ class _DynamicMeans:
             by_source[tariff.dynamic_source_id].append(tariff)
         starts = [start for start, _end in self._bounds]
         active = {
-            (tariff.pk, index): _active_on(tariff, start)
+            (tariff.pk, index): is_active(tariff, start)
             for tariff in tariffs
             for index, start in enumerate(starts)
         }
@@ -257,9 +259,7 @@ class _DynamicMeans:
                 for tariff in by_source[source_id]:
                     if not active[tariff.pk, index]:
                         continue
-                    value = Decimal(price)
-                    if tariff.minimum_price_chf_per_kwh is not None:
-                        value = max(value, Decimal(tariff.minimum_price_chf_per_kwh))
+                    value = floored(tariff, Decimal(price))
                     entry = self._stats[tariff.pk, index].setdefault(cell, [Decimal("0"), 0])
                     entry[0] += value * seconds
                     entry[1] += seconds
@@ -327,13 +327,6 @@ def _is_all_hours(rules: list[dict]) -> bool:
     )
 
 
-def _rate_on(rates: list, day: date) -> Decimal:
-    for rate in rates:
-        if _active_on(rate, day):
-            return Decimal(rate.rate)
-    return Decimal("0")
-
-
 def _vat_boundaries(rates: list) -> set[date]:
     days = set()
     for rate in rates:
@@ -348,7 +341,7 @@ def _gross(vat_mode: str, tariff, net: Decimal, rate: Decimal) -> Decimal | None
     if vat_mode == VatMode.REGISTERED:
         return net * (_ONE + rate)
     if vat_mode == VatMode.INCLUSIVE:
-        return net * (_ONE + rate) if _tariff_bears_input_vat(tariff) else net
+        return with_input_vat(tariff, net, rate)
     return None
 
 
@@ -423,7 +416,7 @@ def build_progression(
     range_to = date_to or max(default_to, range_from)
 
     def overlaps_range(tariff) -> bool:
-        return tariff.valid_from <= range_to and (tariff.valid_to is None or tariff.valid_to >= range_from)
+        return is_active_during(tariff, range_from, range_to)
 
     expected = {t.category for t in displayed if periods_of(t) and overlaps_range(t)}
     expected |= {t.category for t in dynamic_typed if overlaps_range(t)}
@@ -495,15 +488,15 @@ def build_progression(
 def _interval(position, start, end, *, vat_mode, rates, cells, periods_of, displayed, dynamic_typed,
               grid_static, grid_dynamic, dynamic, spans) -> dict:
     with_vat = vat_mode != VatMode.NOT_REGISTERED
-    rate = _rate_on(rates, start) if with_vat else Decimal("0")
+    rate = daily_vat_rate(rates, start) if with_vat else Decimal("0")
 
-    active = [t for t in displayed if _active_on(t, start)]
-    active_dynamic = [t for t in dynamic_typed if _active_on(t, start)]
+    active = [t for t in displayed if is_active(t, start)]
+    active_dynamic = [t for t in dynamic_typed if is_active(t, start)]
     priceable = [t for t in active if periods_of(t)]
     energy = [t for t in priceable if t.billing_mode == BillingMode.ENERGY]
     percentage = [t for t in priceable if t.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY]
-    base = [g for g in grid_static if _active_on(g, start) and periods_of(g)] if percentage else []
-    base_dynamic = [g for g in grid_dynamic if _active_on(g, start)] if percentage else []
+    base = [g for g in grid_static if is_active(g, start) and periods_of(g)] if percentage else []
+    base_dynamic = [g for g in grid_dynamic if is_active(g, start)] if percentage else []
     present = {t.category for t in active + active_dynamic}
     missing = [
         c for c in _CATEGORY_ORDER
@@ -575,8 +568,7 @@ def _slot(indices, *, cells, shaping, energy, percentage, base, dynamic_energy, 
     gross_base = None
     if vat_mode == VatMode.INCLUSIVE:
         gross_base = sum(
-            (_d(bands[g.pk].price_chf_per_kwh) * (_ONE + rate if _tariff_bears_input_vat(g) else _ONE)
-             for g in base),
+            (with_input_vat(g, _d(bands[g.pk].price_chf_per_kwh), rate) for g in base),
             Decimal("0"),
         )
     if base_known:
@@ -584,7 +576,7 @@ def _slot(indices, *, cells, shaping, energy, percentage, base, dynamic_energy, 
             mean = means[grid_tariff.pk][0]
             net_base += mean
             if gross_base is not None:
-                gross_base += mean * (_ONE + rate if _tariff_bears_input_vat(grid_tariff) else _ONE)
+                gross_base += with_input_vat(grid_tariff, mean, rate)
 
     components = []
     for tariff in energy:
@@ -605,8 +597,8 @@ def _slot(indices, *, cells, shaping, energy, percentage, base, dynamic_energy, 
             continue
         fraction = share / _HUNDRED
         net = net_base * fraction
-        if vat_mode == VatMode.INCLUSIVE and not _tariff_bears_input_vat(tariff):
-            gross = gross_base * fraction
+        if vat_mode == VatMode.INCLUSIVE:
+            gross = with_input_vat(tariff, percentage_base(tariff, net_base, gross_base) * fraction, rate)
         else:
             gross = _gross(vat_mode, tariff, net, rate)
         components.append(_Component(tariff, band, net, gross, share))
@@ -709,7 +701,7 @@ def _fixed_fees(tariffs, *, vat_mode, rates, date_from, date_to) -> list[dict]:
             for position, cut in enumerate(cuts):
                 piece_end = cuts[position + 1] - timedelta(days=1) if position + 1 < len(cuts) else tariff.valid_to
                 amount = _d(tariff.fixed_price_chf)
-                rate = _rate_on(rates, cut) if with_vat else None
+                rate = daily_vat_rate(rates, cut) if with_vat else None
                 gross = _gross(vat_mode, tariff, amount, rate) if with_vat else None
                 rows.append({
                     "tariff_id": str(tariff.pk),

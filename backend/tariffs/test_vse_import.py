@@ -27,7 +27,7 @@ from audit.models import AuditEvent
 from tariffs.dynamic.discovery import SourceCapabilities
 from tariffs.dynamic.models import DynamicTariffSource
 from tariffs.dynamic.vse_v1 import PricePoint
-from invoices.engine import _resolve_tariff_band
+from tariffs.pricing import price_at
 from tariffs.importers.planner import CandidateStatus, Selection, apply_import, plan_import
 from tariffs.importers.remote import TariffFetchError, fetch_tariff_document
 from tariffs.importers.vse_json import (
@@ -1261,7 +1261,7 @@ class EnginePricingTests(TestCase):
 
     def _price_at(self, hour, minute=0):
         stamp = datetime_module.datetime(2027, 3, 15, hour, minute)
-        period = _resolve_tariff_band(self.tariff, stamp)
+        _price, period = price_at(self.tariff, stamp)
         return period.price_chf_per_kwh if period is not None else None
 
     def test_daytime_consumption_is_priced_at_the_high_band(self):

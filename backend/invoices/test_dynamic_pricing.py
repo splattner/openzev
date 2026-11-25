@@ -1,6 +1,6 @@
 """Pricing an energy tariff from a fetched dynamic series.
 
-Three layers: ``_DynamicSeries`` (a bisectable view over stored points, no
+Three layers: ``tariffs.pricing.DynamicSeries`` (a bisectable view over stored points, no
 Django test client involved), ``TariffResolver.price_at`` (the one funnel
 every engine call site reads from, static or dynamic), and an end-to-end
 ``generate_invoice`` run — the same integration shape
@@ -23,13 +23,13 @@ import pytest
 from metering.models import MeterReading, ReadingDirection
 from tariffs.dynamic.models import DynamicPricePoint, DynamicTariffSource
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
+from tariffs.pricing import DynamicSeries
 from testing import factories
 
 from .engine import (
     DynamicPriceGapError,
     InvoiceGenerationContext,
     TariffResolver,
-    _DynamicSeries,
     generate_invoice,
 )
 
@@ -66,7 +66,7 @@ def dynamic_tariff(zev, source, **overrides) -> Tariff:
 
 
 # ---------------------------------------------------------------------------
-# _DynamicSeries
+# DynamicSeries
 # ---------------------------------------------------------------------------
 
 class TestDynamicSeries:
@@ -74,7 +74,7 @@ class TestDynamicSeries:
         source = make_source()
         store(source, datetime(2026, 2, 1, 10, tzinfo=UTC), "0.11300")
 
-        series = _DynamicSeries.load(source.pk)
+        series = DynamicSeries.load(source.pk)
 
         assert series.price_at(datetime(2026, 2, 1, 10, 0, tzinfo=UTC)) == Decimal("0.11300")
         assert series.price_at(datetime(2026, 2, 1, 10, 14, tzinfo=UTC)) == Decimal("0.11300")
@@ -84,7 +84,7 @@ class TestDynamicSeries:
         store(source, datetime(2026, 2, 1, 10, tzinfo=UTC), "0.11300")
         store(source, datetime(2026, 2, 1, 10, 15, tzinfo=UTC), "0.22200")
 
-        series = _DynamicSeries.load(source.pk)
+        series = DynamicSeries.load(source.pk)
 
         assert series.price_at(datetime(2026, 2, 1, 10, 15, tzinfo=UTC)) == Decimal("0.22200")
 
@@ -93,7 +93,7 @@ class TestDynamicSeries:
         store(source, datetime(2026, 2, 1, 10, tzinfo=UTC), "0.1")
         store(source, datetime(2026, 2, 1, 12, tzinfo=UTC), "0.1")
 
-        series = _DynamicSeries.load(source.pk)
+        series = DynamicSeries.load(source.pk)
 
         assert series.price_at(datetime(2026, 2, 1, 11, tzinfo=UTC)) is None
 
@@ -101,7 +101,7 @@ class TestDynamicSeries:
         source = make_source()
         store(source, datetime(2026, 2, 1, 10, tzinfo=UTC), "0.1")
 
-        series = _DynamicSeries.load(source.pk)
+        series = DynamicSeries.load(source.pk)
 
         assert series.price_at(datetime(2026, 2, 1, 9, tzinfo=UTC)) is None
         assert series.price_at(datetime(2026, 2, 1, 11, tzinfo=UTC)) is None
@@ -109,7 +109,7 @@ class TestDynamicSeries:
     def test_an_empty_series_resolves_everything_to_none(self):
         source = make_source()
 
-        series = _DynamicSeries.load(source.pk)
+        series = DynamicSeries.load(source.pk)
 
         assert series.price_at(datetime(2026, 2, 1, 10, tzinfo=UTC)) is None
 
@@ -119,7 +119,7 @@ class TestDynamicSeries:
         source = make_source()
         store(source, datetime(2026, 2, 1, 12, tzinfo=UTC), "-0.05430")
 
-        series = _DynamicSeries.load(source.pk)
+        series = DynamicSeries.load(source.pk)
 
         assert series.price_at(datetime(2026, 2, 1, 12, 0, tzinfo=UTC)) == Decimal("-0.05430")
 
@@ -128,7 +128,7 @@ class TestDynamicSeries:
         store(source, datetime(2025, 1, 1, 10, tzinfo=UTC), "9.00000")
         store(source, datetime(2026, 2, 1, 10, tzinfo=UTC), "0.20000")
 
-        series = _DynamicSeries.load(
+        series = DynamicSeries.load(
             source.pk,
             start=datetime(2026, 2, 1, tzinfo=UTC),
             end=datetime(2026, 3, 1, tzinfo=UTC),

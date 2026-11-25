@@ -8,11 +8,13 @@ that the accumulator preserves first-seen order, which the caller's stable sort
 uses to break ties between lines from the same tariff.
 """
 
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
+from unittest import mock
 
 import pytest
 
+from tariffs import pricing
 from tariffs.models import BillingMode, EnergyType, PeriodType, TariffCategory
 from testing import factories
 
@@ -99,6 +101,20 @@ def test_repeated_lookups_return_the_same_answer():
 
     assert resolver.energy(EnergyType.GRID, JAN) == [tariff]
     assert resolver.energy(EnergyType.GRID, JAN) == [tariff]
+
+
+def test_a_missing_band_is_memoised_like_a_found_one():
+    # A tariff without bands bills 0; repeated readings must not resolve it again.
+    tariff = energy_tariff(factories.ZevFactory())
+    resolver = TariffResolver([tariff])
+    ts = datetime(2026, 1, 15, 12, tzinfo=timezone.utc)
+
+    with mock.patch("invoices.engine.resolve_band", wraps=pricing.resolve_band) as in_engine, \
+            mock.patch.object(pricing, "resolve_band", wraps=pricing.resolve_band) as in_pricing:
+        for _ in range(3):
+            assert resolver.price_at(tariff, ts) == (Decimal("0"), None)
+
+    assert (in_engine.call_count, in_pricing.call_count) == (1, 0)
 
 
 def test_a_percentage_tariff_without_a_percentage_is_ignored():

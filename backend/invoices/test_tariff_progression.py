@@ -11,12 +11,11 @@ import pytest
 from accounts.models import VatRate
 from allocation.validity import period_window, wall_clock
 from invoices import tariff_progression
-from invoices.engine import (
-    InvoiceGenerationContext, ItemAccumulator, TariffResolver, _price_energy, _tariff_bears_input_vat,
-)
+from invoices.engine import ItemAccumulator, TariffResolver, _price_energy
 from invoices.tariff_progression import TooManyBands, build_progression
 from tariffs.dynamic.models import DynamicPricePoint, DynamicTariffSource
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory
+from tariffs.pricing import DynamicSeries, price_at, with_input_vat
 from testing import factories
 from testing.helpers import clear_vat_rates
 from zev.models import VatMode
@@ -367,8 +366,7 @@ class TestPricing:
                 net = sum((entry["total"] for entry in accumulator), D("0"))
                 if mode == VatMode.INCLUSIVE:
                     billed = sum(
-                        (entry["total"] * (1 + rate) if _tariff_bears_input_vat(entry["tariff"]) else entry["total"]
-                         for entry in accumulator), D("0"),
+                        (with_input_vat(entry["tariff"], entry["total"], rate) for entry in accumulator), D("0"),
                     )
                 elif mode == VatMode.REGISTERED:
                     billed = net * (1 + rate)
@@ -520,15 +518,15 @@ class TestDynamic:
         seed_prices(source, *JANUARY, lambda moment: D("0.10") + D("0.01") * moment.hour
                     + (D("0.005") if moment.weekday() >= 5 else 0))
         result = progress(zev, date_from=JANUARY[0], date_to=JANUARY[1])
-        series = InvoiceGenerationContext.build(zev, *JANUARY).dynamic_series(source.pk)
-
         start, end = period_window(*JANUARY)
+        series = DynamicSeries.load(source.pk, start=start, end=end)
+
         sums, counts = {}, {}
         cursor = start
         while cursor < end:
             local = wall_clock(cursor).replace(tzinfo=None)
             line = slot_at(result, 0, local)["line"]
-            sums[line] = sums.get(line, 0) + series.price_at(cursor)
+            sums[line] = sums.get(line, 0) + price_at(spot, cursor, series=series)[0]
             counts[line] = counts.get(line, 0) + 1
             cursor += timedelta(minutes=15)
 
@@ -595,14 +593,14 @@ class TestDynamic:
         spot, source = make_dynamic(zev)
         seed_prices(source, *JANUARY, lambda moment: D("0.10") + D("0.01") * moment.hour, minutes=60)
         result = progress(zev, date_from=JANUARY[0], date_to=JANUARY[1])
-        series = InvoiceGenerationContext.build(zev, *JANUARY).dynamic_series(source.pk)
-
         start, end = period_window(*JANUARY)
+        series = DynamicSeries.load(source.pk, start=start, end=end)
+
         sums, counts = {}, {}
         cursor = start
         while cursor < end:
             line = slot_at(result, 0, wall_clock(cursor).replace(tzinfo=None))["line"]
-            sums[line] = sums.get(line, 0) + series.price_at(cursor)
+            sums[line] = sums.get(line, 0) + price_at(spot, cursor, series=series)[0]
             counts[line] = counts.get(line, 0) + 1
             cursor += timedelta(minutes=15)
 
@@ -659,6 +657,17 @@ class TestDynamic:
         slot = progress(zev, "feed_in", date_from=JANUARY[0], date_to=JANUARY[1])["intervals"][0]["slots"][0]
 
         assert slot["net"] == "0.07500"
+
+    def test_tariffs_sharing_a_source_keep_their_own_floor(self, zev):
+        feed_in = dict(tariff_type="feed_in", energy_type=EnergyType.FEED_IN, category=TariffCategory.ENERGY)
+        low, source = make_dynamic(zev, "Einspeisung A", minimum_price_chf_per_kwh=D("0.05"), **feed_in)
+        high, _ = make_dynamic(zev, "Einspeisung B", source=source, minimum_price_chf_per_kwh=D("0.08"), **feed_in)
+        seed_prices(source, *JANUARY, lambda moment: "0.02" if moment.hour < 12 else "0.10")
+
+        slot = progress(zev, "feed_in", date_from=JANUARY[0], date_to=JANUARY[1])["intervals"][0]["slots"][0]
+
+        nets = {c["tariff_id"]: c["net"] for cat in slot["categories"] for c in cat["components"]}
+        assert nets == {str(low.pk): "0.07500", str(high.pk): "0.09000"}
 
     def test_a_percentage_takes_its_share_of_the_dynamic_grid_mean(self, zev):
         _, source = make_dynamic(zev)

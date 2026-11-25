@@ -1,7 +1,7 @@
 """Tests for HT/NT (peak/off-peak) and weekday-aware tariff pricing.
 
 The existing ``test_engine.py`` only exercises ``PeriodType.FLAT``. This module
-covers ``_resolve_tariff_band`` directly (the time-of-day / weekday matching logic)
+covers ``tariffs.pricing.price_at`` directly (the time-of-day / weekday matching logic)
 and an end-to-end ``generate_invoice`` run that splits consumption across a
 high-tariff and low-tariff window.
 """
@@ -21,9 +21,10 @@ from tariffs.models import (
     TariffCategory,
     TariffPeriod,
 )
+from tariffs.pricing import price_at
 from testing import factories
 
-from .engine import _resolve_tariff_band, generate_invoice
+from .engine import generate_invoice
 
 pytestmark = pytest.mark.django_db
 
@@ -58,12 +59,12 @@ def _ht_nt_tariff(zev, *, energy_type=EnergyType.GRID, category=TariffCategory.E
 
 
 # ---------------------------------------------------------------------------
-# _resolve_tariff_band — unit-level
+# price_at — unit-level
 # ---------------------------------------------------------------------------
 
 
 def _resolved_price(tariff, ts):
-    period = _resolve_tariff_band(tariff, ts)
+    _price, period = price_at(tariff, ts)
     return period.price_chf_per_kwh if period is not None else None
 
 class TestGetTariffPriceHtNt:
