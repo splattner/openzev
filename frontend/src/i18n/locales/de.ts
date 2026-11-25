@@ -1930,7 +1930,7 @@ export const de = {
             issues: {
                 meteringNoPoints: 'Keine Messpunkte zugewiesen',
                 metering: 'Messdaten fehlen für {{missing}} von {{total}} Messpunkten',
-                conflict: 'Überschneidet sich mit der gesperrten Rechnung {{number}}',
+                conflict: 'Rechnung {{number}} verhindert die Erstellung',
                 pdf: 'PDF fehlgeschlagen',
                 delivery: 'E-Mail-Versand fehlgeschlagen',
                 noEmail: 'Keine E-Mail-Adresse: selbst zustellen und als versendet markieren',
@@ -2082,6 +2082,8 @@ export const de = {
             messages: {
                 generated: 'Rechnung erstellt.',
                 generateFailed: 'Rechnung konnte nicht erstellt werden.',
+                notReplaceableIssued: 'Rechnung {{number}} ist bereits ausgestellt und kann nicht neu erstellt werden.',
+                notReplaceablePartial: 'Rechnung {{number}} umfasst mehr als diese Periode. Erstellen Sie stattdessen ihre ganze Periode neu.',
                 dynamicPriceGap: 'Für „{{tariff}}“ fehlt am {{timestamp}} ein dynamischer Preis. Aktualisieren Sie die Preisquelle und versuchen Sie es erneut.',
                 invalidDynamicTariff: "„{{tariff}}“ hat eine ungeeignete dynamische Quelle. Prüfen Sie Produkt und Energieart vor der Rechnungserstellung.",
                 pdfGenerated: 'PDF erstellt.',
@@ -4097,7 +4099,7 @@ export const de = {
                     tariffsTodo: 'Kein Energietarif konfiguriert',
                     tariffsWarn: '{{days}} von {{total}} Tag(en) ohne Energietarif',
                     generatedTodo: 'Rechnungen fehlen noch für {{missing}} von {{total}} Teilnehmende(n)',
-                    conflictsWarn: 'Gesperrte Rechnungen verhindern die Erstellung für {{count}} Teilnehmende ({{names}}).',
+                    conflictsWarn: 'Überschneidende Rechnungen verhindern die Erstellung für {{count}} Teilnehmende ({{names}}).',
                     correctionsWarn_one: '{{count}} Rechnung braucht nach einer Messwertkorrektur Prüfung: {{invoices}}',
                     correctionsWarn_other: '{{count}} Rechnungen brauchen nach Messwertkorrekturen Prüfung: {{invoices}}',
                     approvedTodo: 'Ausstehende Freigaben: {{count}}',

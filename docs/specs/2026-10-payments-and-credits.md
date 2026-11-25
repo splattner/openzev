@@ -279,7 +279,7 @@ original is kept (§4.5).
 | Regeneration finds a `draft`, never approved | deleted | deleted |
 | Regeneration finds `cancelled` with `approved_at IS NULL` | deleted | deleted |
 | Regeneration finds `cancelled` with `approved_at` set | deleted | **kept**. The new invoice is created next to it. |
-| Regeneration finds `approved`/`sent`/`paid` | blocked (409) | blocked (unchanged, `locked_overlapping_invoices`) |
+| Regeneration finds `approved`/`sent`/`paid` | blocked (409) | blocked (unchanged, `replacement_blocker`) |
 | Non-admin `DELETE` | draft or cancelled | draft or cancelled **and** `approved_at IS NULL` |
 | Admin `DELETE` | any | any invoice **without payments**, and from phase 2 without credits. An admin can still remove an issued invoice that never received money. |
 | `cancel` with payments | — | refused: "Invoices with recorded payments cannot be cancelled." (phase 2 points to `correct`) |

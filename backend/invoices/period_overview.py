@@ -14,6 +14,7 @@ from django.db.models.functions import TruncDate
 from allocation.validity import active_during, business_tz, period_window
 from zev.models import Participant, MeteringPointAssignment
 from metering.models import MeterReading
+from .engine import replacement_blocker
 from .models import EmailLog, Invoice, InvoiceReadingImpact, InvoiceStatus
 from .readiness import _spans_cover
 from .serializers import InvoiceSerializer
@@ -76,13 +77,11 @@ def compute_period_overview(*, zev, period_start: date_type, period_end: date_ty
         if current is not invoice:
             current._same_period_invoices.append(invoice)
 
-    # Generation eligibility for rows without a usable exact-period invoice,
-    # from one bounded overlap query (no per-participant lookups): locked
-    # (approved/sent/paid) overlap blocks generation exactly as the engine's
-    # replaceability rule, while full day-cover by sent/paid subperiods means
-    # already billed. Draft/cancelled overlaps stay regenerable.
+    # Generation eligibility for rows without a usable exact-period invoice:
+    # overlaps are fetched once; full sent/paid coverage takes precedence over
+    # ``replacement_blocker``.
     overlap_by_pid: dict[int, list[tuple]] = {}
-    for pid, ps, pe, status, inv_id, number in (
+    for pid, ps, pe, status, inv_id, number, approved_at in (
         Invoice.objects.filter(
             zev=zev, period_start__lte=period_end, period_end__gte=period_start
         )
@@ -90,10 +89,10 @@ def compute_period_overview(*, zev, period_start: date_type, period_end: date_ty
         .order_by("participant_id", "period_start", "period_end", "id")
         .values_list(
             "participant_id", "period_start", "period_end", "status", "id",
-            "invoice_number",
+            "invoice_number", "approved_at",
         )
     ):
-        overlap_by_pid.setdefault(pid, []).append((ps, pe, status, inv_id, number))
+        overlap_by_pid.setdefault(pid, []).append((ps, pe, status, inv_id, number, approved_at))
 
     invoice_participant_ids = set(invoice_map)
     participant_ids = {p.id for p in participants}
@@ -146,13 +145,13 @@ def compute_period_overview(*, zev, period_start: date_type, period_end: date_ty
         if invoice is None or invoice.status == InvoiceStatus.CANCELLED:
             overlaps = overlap_by_pid.get(participant.id, [])
             settled = [
-                (ps, pe) for ps, pe, status, _inv_id, _number in overlaps
+                (ps, pe) for ps, pe, status, _inv_id, _number, _approved_at in overlaps
                 if status in (InvoiceStatus.SENT, InvoiceStatus.PAID)
             ]
             if settled and _spans_cover(settled, period_start, period_end):
                 covering = next(
                     (inv_id, number)
-                    for ps, pe, status, inv_id, number in overlaps
+                    for ps, pe, status, inv_id, number, _approved_at in overlaps
                     if status in (InvoiceStatus.SENT, InvoiceStatus.PAID)
                 )
                 eligibility = {
@@ -161,16 +160,17 @@ def compute_period_overview(*, zev, period_start: date_type, period_end: date_ty
                     "invoice_number": covering[1],
                 }
             else:
-                locked = next(
-                    (
-                        (inv_id, number)
-                        for ps, pe, status, inv_id, number in overlaps
-                        if status
-                        not in (InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED)
-                    ),
-                    None,
-                )
-                if locked is None:
+                # Name an issued blocker before a partial one, as the engine does.
+                blockers = [
+                    (reason, inv_id, number)
+                    for ps, pe, status, inv_id, number, approved_at in overlaps
+                    if (reason := replacement_blocker(
+                        status, approved_at, ps, pe,
+                        period_start=period_start, period_end=period_end,
+                    ))
+                ]
+                blocker = min(blockers, key=lambda b: b[0] != "issued", default=None)
+                if blocker is None:
                     eligibility = {
                         "state": "eligible",
                         "invoice_id": None,
@@ -179,8 +179,8 @@ def compute_period_overview(*, zev, period_start: date_type, period_end: date_ty
                 else:
                     eligibility = {
                         "state": "blocked",
-                        "invoice_id": str(locked[0]),
-                        "invoice_number": locked[1],
+                        "invoice_id": str(blocker[1]),
+                        "invoice_number": blocker[2],
                     }
 
         missing_meter_ids = []

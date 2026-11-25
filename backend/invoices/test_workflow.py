@@ -240,9 +240,30 @@ class InvoiceEngineGuardTests(TestCase):
         })
 
     def test_regenerate_approved_invoice_returns_409(self):
-        make_invoice(self.zev, self.participant, InvoiceStatus.APPROVED)
+        approved = make_invoice(self.zev, self.participant, InvoiceStatus.APPROVED)
         resp = self._generate(self.participant.pk)
         self.assertEqual(resp.status_code, 409)
+        self.assertEqual(resp.data, {
+            "code": "invoice_not_replaceable",
+            "reason": "issued",
+            "invoice_number": approved.invoice_number,
+            "error": f"Invoice {approved.invoice_number} already has status 'approved' and cannot be regenerated.",
+        })
+
+    def test_partially_covered_draft_returns_the_specific_409(self):
+        draft = make_invoice(
+            self.zev, self.participant, InvoiceStatus.DRAFT,
+            period=(date(2026, 1, 1), date(2026, 2, 28)),
+        )
+        resp = self._generate(self.participant.pk)
+        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(resp.data, {
+            "code": "invoice_not_replaceable",
+            "reason": "partial_overlap",
+            "invoice_number": draft.invoice_number,
+            "error": f"Replacement period must cover the whole period of invoice {draft.invoice_number}.",
+        })
+        self.assertTrue(Invoice.objects.filter(pk=draft.pk).exists())
 
     def test_regenerate_paid_invoice_returns_409(self):
         make_invoice(self.zev, self.participant, InvoiceStatus.PAID)

@@ -19,7 +19,8 @@ it; a step that merely waits on an upstream one has no link. Data problems
 never block generation — they appear as warnings. When locked invoices from an
 earlier interval overlap the period (for example, paid monthly invoices under a
 new quarterly rhythm), the card shows a generation conflict with a link to the
-blocking invoices instead of offering generation.
+blocking invoices instead of offering generation. A draft that reaches past the
+period also blocks it: regenerate the draft's full period, or delete it.
 
 Period resolution and step completion are separate: a period counts as open
 when it holds a draft or
@@ -312,7 +313,8 @@ Each row in the table represents one **participant** who had active metering-poi
   invoice was cancelled and the period generated again, the row shows the new
   invoice and **Replaces OZV-00014 (Cancelled)** beneath it, linking to the
   cancelled one.
-- Problems name missing meters and days, an overlapping locked invoice,
+- Problems name missing meters and days, an overlapping invoice that blocks
+  generation (an issued one, or a draft reaching past the period),
   a failed PDF, a failed email, or an approved invoice whose participant has no
   email address (deliver it yourself, then **Mark as Sent**). A settled invoice
   whose meters were removed shows no missing-data warning.

@@ -266,19 +266,31 @@ def _gather_period_readings(
     )
 
 
-def locked_overlapping_invoices(participant, period_start, period_end):
-    """Invoices blocking generation for the period: overlapping invoices past
-    draft/cancelled, which have been sent to somebody and must not be silently
-    rewritten. Shared with the readiness conflict detection."""
-    return (
-        Invoice.objects.filter(
-            participant=participant,
-            period_start__lte=period_end,
-            period_end__gte=period_start,
-        )
-        .exclude(status__in=[InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED])
-        .order_by("period_start", "period_end", "id")
-    )
+class InvoiceNotReplaceableError(ValueError):
+    """An overlapping invoice keeps the period from being generated."""
+
+    code = "invoice_not_replaceable"
+
+    def __init__(self, invoice, reason: str, message: str):
+        self.invoice_number = invoice.invoice_number
+        self.reason = reason
+        super().__init__(message)
+
+    def as_dict(self) -> dict:
+        return {"code": self.code, "reason": self.reason, "invoice_number": self.invoice_number, "error": str(self)}
+
+
+def replacement_blocker(status, approved_at, invoice_start, invoice_end, *, period_start, period_end):
+    """Return the reason an overlapping invoice blocks regeneration, or None.
+
+    ``"issued"``: approved, sent or paid. ``"partial_overlap"``: never approved
+    (regeneration would delete it) but not fully inside the requested period.
+    The invoice must already overlap the period."""
+    if status not in (InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED):
+        return "issued"
+    if approved_at is None and not (period_start <= invoice_start and period_end >= invoice_end):
+        return "partial_overlap"
+    return None
 
 
 def _replaceable_overlapping_invoice_ids(participant, period_start, period_end):
@@ -286,18 +298,24 @@ def _replaceable_overlapping_invoice_ids(participant, period_start, period_end):
     overlapping = list(Invoice.objects.filter(
         participant=participant, period_start__lte=period_end, period_end__gte=period_start,
     ).order_by("pk").select_for_update().only("id", "status", "approved_at", "invoice_number", "period_start", "period_end"))
+    partial = None
     for invoice in overlapping:
-        if invoice.status not in (InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED):
-            raise ValueError(
-                f"Invoice {invoice.invoice_number} already has status '{invoice.status}' and cannot be regenerated."
+        reason = replacement_blocker(
+            invoice.status, invoice.approved_at, invoice.period_start, invoice.period_end,
+            period_start=period_start, period_end=period_end,
+        )
+        if reason == "issued":
+            raise InvoiceNotReplaceableError(
+                invoice, reason,
+                f"Invoice {invoice.invoice_number} already has status '{invoice.status}' and cannot be regenerated.",
             )
-    for invoice in overlapping:
-        if invoice.approved_at is None and not (
-            period_start <= invoice.period_start and period_end >= invoice.period_end
-        ):
-            raise ValueError(
-                f"Replacement period must cover the whole period of invoice {invoice.invoice_number}."
-            )
+        if reason == "partial_overlap" and partial is None:
+            partial = invoice
+    if partial is not None:
+        raise InvoiceNotReplaceableError(
+            partial, "partial_overlap",
+            f"Replacement period must cover the whole period of invoice {partial.invoice_number}.",
+        )
     return [invoice.pk for invoice in overlapping if invoice.approved_at is None]
 
 

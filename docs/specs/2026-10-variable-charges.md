@@ -22,8 +22,8 @@ period. Today:
 - `SHARED_MONTHLY_FEE` / `SHARED_YEARLY_FEE` and the `MONTHLY_FEE` modes bill a *tariff*: an amount
   set up front, valid for a date range. Billing a one-off cost that way puts it in the tariff list,
   on the participation contract and in the tariff overview PDF, none of which it belongs on.
-- A manual line on a draft invoice is lost: `_discard_replaceable_invoices` deletes drafts on
-  regeneration and `generate_invoice` rebuilds every item.
+- A manual line on a draft invoice is lost: regeneration deletes the replaced drafts
+  (`reading_impact.settle_regeneration`) and `generate_invoice` rebuilds every item.
 
 **Outcome:** the owner records a **charge** once, says who bears it, and every invoice the charge
 falls into carries it as a line item, including after regeneration. A charge is not a tariff: it
@@ -195,13 +195,13 @@ Swiss VAT rules / the owner's tax adviser before release.**
 
 ### 4.5 Freezing, regeneration, readiness
 
-**Regeneration.** Charges live outside the invoice, so `_discard_replaceable_invoices` followed by
-`generate_invoice` reads them again.
+**Regeneration.** Charges live outside the invoice, so `generate_invoice` reads them again and
+`reading_impact.settle_regeneration` deletes the replaced drafts.
 
 **Freezing without a link.** A charge is *locked* when **any** invoice of its ZEV covering
-`charge_date` is past `draft` and not `cancelled` (the status rule regeneration uses, see
-`engine.locked_overlapping_invoices`), whoever the invoice is for. A period is therefore billed from
-one set of charges: once the first invoice is approved, nothing is added, edited or deleted in it.
+`charge_date` is approved, sent or paid (not `draft` or `cancelled`), whoever the invoice is for.
+A period is therefore billed from one set of charges: once the first invoice is approved, nothing
+is added, edited or deleted in it.
 `charges.locked_invoice_for(zev, day)` answers it for a date, `charges.charge_lock(charge)` for one
 charge and `charges.locked_charge_ids(charges)` for a list in one query. A locked charge refuses
 `PATCH` and `DELETE` with 409, `{"code": "charge_locked", "detail", "invoice_number"}`, and a

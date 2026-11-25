@@ -1870,6 +1870,49 @@ class GenerationConflictTests(ReadinessTestCase):
             self._steps_by_key(payload)["generation_conflicts"]["status"], "ok"
         )
 
+    def test_partially_overlapped_unapproved_draft_is_a_conflict(self):
+        """The engine refuses to delete a never-approved draft it does not fully cover."""
+        from invoices.engine import generate_invoice
+        from invoices.test_helpers import make_invoice
+
+        draft = make_invoice(
+            self.zev, self.participant, InvoiceStatus.DRAFT,
+            period=(date(2026, 1, 1), date(2026, 3, 31)),
+        )
+        start, end = date(2026, 2, 1), date(2026, 2, 28)
+        _fill_readings(self.mp, start, end)
+        payload = compute_readiness(self.zev, start, end)
+        self.assertEqual(payload["next_action"], "review_generation_conflicts")
+        steps = self._steps_by_key(payload)
+        self.assertEqual(steps["generated"]["status"], "done")
+        conflict = steps["generation_conflicts"]["detail_data"]["conflicts"][0]
+        self.assertEqual(conflict["participant_id"], str(self.participant.id))
+        self.assertEqual(
+            [(inv["number"], inv["status"]) for inv in conflict["invoices"]],
+            [(draft.invoice_number, "draft")],
+        )
+        with self.assertRaisesMessage(ValueError, "must cover the whole period"):
+            generate_invoice(self.participant, start, end)
+
+    def test_issued_cancellation_reaching_past_the_period_is_kept_not_a_conflict(self):
+        """Previously approved cancellations are retained, so they do not block regeneration."""
+        from django.utils import timezone
+
+        from invoices.test_helpers import make_invoice
+
+        cancelled = make_invoice(
+            self.zev, self.participant, InvoiceStatus.CANCELLED,
+            period=(date(2026, 1, 1), date(2026, 3, 31)),
+        )
+        Invoice.objects.filter(pk=cancelled.pk).update(approved_at=timezone.now())
+        start, end = date(2026, 2, 1), date(2026, 2, 28)
+        _fill_readings(self.mp, start, end)
+        payload = compute_readiness(self.zev, start, end)
+        self.assertEqual(payload["next_action"], "generate")
+        self.assertEqual(
+            self._steps_by_key(payload)["generation_conflicts"]["status"], "ok"
+        )
+
     def test_mixed_participants_keep_valid_work_beside_the_conflict(self):
         paid, start, end = self._quarter_with_paid_january()
         second = self._add_billable_participant()

@@ -415,7 +415,7 @@ New `invoices.models.LegExternalSettlement`, the record that a paid stale docume
 
 Immutable once recorded in v1: no update or delete endpoint.
 
-**Identity.** One live document per `(participant, overlapping period, document_kind)`. `_discard_replaceable_invoices` and `locked_overlapping_invoices` gain a `document_kind` parameter (default `invoice`) and filter on it; for ZEV/vZEV every row is `invoice`, so their behaviour is unchanged. The two documents of one prosumer are found by `(zev, participant, period_start, period_end)`.
+**Identity.** One live document per `(participant, overlapping period, document_kind)`. `_replaceable_overlapping_invoice_ids` (the overlaps `reading_impact.settle_regeneration` deletes) gains a `document_kind` parameter (default `invoice`) and filters on it; for ZEV/vZEV every row is `invoice`, so its behaviour is unchanged. The two documents of one prosumer are found by `(zev, participant, period_start, period_end)`.
 
 **Roles per kind.** `Invoice.issuer` always means the document's author and `Invoice.recipient` its addressee; which of them supplies the electricity depends on `document_kind`. The PDF, the frontend and MCP `explain_invoice` read roles from this table and never assume "issuer = supplier":
 
@@ -616,7 +616,7 @@ Behaviour:
 
 | Path | Today | LEG change |
 |---|---|---|
-| `invoices/engine.py` `_discard_replaceable_invoices`, `locked_overlapping_invoices` | Participant + overlapping period; deletes drafts and every cancelled overlap | + `document_kind`; on LEG `keep_issued=True` keeps cancelled documents with `approved_at` (§4.5.2) |
+| `invoices/engine.py` `_replaceable_overlapping_invoice_ids`, `invoices/reading_impact.py` `settle_regeneration` | Participant + overlapping period; deletes drafts and never-approved cancellations, keeps cancellations with `approved_at` (ADR 0037) | + `document_kind`; on LEG `keep_issued=True` keeps cancelled documents with `approved_at` (§4.5.2) |
 | `invoices/workflow.py` `approve_invoice` | Freezes the issuer/recipient copy | Also stamps `approved_at` (all ZEV types) |
 | `invoices/document_parties.py` | `recipient` copy without VAT status | Copy gains `vat_registration` and `vat_registration_since` (Doc B) |
 | `invoices/readiness.py` | Steps `metering`, `assignments`, `tariffs` read `MeterReading`, assignments and local/grid tariffs; invoice steps count one invoice per participant | LEG: `leg_setup` (incl. producers whose declaration does not cover the period) and `leg_settlement` (date coverage, series completeness against current assignments, overridden findings, later changes to approved batches with the documents they affect, unresolved stale documents with the action each needs) replace `metering`; `tariffs` checks LEG price resolution for every group in use; `assignments` unchanged; invoice steps and `generation_conflicts` count documents per `(participant, kind)` |

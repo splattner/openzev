@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django.db.models import Count, Exists, F, OuterRef, Q, Subquery, Window
@@ -24,6 +24,7 @@ from zev.models import PARTY_NAME_FIELDS, MeteringPoint, MeteringPointAssignment
 from zev.iban import is_valid_iban
 
 from .charges import CHARGE_SORT_ORDER, bearers_among, split_charge
+from .engine import replacement_blocker
 from .models import Charge, EmailLog, Invoice, InvoiceItem, InvoiceReadingImpact, InvoiceStatus
 
 
@@ -483,7 +484,7 @@ class BulkData:
     energy: list[Tariff]
     pct: list[Tariff]
     dynamic_uncovered: dict  # dynamic source id -> {uncovered day, ...}, span-wide
-    invoice_rows: list[tuple[int, int, date, date, str, str]]  # (id, pid, ps, pe, status, number)
+    invoice_rows: list[tuple[int, int, date, date, str, str, datetime | None]]  # (id, pid, ps, pe, status, number, approved_at)
     latest_email_status: dict[int, str]  # per invoice id
     impacts: list[tuple]  # open reading impacts: (invoice id, pid, ps, pe, status, number, name, delivery id, created)
     charges: list[Charge] = field(default_factory=list)  # dated in the span, participants prefetched
@@ -556,7 +557,9 @@ def _load_bulk(zev, span_start: date, span_end: date) -> BulkData:
             zev=zev, period_start__lte=span_end, period_end__gte=span_start
         )
         .order_by("participant_id", "-created_at", "-id")
-        .values_list("id", "participant_id", "period_start", "period_end", "status", "invoice_number")
+        .values_list(
+            "id", "participant_id", "period_start", "period_end", "status", "invoice_number", "approved_at",
+        )
     )
     latest_email_status: dict[int, str] = {}
     for invoice_id, status in _newest_email_logs_qs(zev).values_list(
@@ -727,13 +730,13 @@ def _covered_participant_ids(
     locked invoices)."""
     covered = {
         pid
-        for _inv_id, pid, ps, pe, status, _number in data.invoice_rows
+        for _inv_id, pid, ps, pe, status, _number, _approved_at in data.invoice_rows
         if (ps, pe) == (period_start, period_end)
         and status != InvoiceStatus.CANCELLED
     }
     if billable - covered:
         settled_spans: dict[int, list[tuple[date, date]]] = {}
-        for _inv_id, pid, ps, pe, status, _number in data.invoice_rows:
+        for _inv_id, pid, ps, pe, status, _number, _approved_at in data.invoice_rows:
             if status not in (InvoiceStatus.SENT, InvoiceStatus.PAID):
                 continue
             if ps > period_end or pe < period_start:
@@ -749,7 +752,7 @@ def _covered_participant_ids(
 
 def _bulk_invoice_steps(data: BulkData, period_start: date, period_end: date) -> list[StepResult]:
     invoice_map: dict[int, tuple[int, date, date, str]] = {}
-    for inv_id, pid, ps, pe, status, _number in data.invoice_rows:
+    for inv_id, pid, ps, pe, status, _number, _approved_at in data.invoice_rows:
         if (ps, pe) != (period_start, period_end):
             continue
         invoice_map.setdefault(pid, (inv_id, ps, pe, status))
@@ -763,7 +766,7 @@ def _bulk_invoice_steps(data: BulkData, period_start: date, period_end: date) ->
 
     failed_emails = {
         inv_id
-        for inv_id, _pid, ps, pe, status, _number in data.invoice_rows
+        for inv_id, _pid, ps, pe, status, _number, _approved_at in data.invoice_rows
         if (ps, pe) == (period_start, period_end)
         and status not in (InvoiceStatus.PAID, InvoiceStatus.CANCELLED)
         and data.latest_email_status.get(inv_id) == EmailLog.Status.FAILED
@@ -780,7 +783,7 @@ def _bulk_invoice_steps(data: BulkData, period_start: date, period_end: date) ->
     # Conflicted participants are not ordinary generation work: their remedy
     # is the generation_conflicts step, so they leave the missing set.
     conflicted = set(
-        _locked_overlap_by_pid(data, uncovered, period_start, period_end)
+        _blocking_overlaps_by_pid(data, uncovered, period_start, period_end)
     )
     missing_ids = sorted(uncovered - conflicted)
     generated_count = len(billable & covered)
@@ -920,20 +923,19 @@ def _bulk_charges(data: BulkData, period_start: date, period_end: date) -> StepR
     return StepResult("charges", "done", len(charges))
 
 
-def _locked_overlap_by_pid(
+def _blocking_overlaps_by_pid(
     data: BulkData, missing: set[int], period_start: date, period_end: date
 ) -> dict[int, list[dict]]:
-    """Locked (approved/sent/paid) invoices overlapping the period per
-    uncovered billable participant — the engine's replaceability rule."""
-    locked_by_pid: dict[int, list[dict]] = {}
-    for inv_id, pid, ps, pe, status, number in data.invoice_rows:
+    """Overlapping invoices ``replacement_blocker`` refuses, per participant in ``missing``."""
+    blockers_by_pid: dict[int, list[dict]] = {}
+    for inv_id, pid, ps, pe, status, number, approved_at in data.invoice_rows:
         if pid not in missing:
-            continue
-        if status in (InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED):
             continue
         if ps > period_end or pe < period_start:
             continue
-        locked_by_pid.setdefault(pid, []).append(
+        if replacement_blocker(status, approved_at, ps, pe, period_start=period_start, period_end=period_end) is None:
+            continue
+        blockers_by_pid.setdefault(pid, []).append(
             {
                 "id": str(inv_id),
                 "number": number,
@@ -942,17 +944,13 @@ def _locked_overlap_by_pid(
                 "end": pe.isoformat(),
             }
         )
-    return locked_by_pid
+    return blockers_by_pid
 
 
 def _bulk_generation_conflicts(
     data: BulkData, period_start: date, period_end: date
 ) -> StepResult:
-    """Billable participants whose generation is blocked by locked overlapping
-    invoices (same overlap/replaceability rule as the engine's
-    ``locked_overlapping_invoices``): partial locked coverage is an explicit
-    conflict, not ordinary generation. Draft/cancelled overlaps stay
-    replaceable and never conflict."""
+    """Report regeneration blockers for uncovered billable participants."""
     link = f"/billing/invoices?period_start={period_start.isoformat()}&period_end={period_end.isoformat()}"
     billable = _billable_participant_ids_from(
         data.participants, data.assignments, period_start, period_end
@@ -960,9 +958,9 @@ def _bulk_generation_conflicts(
     missing = billable - _covered_participant_ids(
         data, billable, period_start, period_end
     )
-    locked_by_pid = _locked_overlap_by_pid(data, missing, period_start, period_end)
+    blockers_by_pid = _blocking_overlaps_by_pid(data, missing, period_start, period_end)
     ordered = sorted(
-        locked_by_pid,
+        blockers_by_pid,
         key=lambda pid: (
             data.participants[pid].last_name,
             data.participants[pid].first_name,
@@ -975,7 +973,7 @@ def _bulk_generation_conflicts(
             "participant_id": str(pid),
             "participant_name": data.participants[pid].full_name,
             "invoices": sorted(
-                locked_by_pid[pid], key=lambda inv: (inv["start"], inv["end"], inv["id"])
+                blockers_by_pid[pid], key=lambda inv: (inv["start"], inv["end"], inv["id"])
             ),
         }
         for pid in ordered
@@ -988,8 +986,7 @@ def _bulk_generation_conflicts(
         "warn",
         len(conflicts),
         detail=(
-            f"{len(conflicts)} participant(s) blocked by locked overlapping "
-            f"invoices: {names}"
+            f"{len(conflicts)} participant(s) blocked by overlapping invoices: {names}"
         ),
         detail_data={
             "conflict_count": len(conflicts),
