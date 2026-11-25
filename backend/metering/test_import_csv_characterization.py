@@ -178,6 +178,38 @@ class CsvImportCharacterizationTests(TestCase):
             self._timestamps(), [datetime(2026, 2, 6, 0, 0, tzinfo=ZURICH)]
         )
 
+    def test_daily_preview_counts_only_fitted_slots_on_dst_start(self):
+        self.metering_point.meter_type = MeteringPointType.BIDIRECTIONAL
+        self.metering_point.save(update_fields=["meter_type"])
+        after_gap = datetime(2026, 3, 29, 1, tzinfo=timezone.utc)  # 03:00 in Zurich
+        MeterReading.objects.create(
+            metering_point=self.metering_point, timestamp=after_gap, energy_kwh=Decimal("5"), direction="in",
+        )
+        # Zero placeholders imply IN for the day hint. Every fitted slot is OUT.
+        values = [-1] * 8 + [0] * 4 + [-2] * 84
+        rows = [["CH-IMPORT-1", datetime(2026, 3, 29), *values]]
+        fields = dict(
+            format_profile="daily_15min", has_header="false",
+            col_meter_id="0", col_timestamp="1", col_energy_start="2",
+        )
+
+        preview = self._preview_xlsx("spring.xlsx", rows, **fields)
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(preview.data["errors"], [])
+        self.assertEqual(preview.data["preview_rows"][0]["directions"], ["in", "out"])
+        self.assertTrue(preview.data["preview_rows"][0]["existing_data"])
+        self.assertEqual(preview.data["summary"]["readings_existing"], 0)
+
+        upload = self._upload_xlsx("spring.xlsx", rows, **fields)
+        self.assertEqual(upload.status_code, 201)
+        self.assertEqual(upload.data["errors"], [])
+        self.assertEqual(upload.data["rows_imported"], 92)
+        self.assertEqual(MeterReading.objects.filter(direction="out").count(), 92)
+        self.assertEqual(MeterReading.objects.get(timestamp=after_gap, direction="out").energy_kwh, Decimal("2"))
+        replay = self._preview_xlsx("spring.xlsx", rows, **fields)
+        self.assertEqual(replay.data["summary"]["readings_existing"], 92)
+        self.assertEqual(replay.data["summary"]["rows_skipped_existing"], 1)
+
     def test_xlsx_text_date_cell_with_timestamp_format(self):
         resp = self._upload_xlsx(
             "textdate.xlsx",
@@ -460,6 +492,98 @@ class CsvImportCharacterizationTests(TestCase):
         self.assertEqual(resp.data["rows_skipped"], 1)
         self.assertEqual(MeterReading.objects.count(), 0)
 
+    def test_daily_row_errors_preserve_preview_hints_and_import_validation_order(self):
+        self.metering_point.meter_type = MeteringPointType.BIDIRECTIONAL
+        self.metering_point.save(update_fields=["meter_type"])
+        MeterReading.objects.create(
+            metering_point=self.metering_point, timestamp=datetime(2026, 6, 9, 0, 15, tzinfo=ZURICH),
+            energy_kwh=Decimal("3"), direction="out",
+        )
+        contents = (
+            b"meter_id,date,direction,v1,v2\n"
+            b"CH-IMPORT-1,2026-06-09,,bad,-3\n"
+            b"CH-IMPORT-1,2026-06-09,invalid,bad,-3\n"
+            b"CH-IMPORT-1,2026-06-09,invalid,,\n"
+            b"UNKNOWN,2026-06-09,,bad,-3\n"
+        )
+        fields = dict(
+            format_profile="daily_15min", col_timestamp="date", col_energy_start="v1",
+            values_count="2", overwrite_existing="true", zev_id=str(self.zev.id),
+        )
+        preview = preview_csv(self.client, "errors.csv", contents, **fields)
+        upload = upload_csv(self.client, "errors.csv", contents, **fields)
+
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(upload.status_code, 201)
+        known_errors = [
+            {"row": 2, "meter_id": "CH-IMPORT-1", "error": "Invalid numeric value 'bad'"},
+            {"row": 3, "meter_id": "CH-IMPORT-1", "error": "Invalid numeric value 'bad'"},
+            {"row": 4, "meter_id": "CH-IMPORT-1", "error": "Row contains no interval values."},
+        ]
+        self.assertEqual(preview.data["errors"], [
+            *known_errors, {"row": 5, "meter_id": "UNKNOWN", "error": "Invalid numeric value 'bad'"},
+        ])
+        self.assertEqual(upload.data["errors"], [
+            *known_errors,
+            {"row": 5, "meter_id": "UNKNOWN", "error": "Metering point 'UNKNOWN' not found or not accessible."},
+        ])
+        self.assertEqual(
+            [(row["directions"], row["existing_data"]) for row in preview.data["preview_rows"]],
+            [(["out"], True), ([], False), ([], False), (["in"], False)],
+        )
+        self.assertEqual(preview.data["summary"]["readings_existing"], 0)
+        self.assertEqual(upload.data["rows_skipped"], 4)
+        self.assertEqual(upload.data["rows_imported"], 0)
+        self.assertEqual(upload.data["reading_changes"], [])
+
+    def test_daily_date_window_overflow_skips_only_invalid_rows(self):
+        contents = (
+            b"meter_id,date,v1\n"
+            b"CH-IMPORT-1,2026-06-09,1\n"
+            b"CH-IMPORT-1,0001-01-01,2\n"
+            b"CH-IMPORT-1,9999-12-31,3\n"
+        )
+        fields = dict(
+            format_profile="daily_15min", col_timestamp="date", col_energy_start="v1",
+            values_count="1", zev_id=str(self.zev.id),
+        )
+        preview = preview_csv(self.client, "dates.csv", contents, **fields)
+        upload = upload_csv(self.client, "dates.csv", contents, **fields)
+
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(upload.status_code, 201)
+        self.assertEqual(preview.data["errors"], [
+            {"row": 3, "meter_id": "CH-IMPORT-1", "error": "Date '0001-01-01' is out of range for a daily profile."},
+            {"row": 4, "meter_id": "CH-IMPORT-1", "error": "Date '9999-12-31' is out of range for a daily profile."},
+        ])
+        self.assertEqual(upload.data["errors"], preview.data["errors"])
+        self.assertEqual(upload.data["rows_skipped"], 2)
+        self.assertEqual(upload.data["rows_imported"], 1)
+        self.assertEqual(self._timestamps(), [datetime(2026, 6, 9, tzinfo=ZURICH)])
+
+    def test_daily_slot_overflow_skips_only_invalid_rows(self):
+        blanks = b"," * 199
+        contents = (
+            b"meter_id,date," + b",".join(b"v%d" % i for i in range(1, 201)) + b"\n"
+            b"CH-IMPORT-1,2026-06-09,1" + blanks + b"\n"
+            b"CH-IMPORT-1,9999-12-30" + blanks + b",2\n"
+        )
+        fields = dict(
+            format_profile="daily_15min", col_timestamp="date", col_energy_start="v1",
+            values_count="200", timestamp_timezone="UTC", zev_id=str(self.zev.id),
+        )
+        preview = preview_csv(self.client, "slots.csv", contents, **fields)
+        upload = upload_csv(self.client, "slots.csv", contents, **fields)
+
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(upload.status_code, 201)
+        self.assertEqual(preview.data["errors"], [
+            {"row": 3, "meter_id": "CH-IMPORT-1", "error": "Date '9999-12-30' is out of range for a daily profile."},
+        ])
+        self.assertEqual(upload.data["errors"], preview.data["errors"])
+        self.assertEqual(upload.data["rows_skipped"], 1)
+        self.assertEqual(upload.data["rows_imported"], 1)
+
     def test_daily_profile_duplicate_slot_writes_nothing(self):
         first = b"meter_id,date,v1,v2\nCH-IMPORT-1,2026-06-10,1.0000,2.0000\n"
         fields = dict(
@@ -497,24 +621,44 @@ class CsvImportCharacterizationTests(TestCase):
         )
 
     def test_xlsx_native_date_cell_with_timestamp_format_for_daily_profile(self):
-        resp = self._upload_xlsx(
-            "daily-dt.xlsx",
+        rows = [
+            ["meter_id", "date", "v1", "v2", "v3"],
+            ["CH-IMPORT-1", datetime(2026, 2, 7, 14, 0), 1.0, None, 2.5],
+        ]
+        fields = dict(
+            format_profile="daily_15min", col_timestamp="date", col_energy_start="2",
+            interval_minutes="30", values_count="3", timestamp_format="%d.%m.%Y",
+        )
+        preview = self._preview_xlsx("daily-dt.xlsx", rows, **fields)
+        self.assertEqual(preview.data["errors"], [])
+        self.assertEqual(preview.data["preview_rows"][0]["timestamp"], "2026-02-07")
+
+        upload = self._upload_xlsx("daily-dt.xlsx", rows, **fields)
+        self.assertEqual(upload.status_code, 201)
+        self.assertEqual(upload.data["errors"], [])
+        self.assertEqual(
+            self._timestamps(),
             [
-                ["meter_id", "date", "v1"],
-                ["CH-IMPORT-1", datetime(2026, 2, 7, 14, 0), 1.0],
+                datetime(2026, 2, 7, 0, 0, tzinfo=ZURICH),
+                datetime(2026, 2, 7, 1, 0, tzinfo=ZURICH),
             ],
-            format_profile="daily_15min",
-            col_timestamp="date",
-            col_energy_start="2",
-            values_count="1",
-            timestamp_format="%d.%m.%Y",
         )
 
-        self.assertEqual(resp.status_code, 201)
-        self.assertEqual(resp.data["rows_imported"], 1)
-        self.assertEqual(
-            self._timestamps(), [datetime(2026, 2, 7, 0, 0, tzinfo=ZURICH)]
+    def test_daily_upload_uses_current_meter_type_after_preview(self):
+        contents = b"meter_id,date,v1\nCH-IMPORT-1,2026-02-07,1\n"
+        fields = dict(
+            format_profile="daily_15min", col_timestamp="date", col_energy_start="v1",
+            values_count="1", zev_id=str(self.zev.id),
         )
+        preview = preview_csv(self.client, "meter-type.csv", contents, **fields)
+        self.assertEqual(preview.data["preview_rows"][0]["directions"], ["in"])
+
+        self.metering_point.meter_type = MeteringPointType.PRODUCTION
+        self.metering_point.save(update_fields=["meter_type"])
+        upload = upload_csv(self.client, "meter-type.csv", contents, **fields)
+
+        self.assertEqual(upload.status_code, 201)
+        self.assertEqual(MeterReading.objects.get().direction, "out")
 
     def test_csv_errors_carry_meter_id(self):
         csv_bytes = (

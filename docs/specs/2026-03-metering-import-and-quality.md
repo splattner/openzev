@@ -244,7 +244,7 @@ positional `daily_15min` interval slots are read the same way.
 | Missing values | An absent cell reports "Missing …"; a whitespace-only cell reports "Empty …" |
 | Numbers | Comma decimal separators are accepted. Non-finite values (`nan`, `inf`) are rejected. Unparseable numbers report `Invalid numeric value '<input>'` rather than leaking `decimal` conversion codes. Magnitudes above `99999999.9999` kWh (the `DecimalField(max_digits=12, decimal_places=4)` bound) are rejected with an actionable error in both preview and import, so no `DataError` can escape the import transaction on PostgreSQL |
 | Timestamps | `timestamp_format` (a `strptime` string) wins if supplied; otherwise ISO-8601 is parsed first, falling back to a lenient parser. A parsed offset is converted to UTC (`astimezone`), never discarded. An offset-less value — text or a native Excel datetime cell — is a wall-clock time in `timestamp_timezone` (default Europe/Zurich), with the DST rules of §4.1.1. For `daily_15min`, non-ISO dates are parsed day-first to suit European exports |
-| Truncated daily rows | Missing interval columns or an invalid slot value reject the whole row atomically (one error, one `rows_skipped`, zero `rows_imported`); preview shares `_parse_daily_values` so both report the identical message. A row with no interval values at all is skipped with a "no interval values" error in both paths |
+| Daily row interpretation | Daily rows are interpreted by the shared `_interpret_daily_row` helper, which returns a `DailyRow` (fitted slots, source directions, error), so preview and import use the same UTC timestamp, direction and absolute kWh for each fitted slot. Blanks keep their interval positions. After validating the date, check the column count, numeric cells from left to right, presence of at least one value, civil-day length and direction. A slot timestamp past the supported range reports the same out-of-range date error. A rejected row yields no slots and counts as one skip on import |
 | Daily duplicates / gap-fill | Without overwrite, existing slots are skipped per slot and missing slots imported: a partially duplicate row imports its new slots with no row error; a fully duplicate row (all slots in DB or earlier in the file) is skipped with one `Duplicate reading` error. Preview sets `existing_data` for partial and full duplicates without returning blocking errors. Fully existing daily rows increment `summary.rows_skipped_existing` (including intra-file duplicates tracked by the written-set); the wizard shows a localized skip notice and permits merge re-imports. With overwrite, only new or changed slots write; an entirely unchanged row is skipped while `existing_data` remains set |
 | Standard duplicates | Standard rows are interpreted by the shared `_interpret_standard_row` helper, so preview and import validate timestamps, values and directions identically. Preview prefetches existing `(metering_point, timestamp, direction)` pairs with chunked exact-timestamp queries (no range scan) and sets `existing_data` for rows matching the database or an earlier row in the same file; duplicates without overwrite increment `summary.rows_skipped_existing` without blocking errors, mirroring the daily contract. `summary.readings_existing` counts exact matching reading keys across the whole file — one per duplicate standard row, one per duplicate daily slot, including repeated writes within the file (validation failures excluded; data may change before execution) — and feeds the overwrite confirmation count |
 
@@ -327,18 +327,15 @@ only for the transfer-archive importer, whose timestamps carry offsets.
   standard row with energy `0` is skipped — counted in `rows_skipped`, one
   warning per day on the log, and `rows_skipped_dst_gap` in the preview — and a
   row with energy is a row error `Timestamp <value> does not exist in Swiss time (DST start).`
-- **Daily rows** (`_fit_daily_values`): a Swiss day has 92, 96 or 100
-  quarter-hours. Surplus trailing empty values are dropped; on the spring day
-  an empty or zero 02:00 hour is dropped; a 25-hour day given an ordinary
-  day's values, or any other surplus, is a row error
-  `<date> has <L> intervals in Swiss time (DST start|DST end), but the row has <n> values.`
-  Rows shorter than an ordinary day are kept (partial days). `UTC` rows pass
-  through unchanged. `values_count` is one number for the whole file (detected
-  from the usual row, e.g. 96), so on a day longer than `values_count` slots
-  `_daily_read_count` reads the row's own columns up to the day's length when it
-  has that many — an export that writes 100 values only on the autumn DST day
-  imports without raising `values_count`; a row with fewer columns still gets
-  the error above (`n` is then what the row really carries).
+- **Daily rows** span local midnight to the next midnight. If either bound
+  falls outside the supported timestamp range, both preview and import
+  report a row error; so does a slot timestamp beyond that range. With Swiss
+  quarter-hour data, a day has 92, 96 or 100 slots. Fitting removes surplus
+  trailing blanks first. On the spring day, if one extra hour remains, it drops the 02:00 hour when those cells are
+  blank or zero. On the autumn day, a full set of 100 columns is read even
+  when `values_count` is 96. When fitting reads only 96–99 columns, it reports
+  a day-length error. Fewer than 96 can represent a partial day. Individual
+  cells may stay blank. `UTC` rows skip civil-day fitting.
 
 Details and every message: `2026-09-swiss-civil-time.md` §6.1.
 
@@ -349,7 +346,16 @@ Details and every message: `2026-09-swiss-civil-time.md` §6.1.
 | Default (skip) | Skip if `(metering_point, timestamp, direction)` already exists | Standard: `get_or_create`; daily: per-day `create` inside `transaction.atomic()` |
 | Overwrite | Update existing reading's energy value in place | `update_or_create` |
 
-Duplicate detection for `daily_15min` batches the day's existing `(metering_point, timestamp, direction)` pairs into one range query per contiguous block of file days (so sparse files do not query the full earliest-to-latest span), then checks in memory; slots written earlier in the same file are tracked in a written-set so intra-file duplicates report the same slot-level error. Standard rows batch existing pairs with chunked exact-timestamp `__in` queries (500 per chunk, below SQLite/PostgreSQL parameter limits) and intersect in memory. Preview uses the same `_prefetch_daily_existing` source (no earliest→latest range scan) and the same `_parse_daily_values` validator, so empty rows, missing columns and invalid numerics agree; its `existing_data` flag is day-level (any reading that day with overlapping direction) while duplicate skip notices use exact slots. The write is atomic per row for validation failures: `imported` counts only committed slots (counted after the row savepoint succeeds, so a rolled-back row contributes zero). A concurrent duplicate used to roll back the row's savepoint and report one row-level duplicate error with no partial day; the write path now retries per slot after such a collision, so surviving slots commit and only a fully collided row reports the duplicate error. Absorbed late collisions are not counted in `rows_skipped` (the row succeeded). Overwrite reports as a `warnings` note: `"Overwrote N existing readings."` (never in `errors`, so the UI success path stays success).
+Daily preview and skip-mode import fetch existing reading keys in one range
+query per contiguous block of file days. Both track slots earlier in the
+file. Standard preview fetches existing keys with exact-timestamp `__in` queries
+in chunks of 500. Upload uses the current meter type.
+
+On a late collision, daily skip-mode import rolls back the row savepoint and
+retries per slot. Only committed slots count as imported and enter the change
+evidence. A fully collided row counts as one skip with a duplicate error; a
+partially absorbed collision is not counted in `rows_skipped` (the row succeeded).
+Overwrites appear in `warnings` as `"Overwrote N existing readings."`.
 
 **Meter visibility:** meters are scoped to role **and** the validated
 target ZEV (`_meter_queryset_for_user(user, zev)`): `admin` → all meters in the
@@ -680,25 +686,18 @@ retention limits.
 **Coverage:** missing-meter counts cover the whole file as unique meter IDs,
 not rows in the first `max_rows` (display rows stay capped at 30).
 
-**Row-level validation:** preview validates every data row before display:
-missing/empty `meter_id`, missing/invalid timestamp (honoring
-`timestamp_format`), missing/invalid `energy_kwh` (including comma decimals
-and non-finite values), invalid `direction`, and for `daily_15min` missing/invalid
-date, missing interval columns, and the first failing slot's energy error —
-one error per daily row, mirroring import, so a single bad 96-slot row cannot
-burn the whole error budget. Blank `meter_id`
-cells are validation errors, not "missing meters." Fields are validated
-whether or not the meter exists — a file of unknown meters cannot hide
-errors the import would surface. Once the error list reaches
-`MAX_REPORTED_ERRORS`, row validation stops early (with the truncation
-sentinel) but the whole-file meter-ID scan continues, so summary counts stay
-exact. Errors are returned in `errors` and block `Start Import` in the
-wizard. Preview `existing_data` for `daily_15min` is otherwise unchanged.
+**Row-level validation.** Preview reports missing or blank meter IDs separately
+from errors in the timestamp, energy and direction fields. Daily field
+validation reports the first error in the order described in §4.1. Preview
+validates those fields for unknown meters as well. Upload checks meter
+accessibility before interpreting the row. Preview returns errors in `errors`,
+where they block **Start Import** in the wizard, and adds a truncation note
+at the error cap if further rows remain. The meter-ID scan continues through
+the whole file so coverage counts stay exact.
 
-**Advisory contract:** preview is a UI aid, not a server-side gate. The wizard
-requires a fresh, clean preview before import, but the upload endpoint accepts
-direct uploads and runs the identical server-side validation — no preview
-token is required or checked.
+**Advisory contract.** The wizard requires a fresh, clean preview before
+import. The upload endpoint accepts direct uploads and validates the file
+again using the current meter configuration.
 
 **Response shape:**
 
@@ -732,22 +731,23 @@ token is required or checked.
 - `missing_meter_ids` is the sorted distinct missing set, capped at 50
   (truncated with +N). A meter appearing 30× counts as 1.
 
-Every preview row carries `directions`, the sorted set of reading directions
-that row would import (`["in"]`, `["out"]`, or `["in", "out"]` for a daily row
-a bidirectional meter splits by sign). It is empty for rows whose direction
-could not be determined — an invalid direction cell, or a row past the error
-cap. The wizard renders it as its own preview column, so a misconfigured
-direction column is visible before anything is written.
+The sorted `directions` list can be `[]`, `["in"]`, `["out"]`, or
+`["in", "out"]`. Standard rows report the direction of a valid reading. Daily
+rows report directions inferred from parseable source values, including in
+rejected rows and in a zero-filled hour removed during DST fitting.
+A mapped direction overrides inference. Preview uses consumption inference
+for unknown meters. An invalid direction or a row past the validation cap
+gives an empty list.
 
 For `daily_15min` profile, each preview row includes `interval_minutes` and
 `values_count` instead of `energy`. `existing_data` is direction-aware and
-uses one range query per contiguous block of file days: it flags any stored
-reading on the row's civil day (`DayWindow`) with a direction that row would import. It also
-flags exact duplicate slots earlier in the file. The flag remains visible in
-overwrite mode. In skip mode, fully duplicate daily rows contribute to
-`summary.rows_skipped_existing` instead of blocking errors. This count covers
-validated rows (validation stops at the error cap); it is zero for standard
-profiles, overwrite mode, and invalid configuration. New days in the same file
+uses one range query per contiguous block of file days. It flags any stored
+reading on the row's civil day (`DayWindow`) with a direction shown for the row.
+For valid rows it also flags exact duplicate slots earlier in the file.
+Only exact fitted-slot matches contribute to `summary.readings_existing` in
+either mode. In skip mode, fully duplicate daily rows contribute to
+`summary.rows_skipped_existing`. This count covers validated rows and is zero
+in overwrite mode and for invalid configuration. New days in the same file
 remain importable without overwrite. Upload still records skipped fully
 duplicate rows in the import protocol; the preview notice is advisory.
 

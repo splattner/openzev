@@ -293,9 +293,10 @@ time**. What matters on import is how a timestamp in your file is read:
   with energy there is reported as an error.
 - A daily-profile row has 92 quarter-hours on the March day, 96 on ordinary
   days and 100 on the October day. On the March day, a 96-column row may leave
-  the missing 02:00 hour empty (or 0), or leave the last four columns empty. On
-  the October day the row needs all 100 values: set **Intervals per row** to
-  100 for such files (the extra columns stay empty on ordinary days).
+  the missing 02:00 hour empty (or 0), or leave the last four columns empty.
+  For a full October day, supply 100 interval columns and leave individual
+  cells blank where values are unavailable. The importer reads all 100 when
+  the October row supplies them, even if **Intervals per row** is set to 96.
 
 The import protocol shows which zone each CSV import used.
 
@@ -399,6 +400,13 @@ imported.
 
 A daily-profile row carried no interval values at all. Fill in at least one
 slot — preview and import both reject the empty row.
+
+### "Date is out of range for a daily profile"
+
+The row's day, or one of its interval times, falls outside the supported
+timestamp range. Correct the date
+in the source file. Upload skips the affected row and can import valid rows
+from the same file.
 
 ### "Value parse error"
 

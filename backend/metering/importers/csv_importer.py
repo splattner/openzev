@@ -88,6 +88,15 @@ class DayWindow:
     end: datetime
 
 
+@dataclass
+class DailyRow:
+    """Slots eligible for import and directions visible in the original cells."""
+
+    slots: list[tuple[datetime, str, Decimal]]
+    source_directions: set[str]
+    error: str | None = None
+
+
 class TimestampReader:
     """Reads one file's timestamps into UTC instants (ADR 0026).
 
@@ -146,10 +155,12 @@ class TimestampReader:
 
     def day_window(self, raw_day):
         """The civil day a daily-profile row covers."""
+        if _is_missing(raw_day):
+            raise ValueError("Missing date value for daily profile.")
         if isinstance(raw_day, datetime):
             day = raw_day.date()
         else:
-            text = "" if raw_day is None else str(raw_day).strip()
+            text = str(raw_day).strip()
             try:
                 if self.timestamp_format:
                     day = datetime.strptime(text, self.timestamp_format).date()
@@ -161,10 +172,13 @@ class TimestampReader:
             except (ValueError, TypeError, OverflowError):
                 preview = text[:100] + ("…" if len(text) > 100 else "")
                 raise ValueError(f"Invalid date value '{preview}'.") from None
-        next_day = day + timedelta(days=1)
-        start = datetime(day.year, day.month, day.day, tzinfo=self.zone)
-        end = datetime(next_day.year, next_day.month, next_day.day, tzinfo=self.zone)
-        return DayWindow(day, start.astimezone(timezone.utc), end.astimezone(timezone.utc))
+        try:
+            next_day = day + timedelta(days=1)
+            start = datetime(day.year, day.month, day.day, tzinfo=self.zone)
+            end = datetime(next_day.year, next_day.month, next_day.day, tzinfo=self.zone)
+            return DayWindow(day, start.astimezone(timezone.utc), end.astimezone(timezone.utc))
+        except OverflowError:
+            raise ValueError(f"Date '{day.isoformat()}' is out of range for a daily profile.") from None
 
 
 def _coerce_timestamp_timezone(value):
@@ -189,15 +203,15 @@ def _day_length_error(window, slots, provided):
 
 
 def _fit_daily_values(values, window, interval_minutes, local):
-    """The row's values for the slots its civil day really has.
+    """Fit (direction, energy) pairs and blank slots to the local day.
 
-    Returns ``(values, error)``. A Swiss day has 92, 96 or 100 quarter-hours.
-    Surplus trailing empty columns are dropped (a 100-column file on an
-    ordinary day); on the spring DST day a row that still lists the missing
-    02:00 hour may leave it empty or zero, and it is dropped. A 25-hour day
-    needs all its values. Rows shorter than an ordinary day are kept as they
-    are — partial days are allowed. UTC files keep their values unchanged.
+    Trim surplus trailing blanks before dropping a blank or zero-filled
+    spring DST gap. On a 25-hour day, reject counts from an ordinary day's
+    slot count up to the full day's count, excluding the full count. UTC rows,
+    intervals that do not tile the day, and partial days pass through unchanged.
     """
+    if all(value is None for value in values):
+        return None, "Row contains no interval values."
     if not local:
         return values, None
     interval = timedelta(minutes=interval_minutes)
@@ -214,8 +228,8 @@ def _fit_daily_values(values, window, interval_minutes, local):
         if len(fitted) > slots and length < timedelta(hours=24) and not hour % interval:
             per_hour = hour // interval
             first = 2 * per_hour
-            missing = fitted[first:first + per_hour]
-            if len(fitted) - slots == per_hour and all(v is None or v == 0 for v in missing):
+            gap_values = (value for value in fitted[first:first + per_hour] if value is not None)
+            if len(fitted) - slots == per_hour and all(energy == 0 for _, energy in gap_values):
                 fitted = fitted[:first] + fitted[first + per_hour:]
         if len(fitted) > slots:
             return None, _day_length_error(window, slots, provided)
@@ -716,70 +730,71 @@ def _contiguous_day_ranges(windows):
     return ranges
 
 
-def _daily_read_count(values_count, window, interval_minutes, local, row, start_pos):
-    """``(values_count, width)`` to read this daily row with.
-
-    ``values_count`` is one number for the whole file, but the autumn DST day
-    has 100 quarter-hours where the others have 96. When the row really carries
-    the day's full length of values, read them all instead of cutting the row
-    at ``values_count`` (which would report a 96-value row the file never had).
-    A row without that many columns is left alone and fails the length check.
-    """
-    row_width = len(row)
+def _daily_read_count(values_count, window, interval_minutes, local, available_columns):
+    """Read the configured count unless the row has room for a longer civil day."""
     if local:
         interval = timedelta(minutes=interval_minutes)
         length = window.end - window.start
         if not length % interval:
             slots = length // interval
-            if slots > values_count and row_width - start_pos >= slots:
-                return slots, row_width
-    return values_count, row_width
+            if slots > values_count and available_columns >= slots:
+                return slots
+    return values_count
 
 
-def _parse_daily_values(row, start_pos, values_count, width):
-    """Shared daily-slot validation for preview and import.
-
-    Returns ``(values, row_error)`` where values is a list of Decimal|None
-    (None = missing slot) and row_error is a missing-column or invalid-numeric
-    message. Empty rows are NOT an error here; callers check
-    ``all(v is None)`` so preview and import agree on the empty-row message.
-    """
+def _parse_daily_values(row, start_pos, values_count, meter_type, explicit_direction):
+    """Keep all parseable cells for preview hints, plus the first validation error."""
     required_end = start_pos + values_count
+    width = len(row)
+    error = None
     if required_end > width:
-        return None, (
+        error = (
             f"Missing interval column at position {width} "
             f"(slot {width - start_pos + 1}/{values_count})."
         )
     values: list = []
-    for slot in range(values_count):
-        raw_energy = row[start_pos + slot]
+    for raw_energy in row[start_pos:required_end]:
         if _is_missing(raw_energy) or str(raw_energy).strip() == "":
             values.append(None)
             continue
         try:
-            values.append(_parse_decimal(raw_energy))
+            energy = _parse_decimal(raw_energy)
         except (InvalidOperation, ValueError, TypeError, OverflowError) as exc:
-            return None, str(exc)
-    return values, None
+            values.append(None)
+            if error is None:
+                error = str(exc)
+        else:
+            values.append(_infer_direction_and_energy(meter_type, energy, explicit_direction))
+    return values, error
 
 
-def _daily_row_directions(row, start_pos, values_count, width, meter_type, explicit_direction=None):
-    """Directions a daily row would import, for direction-aware existence checks."""
-    directions: set[str] = set()
-    for slot in range(values_count):
-        col_pos = start_pos + slot
-        if col_pos >= width:
-            break
-        raw_energy = row[col_pos] if col_pos < len(row) else None
-        if _is_missing(raw_energy) or str(raw_energy).strip() == "":
-            continue
-        try:
-            energy_raw = _parse_decimal(raw_energy)
-        except InvalidOperation:
-            continue
-        direction, _ = _infer_direction_and_energy(meter_type, energy_raw, explicit_direction)
-        directions.add(direction)
-    return directions
+def _interpret_daily_row(row, *, resolved_cols, window, local, interval_minutes, values_count, meter_type):
+    """Return validated UTC slots, source directions, and the row error, if any."""
+    start_pos = resolved_cols["energy_start"]
+    count = _daily_read_count(values_count, window, interval_minutes, local, len(row) - start_pos)
+    explicit_direction, direction_error = _row_direction(row, resolved_cols)
+    inference_type = meter_type if meter_type is not None else "consumption"
+    values, error = _parse_daily_values(row, start_pos, count, inference_type, explicit_direction)
+    # Day-level hints include parseable cells even when validation or DST fitting drops them.
+    directions = set()
+    if direction_error is None:
+        directions = {value[0] for value in values if value is not None}
+    if error is None:
+        values, error = _fit_daily_values(values, window, interval_minutes, local)
+    error = error or direction_error
+    # Unknown meters need field validation and hints without constructing timestamps.
+    if error is not None or meter_type is None:
+        return DailyRow([], directions, error)
+
+    try:
+        slots = [
+            (window.start + timedelta(minutes=interval_minutes * slot), *value)
+            for slot, value in enumerate(values) if value is not None
+        ]
+    except OverflowError:
+        # A long row or interval can run past the last representable timestamp.
+        return DailyRow([], directions, f"Date '{window.day.isoformat()}' is out of range for a daily profile.")
+    return DailyRow(slots, directions)
 
 
 def _fetch_existing_daily_set(mp_ids, min_start, max_end):
@@ -968,8 +983,6 @@ def preview_csv(
         meter_id = None
         mp = None
         window = None
-        # Directions this row would import, surfaced in the preview so a
-        # misconfigured direction column is visible before the write.
         row_directions: list = []
         # After the error cap, keep scanning meter IDs so summary counts stay exact.
         deep = len(errors) < MAX_REPORTED_ERRORS
@@ -990,80 +1003,47 @@ def preview_csv(
                 existing_ids.add(meter_id)
         # Fields are validated whether or not the meter exists, so a file of
         # unknown meters cannot hide errors the import would surface.
-        # Shared with import_csv via _parse_daily_values: empty rows, missing
-        # columns and invalid numerics report identically in both paths.
         preview_existing_data = False
         if format_profile == "daily_15min":
-            if _is_missing(raw_timestamp):
-                if deep:
-                    add_error(errors, _csv_error(row_number, meter_id, "Missing date value for daily profile."))
-            elif deep:
+            source_directions: set[str] = set()
+            if deep or idx < max_rows:
                 try:
                     window = reader.day_window(raw_timestamp)
                 except (ValueError, TypeError, OverflowError) as exc:
-                    add_error(errors, _csv_error(row_number, meter_id, str(exc)))
-                else:
-                    start_pos = resolved_cols["energy_start"]
-                    # Meter type only affects direction inference for the
-                    # duplicate check; numeric validation runs regardless.
-                    probe_type = mp.meter_type if mp is not None else "consumption"
-                    # A mapped direction column (literal in/out, or the OBIS
-                    # code VNB profile exports carry) wins over meter-type
-                    # inference, so two files that differ only in OBIS code
-                    # land in different directions on the same metering point.
-                    explicit_direction, direction_error = _row_direction(row, resolved_cols)
-                    # Existing-data flag runs even on invalid rows (e.g.
-                    # truncated daily rows): it reflects day-level DB presence,
-                    # not validation success.
-                    read_count, read_width = _daily_read_count(
-                        values_count, window, interval_minutes, reader.is_local, row, start_pos
+                    if deep:
+                        add_error(errors, _csv_error(row_number, meter_id, str(exc)))
+            if deep and window is not None:
+                daily = _interpret_daily_row(
+                    row,
+                    resolved_cols=resolved_cols,
+                    window=window,
+                    local=reader.is_local,
+                    interval_minutes=interval_minutes,
+                    values_count=values_count,
+                    meter_type=mp.meter_type if mp is not None else None,
+                )
+                source_directions = daily.source_directions
+                if mp is not None:
+                    preview_existing_data = any(
+                        window.start <= ts < window.end
+                        for direction in source_directions
+                        for ts in preexisting_by_mp_dir.get((mp.id, direction), ())
                     )
-                    read_width = max(read_width, table.width)
-                    if direction_error is None:
-                        day_directions = _daily_row_directions(
-                            row, start_pos, read_count, read_width, probe_type, explicit_direction
-                        )
-                        row_directions = sorted(day_directions)
-                        if mp is not None and day_directions:
-                            preview_existing_data = any(
-                                window.start <= ts < window.end
-                                for direction in day_directions
-                                for ts in preexisting_by_mp_dir.get((mp.id, direction), ())
-                            )
-                    values, row_error = _parse_daily_values(row, start_pos, read_count, read_width)
-                    if row_error is None and not all(v is None for v in values):
-                        values, row_error = _fit_daily_values(values, window, interval_minutes, reader.is_local)
-                    if row_error is not None:
-                        add_error(errors, _csv_error(row_number, meter_id, row_error))
-                    elif all(v is None for v in values):
-                        add_error(errors, _csv_error(row_number, meter_id, "Row contains no interval values."))
-                    elif direction_error is not None:
-                        # Reported after the value checks, matching the order
-                        # _interpret_standard_row uses for standard rows.
-                        add_error(errors, _csv_error(row_number, meter_id, direction_error))
-                    elif mp is not None:
-                        slot_keys = []
-                        for slot, value in enumerate(values):
-                            if value is None:
-                                continue
-                            direction, _ = _infer_direction_and_energy(probe_type, value, explicit_direction)
-                            ts = window.start + timedelta(minutes=interval_minutes * slot)
-                            slot_keys.append((mp.id, ts, direction))
-                        duplicates = sum(
-                            1 for key in slot_keys if key in preexisting_daily or key in preview_written
-                        )
-                        # Exact-slot matches feed the overwrite confirmation
-                        # count (readings, not rows), in both modes.
-                        readings_existing += duplicates
-                        if slot_keys:
-                            # Exact duplicates also imply day-level data.
-                            if duplicates > 0:
-                                preview_existing_data = True
-                            for key in slot_keys:
-                                if key not in preexisting_daily and key not in preview_written:
-                                    preview_written.add(key)
-                            if duplicates == len(slot_keys) and not overwrite_existing:
-                                skipped_existing += 1
+                if daily.error is not None:
+                    add_error(errors, _csv_error(row_number, meter_id, daily.error))
+                elif mp is not None:
+                    duplicates = 0
+                    for ts, direction, _ in daily.slots:
+                        key = (mp.id, ts, direction)
+                        if key in preexisting_daily or key in preview_written:
+                            duplicates += 1
+                        else:
+                            preview_written.add(key)
+                    readings_existing += duplicates
+                    if duplicates:
+                        preview_existing_data = True
+                        if duplicates == len(daily.slots) and not overwrite_existing:
+                            skipped_existing += 1
         elif deep:
             # Shared with import_csv via _interpret_standard_row: timestamps,
             # values and directions report identically in both paths.
@@ -1095,13 +1075,9 @@ def preview_csv(
         if idx < max_rows:
             exists = mp is not None
             if format_profile == "daily_15min":
-                date_value = None
-                if not _is_missing(raw_timestamp):
-                    try:
-                        candidate = window or TimestampReader(timestamp_format, timestamp_timezone).day_window(raw_timestamp)
-                        date_value = candidate.day.isoformat()
-                    except (ValueError, TypeError, OverflowError):
-                        date_value = str(raw_timestamp)
+                date_value = None if _is_missing(raw_timestamp) else str(raw_timestamp)
+                if window is not None:
+                    date_value = window.day.isoformat()
                 preview_rows.append(
                     {
                         "row": row_number,
@@ -1110,7 +1086,7 @@ def preview_csv(
                         "meter_type": mp.meter_type if mp else None,
                         "timestamp": date_value,
                         "existing_data": preview_existing_data,
-                        "directions": row_directions,
+                        "directions": sorted(source_directions),
                         "interval_minutes": interval_minutes,
                         "values_count": values_count,
                     }
@@ -1274,10 +1250,9 @@ def _import_table_rows(
     skipped = 0
     overwritten = 0
     errors: list[dict] = []
-    # Batched duplicate pre-check for daily rows (one range query per upload,
-    # not per row). Slots written earlier in this same file are tracked in
-    # written_daily so intra-file duplicates report the same slot-level error.
+    # Batch the daily duplicate pre-check by contiguous blocks of file days.
     preexisting_daily: set = set()
+    # Track slots written earlier in this file so their duplicates get the same error.
     written_daily: set = set()
     if format_profile == "daily_15min" and not overwrite_existing:
         preexisting_daily = _prefetch_daily_existing(
@@ -1322,54 +1297,27 @@ def _import_table_rows(
                 continue
 
             if format_profile == "daily_15min":
-                raw_day = row[resolved_cols["timestamp"]]
-                if _is_missing(raw_day):
-                    skipped += 1
-                    add_error(errors, _csv_error(row_number, meter_id, "Missing date value for daily profile."))
-                    continue
-
-                window = reader.day_window(raw_day)
-                start_pos = resolved_cols["energy_start"]
-
-                # Shared validation with preview_csv: missing columns and
-                # invalid numerics reject the whole row (atomic); existing
-                # readings are skipped per slot so gap-filling keeps working
-                # without overwrite.
-                read_count, read_width = _daily_read_count(
-                    values_count, window, interval_minutes, reader.is_local, row, start_pos
+                window = reader.day_window(row[resolved_cols["timestamp"]])
+                daily = _interpret_daily_row(
+                    row,
+                    resolved_cols=resolved_cols,
+                    window=window,
+                    local=reader.is_local,
+                    interval_minutes=interval_minutes,
+                    values_count=values_count,
+                    meter_type=mp.meter_type,
                 )
-                values, row_error = _parse_daily_values(
-                    row, start_pos, read_count, max(read_width, table.width)
-                )
-                if row_error is None and not all(value is None for value in values):
-                    values, row_error = _fit_daily_values(values, window, interval_minutes, reader.is_local)
-                if row_error is not None:
+                if daily.error is not None:
                     skipped += 1
-                    add_error(errors, _csv_error(row_number, meter_id, row_error))
+                    add_error(errors, _csv_error(row_number, meter_id, daily.error))
                     continue
-                if all(value is None for value in values):
-                    skipped += 1
-                    add_error(errors, _csv_error(row_number, meter_id, "Row contains no interval values."))
-                    continue
-                # Mapped direction column (literal in/out, or an OBIS code)
-                # wins over meter-type inference — see preview_csv.
-                explicit_direction, direction_error = _row_direction(row, resolved_cols)
-                if direction_error is not None:
-                    skipped += 1
-                    add_error(errors, _csv_error(row_number, meter_id, direction_error))
-                    continue
-                slots: list = []
-                for slot, value in enumerate(values):
-                    if value is None:
-                        continue
-                    direction, energy = _infer_direction_and_energy(mp.meter_type, value, explicit_direction)
-                    ts = window.start + timedelta(minutes=interval_minutes * slot)
-                    if not overwrite_existing and (
-                        (mp.id, ts, direction) in preexisting_daily
-                        or (mp.id, ts, direction) in written_daily
-                    ):
-                        continue
-                    slots.append((ts, direction, energy))
+                slots = daily.slots
+                if not overwrite_existing:
+                    slots = [
+                        (ts, direction, energy) for ts, direction, energy in slots
+                        if (mp.id, ts, direction) not in preexisting_daily
+                        and (mp.id, ts, direction) not in written_daily
+                    ]
                 if not slots:
                     skipped += 1
                     add_error(
