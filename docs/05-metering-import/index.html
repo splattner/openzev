@@ -1032,6 +1032,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#date-is-out-of-range-for-a-daily-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Date is out of range for a daily profile"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#value-parse-error" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2085,6 +2096,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#date-is-out-of-range-for-a-daily-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Date is out of range for a daily profile"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#value-parse-error" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2603,9 +2625,10 @@ time</strong>. What matters on import is how a timestamp in your file is read:</
   with energy there is reported as an error.</li>
 <li>A daily-profile row has 92 quarter-hours on the March day, 96 on ordinary
   days and 100 on the October day. On the March day, a 96-column row may leave
-  the missing 02:00 hour empty (or 0), or leave the last four columns empty. On
-  the October day the row needs all 100 values: set <strong>Intervals per row</strong> to
-  100 for such files (the extra columns stay empty on ordinary days).</li>
+  the missing 02:00 hour empty (or 0), or leave the last four columns empty.
+  For a full October day, supply 100 interval columns and leave individual
+  cells blank where values are unavailable. The importer reads all 100 when
+  the October row supplies them, even if <strong>Intervals per row</strong> is set to 96.</li>
 </ul>
 <p>The import protocol shows which zone each CSV import used.</p>
 <p>The <strong>Date/time format</strong> field is a Python
@@ -2688,6 +2711,11 @@ imported.</p>
 <h3 id="row-contains-no-interval-values">"Row contains no interval values."<a class="headerlink" href="#row-contains-no-interval-values" title="Permanent link">&para;</a></h3>
 <p>A daily-profile row carried no interval values at all. Fill in at least one
 slot — preview and import both reject the empty row.</p>
+<h3 id="date-is-out-of-range-for-a-daily-profile">"Date is out of range for a daily profile"<a class="headerlink" href="#date-is-out-of-range-for-a-daily-profile" title="Permanent link">&para;</a></h3>
+<p>The row's day, or one of its interval times, falls outside the supported
+timestamp range. Correct the date
+in the source file. Upload skips the affected row and can import valid rows
+from the same file.</p>
 <h3 id="value-parse-error">"Value parse error"<a class="headerlink" href="#value-parse-error" title="Permanent link">&para;</a></h3>
 <p>Reading value is not numeric (e.g., "N/A").</p>
 <p>Solutions:</p>
