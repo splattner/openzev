@@ -1504,6 +1504,10 @@ export interface InvoiceReadingImpact {
     resolved_at: string | null
 }
 
+/** An invoice action the server offers the caller (`allowed_actions`); write endpoints recheck. */
+export type InvoiceAction =
+    | 'approve' | 'mark_sent' | 'send_email' | 'mark_paid' | 'record_payment' | 'correct' | 'adjust' | 'delete'
+
 export interface Invoice {
     id: string
     invoice_number: string
@@ -1576,6 +1580,8 @@ export interface Invoice {
     open_data_impact_count?: number
     /** Source evidence for callers with ZEV view access; empty without it (detail only). */
     data_impacts?: InvoiceReadingImpact[]
+    /** The actions offered to the caller now (list and detail). */
+    allowed_actions: InvoiceAction[]
 }
 
 export type CreditKind = 'reversal' | 'adjustment'
@@ -1646,6 +1652,8 @@ export interface Credit {
     pdf_status: InvoicePdfStatus
     created_by_name: string | null
     created_at: string
+    /** `refund` while the caller may pay out what remains. */
+    allowed_actions: 'refund'[]
 }
 
 /** Answer of `POST invoices/{id}/correct/`. */

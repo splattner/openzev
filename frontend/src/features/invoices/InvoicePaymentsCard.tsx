@@ -12,8 +12,7 @@ import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { formatChf, formatChfAmount } from '../../lib/numbers'
 import { useToast } from '../../lib/toast'
 import type { Invoice, Payment } from '../../types/api'
-import { canRecordPayment } from './invoiceCredits'
-import { isPartlyPaid } from './invoiceStatus'
+import { isAllowed, isPartlyPaid } from './invoiceStatus'
 import { RecordPaymentModal } from './RecordPaymentModal'
 
 /**
@@ -45,7 +44,7 @@ export function InvoicePaymentsCard({
         note: row => row.note,
         recordedBy: row => row.created_by_name,
     })
-    const canRecord = canManage && invoice.status === 'sent'
+    const canSettle = isAllowed(invoice, 'mark_paid')
     // Once credit notes exist the payments they were issued against are fixed.
     const hasCredits = (invoice.credits ?? []).length > 0
 
@@ -75,15 +74,15 @@ export function InvoicePaymentsCard({
         onError: (error) => pushToast(formatApiError(error, t('pages.invoiceDetail.payments.removeFailed')), 'error'),
     })
 
-    if (payments.length === 0 && !canRecord) return null
+    if (payments.length === 0 && !canSettle) return null
 
     return (
         <section className="card" aria-labelledby="invoice-payments-title">
             <div className="card-header">
                 <h3 id="invoice-payments-title">{t('pages.invoiceDetail.payments.title')}</h3>
-                {canRecord ? (
+                {canSettle ? (
                     <div className="actions-row actions-row-wrap">
-                        {canRecordPayment(invoice) ? (
+                        {isAllowed(invoice, 'record_payment') ? (
                             <button type="button" className="button button-secondary" onClick={() => setRecording(true)}>
                                 <FontAwesomeIcon icon={faPlus} fixedWidth />
                                 {t('pages.invoiceDetail.payments.record')}

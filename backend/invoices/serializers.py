@@ -6,6 +6,7 @@ from zev.models import Participant
 from . import charges as charge_rules
 from .models import Charge, ChargeAllocation, Credit, CreditApplication, CreditKind, Invoice, InvoiceItem, InvoiceReadingImpact, InvoiceStatus, EmailLog, Payment
 from .description_utils import strip_period_suffix
+from .workflow import allowed_actions, credit_allowed_actions
 
 
 class InvoiceItemSerializer(serializers.ModelSerializer):
@@ -127,6 +128,7 @@ class CreditSerializer(serializers.ModelSerializer):
     pdf_url = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
     applications = CreditApplicationSerializer(many=True, read_only=True)
+    allowed_actions = serializers.SerializerMethodField()
 
     class Meta:
         model = Credit
@@ -135,7 +137,7 @@ class CreditSerializer(serializers.ModelSerializer):
             "source_invoice", "source_invoice_number", "reason", "amount_chf", "vat_mode",
             "vat_rate", "vat_chf", "embedded_vat_chf", "rounding_chf", "remaining_chf", "refunded_chf",
             "refunded_on", "refund_note", "status", "applications", "pdf_url",
-            "pdf_status", "created_by_name", "created_at",
+            "pdf_status", "created_by_name", "created_at", "allowed_actions",
         ]
         read_only_fields = fields
 
@@ -150,6 +152,10 @@ class CreditSerializer(serializers.ModelSerializer):
 
     def get_status(self, obj) -> str:
         return obj.status
+
+    def get_allowed_actions(self, obj) -> list[str]:
+        request = self.context.get("request")
+        return credit_allowed_actions(obj, request.user) if request else []
 
     def get_pdf_url(self, obj) -> str | None:
         request = self.context.get("request")
@@ -185,6 +191,7 @@ class InvoiceListSerializer(serializers.ModelSerializer):
     amount_due_chf = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     needs_data_review = serializers.SerializerMethodField()
     open_data_impact_count = serializers.SerializerMethodField()
+    allowed_actions = serializers.SerializerMethodField()
 
     class Meta:
         model = Invoice
@@ -232,6 +239,10 @@ class InvoiceListSerializer(serializers.ModelSerializer):
         if payments is None:
             payments = obj.payments.all()
         return sum((p.amount_chf for p in payments), Decimal("0"))
+
+    def get_allowed_actions(self, obj) -> list[str]:
+        request = self.context.get("request")
+        return allowed_actions(obj, request.user) if request else []
 
     def get_paid_chf(self, obj) -> str:
         return f"{self._paid(obj):.2f}"
@@ -377,9 +388,9 @@ class InvoiceSerializer(InvoiceListSerializer):
         issued."""
         credits = getattr(obj, "_prefetched_objects_cache", {}).get("credits")
         if credits is None:
-            credits = obj.credits.select_related("source_invoice", "participant__party", "created_by").prefetch_related(
-                "applications__invoice"
-            )
+            credits = obj.credits.select_related(
+                "zev", "source_invoice", "participant__party", "created_by"
+            ).prefetch_related("applications__invoice")
         return CreditSerializer(credits, many=True, context=self.context).data
 
     def get_payments(self, obj) -> list[dict] | None:

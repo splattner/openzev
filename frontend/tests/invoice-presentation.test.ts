@@ -20,6 +20,7 @@ import { AdminInvoicesContent } from '../src/pages/AdminInvoicesPage'
 const invoice: Invoice = {
     id: 'i1', invoice_number: 'INV-1', zev: 'z1', zev_name: 'Community A', participant: 'p1', participant_name: 'Anna',
     period_start: '2026-02-01', period_end: '2026-02-28', status: 'sent', total_chf: '-12.30', pdf_url: '/stored.pdf', pdf_status: 'ready',
+    allowed_actions: ['send_email', 'mark_paid', 'delete'],
 }
 const cleanups: Array<() => void> = []
 afterEach(() => cleanups.splice(0).forEach(cleanup => cleanup()))
@@ -138,6 +139,20 @@ describe('shared invoice presentation', () => {
         expect(JSON.parse(container.querySelector('output')!.textContent!)).toEqual({
             from: '/billing/invoices', period_start: '2026-02-01', period_end: '2026-02-28',
         })
+    })
+
+    it('offers Delete in the admin list only where the server allows it', async () => {
+        api.list.mockResolvedValue([
+            invoice,
+            // Paid: payments block deletion, for an admin too.
+            { ...invoice, id: 'i2', invoice_number: 'INV-2', status: 'paid', allowed_actions: ['correct', 'adjust'] },
+        ])
+        const { container } = await mount(createElement(AdminInvoicesContent))
+        const deleteButton = (number: string) => [...container.querySelectorAll('tbody tr')]
+            .find(row => row.querySelector('a')?.textContent === number)!
+            .querySelector('button.button-danger')
+        expect(deleteButton('INV-1')?.textContent).toBe('adminInvoices.delete')
+        expect(deleteButton('INV-2')).toBeNull()
     })
 
     it('shows only the load error for an initial admin invoice failure', async () => {

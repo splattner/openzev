@@ -336,9 +336,28 @@ corrections on the replaced drafts settle in the same transaction under the bill
 
 | Role | Allowed deletions |
 |---|---|
-| `admin` | Any invoice without payments, regardless of status |
-| `zev_owner` | Only `draft` or `cancelled` invoices in their ZEVs that were never approved (`can_delete_invoice`) and have no payments |
-| `participant` | No deletions (HTTP `403`) |
+| `admin` | Any invoice without payments or credit notes issued for it, regardless of status, also in a disabled ZEV |
+| manager | Only `draft` or `cancelled` invoices in their enabled ZEVs that were never approved (`can_delete_invoice`) and have no payments or credit notes |
+| viewer, `participant` | No deletions (HTTP `404`: the write-scoped queryset does not resolve the row) |
+
+`destroy` decides with `workflow.delete_refusal(invoice, user)`, refusing in
+this order: not `access.can_manage` (`scope`; unreachable over HTTP, since the
+write-scoped queryset already answers 404), a disabled ZEV for a non-admin
+(`disabled`), credit notes issued for the invoice (`credits`), payments
+(`payments`), and for a non-admin `can_delete_invoice` false (`status`).
+`disabled`, `credits`, `payments` and `status` are a `400`; `scope` is a `403`.
+Each refusal is audited as `invoice.delete` with status `denied`. Credit
+set against the invoice (`CreditApplication`) is not a credit note issued for
+it: an admin may delete such an invoice, and the application cascades away,
+freeing the credit. The `delete` offer in `allowed_actions` (§6.3) uses the
+same credits/payments/status check.
+
+`destroy` resolves the row with `get_object()`, then takes the invoice row
+lock in one transaction (the single-row lock `_lock_and_transition` takes, so
+the ADR 0038 order is unchanged), checks `delete_refusal` on the locked row
+and deletes while still holding it. A concurrent approval, payment or
+correction either commits first and is seen, or waits. A concurrent delete
+that committed first leaves no row to lock: `404`.
 
 ### 4.6 Reading-correction impact
 
@@ -509,7 +528,7 @@ All invoice endpoints are routed under `/api/v1/invoices/invoices/` via a DRF `G
 |---|---|---|---|
 | `GET` | `/invoices/` | Authenticated | List invoices (scoped by role, see §6); optional `status` filter — comma-separated `InvoiceStatus` values (e.g. `approved,sent`), conjunctive with role/`zev_id` scoping; unknown → `400` with `status` in the body. Also accepts `participant_id` (UUID, narrow-only; `400` with `participant_id` in the body if malformed) and `period_from`/`period_to` (`YYYY-MM-DD`, narrow-only, either may be given alone; invoices whose period overlaps `[period_from, period_to]`; `400` with the offending field name if malformed) — added for the MCP `find_invoices`/`explain_invoice` tools (SPEC-2026-mcp-server §6.3/§6.4), list-only like `status`, and conjunctive with every other filter and with role/`zev_id` scoping (never widens it). Uses `InvoiceListSerializer` — **no** nested `items`/`email_logs` (see §9.1) |
 | `GET` | `/invoices/{id}/` | Authenticated | Retrieve single invoice (with items + email_logs) |
-| `DELETE` | `/invoices/{id}/` | ZEV owner or admin | Delete (see §4.5 rules) |
+| `DELETE` | `/invoices/{id}/` | ZEV manager or admin | Delete under the row lock (see §4.5 rules) |
 
 ### 5.2 Invoice generation
 
@@ -912,7 +931,7 @@ emptiness renders only after a successful list result.
 | Correct an invoice (credit note) | Yes | Yes | No (HTTP 404) | No |
 | Read credit notes | Yes | Yes | Yes | Own only |
 | Generate PDF / send email / retry email | Yes | Yes | No | No |
-| Delete | Any status without payments or credit notes | Never-approved draft/cancelled without payments | No | No |
+| Delete | Any status without payments or credit notes | Never-approved draft/cancelled without payments or credit notes, enabled ZEV | No | No |
 | PDF template read/write | Yes | No (HTTP 403) | No | No |
 | Contract PDF template read/write | Yes | No (HTTP 403) | No | No |
 | Dashboard | Yes | No (HTTP 403) | No | No |
@@ -925,6 +944,39 @@ generate-all and the batch writes (`_get_period_invoices` with
 `require_active=True`), `zev.access.can_view` in period-overview and
 `download-pdfs` (the one read-only POST, listed in
 `InvoiceViewSet.viewer_allowed_actions`).
+
+### 6.3 Allowed actions per invoice
+
+`allowed_actions` lists the invoice actions offered to the requesting user. It
+is not an exhaustive list of permitted operations: write endpoints recheck
+permission and invoice state, and the UI chooses action placement and
+priority. `InvoiceListSerializer` carries it, so list, detail, workflow echoes
+and period-overview rows do (`workflow.allowed_actions`). It is `[]` without
+request context, for anyone without `access.can_manage` on the invoice's ZEV
+(viewer, participant), and for a non-admin while the ZEV is disabled; admins
+keep the actions the invoice's state allows. Otherwise:
+
+| Action | Offered when |
+|---|---|
+| `approve` | `draft` |
+| `mark_sent` | `approved` |
+| `send_email` | `approved` or `sent` (send, resend); narrower than the endpoint, which checks no status |
+| `mark_paid` | `sent` |
+| `record_payment` | `sent`, `amount_due_chf > 0` and `amount_due_chf − paid > 0` |
+| `correct` | `paid`, or `sent` with money received; `total_chf > 0`; and something creditable (received − `credited_chf`) or an unreleased credit application |
+| `adjust` | as `correct`, but only with something creditable (cash) |
+| `delete` | no credit notes, no payments, and for a non-admin `can_delete_invoice` (§4.5) |
+
+`needs_data_review` withholds nothing, as it blocks nothing in the workflow.
+`cancel` and `replace`/`generate` are not offered here: the UI has no cancel
+button, and replacement and regeneration keep their own eligibility. List
+pages add no query per row (annotations beside `paid_sum`).
+
+`CreditSerializer.allowed_actions` is `["refund"]` while something remains of
+the credit and the caller may write to its ZEV, else `[]`.
+
+The MCP server is read-only and builds its invoice output from an explicit
+field list, so it does not carry `allowed_actions`.
 
 ---
 
@@ -1324,6 +1376,7 @@ Two shapes, split by cost. `InvoiceListSerializer` returns all invoice fields pl
 - `credit_applied_chf` (a model column) and `amount_due_chf` (read-only, the derived property) as 2-decimal strings.
 - `rounding_chf` and `due_rounding_chf` (model columns, read-only) as 2-decimal strings: the 5-Rappen rounding inside `total_chf` and of the amount due after credit.
 - `outstanding_chf`: `amount_due_chf − paid_chf`, or `"0.00"` for a cancelled invoice.
+- `allowed_actions`: what the requesting user may do with the invoice now (§6.3).
 
 `InvoiceSerializer` subclasses it and adds the nested read-only relations:
 - `items`: nested `InvoiceItemSerializer` (read-only).
@@ -1331,7 +1384,7 @@ Two shapes, split by cost. `InvoiceListSerializer` returns all invoice fields pl
 - `payments`: nested `PaymentSerializer` list (`id, invoice, amount_chf, paid_on,
   note, source, created_by_name, created_at`) for callers with
   `zev.access.can_view` on the invoice's ZEV; `null` for a participant.
-- `credits`: the credit notes issued for the invoice (nested `CreditSerializer`), visible to the participant.
+- `credits`: the credit notes issued for the invoice (nested `CreditSerializer`, each with its own `allowed_actions`, §6.3), visible to the participant.
 - `credit_applications`: `[{id, credit, credit_number, credit_source_invoice, credit_source_invoice_number, amount_chf, released_at}]`, the credit notes set against the invoice (released ones included), visible to the participant. Detail shape only.
 - `replaces`: `[{id, invoice_number}]`, the participant's cancelled invoices for the exact same ZEV and period created before this one, newest first (what a correction or a cancel-and-regenerate left behind). Detail shape only.
 - `replaced_by`: `{id, invoice_number}` or `null`. For a cancelled invoice, the newest invoice for the same participant and period created after it (any status); always `null` for an invoice that is not cancelled. Both read the same-period siblings once per invoice (`InvoiceSerializer._same_period`, one query); `compute_period_overview` hands them in as `_same_period_invoices` from the rows it already loaded, so the overview adds no query per row or per replaced invoice.
@@ -1562,6 +1615,7 @@ visibility, restored access, and strict selection with a second membership.
 | `test_invoice_numbering.py` | `test_concurrent_invoice_allocations_serialize` (2 PostgreSQL cases) | §4.1: overlapping allocations serialize across commit and rollback |
 | `test_invoice_numbering.py` | `test_number_allocation_allows_foreign_key_inserts` (2 PostgreSQL cases) | Invoice and contract allocation locks allow a separate audit-event insert to commit before allocation commits |
 | `test_serializers.py` | `InvoiceDescriptionSerializationTests` | §8.9: period suffix stripping in serializer |
+| `test_allowed_actions.py` | `AllowedActionsMatrixTests`, `DestroyHonoursThePredicateTests`, `CorrectionEndpointTests`, `ListQueryCountTests`, `CreditAllowedActionsTests` | §4.5/§6.3: action eligibility by state and role, offers against the delete and correct endpoints, delete concurrency, list query growth, credit refund |
 | `test_template_context.py` | `BuildSampleInvoiceContextTests`, `BuildSampleContractContextTests`, `BuildSampleAnnualStatementContextTests` | §5.7 preview: sample context required keys, invoice number/totals, `grouped_items` structure, formatted dates, recipient address-line preview parity, annual-statement monthly data and chart |
 | `test_field_catalog.py` | `PdfCatalogResolutionTests` (7), `EmailCatalogResolutionTests` (2), `CatalogPayloadShapeTests` (5) | §5.7/§7.4: sample-path resolution, default-template output coverage, unique/current catalog coverage, four shared production email contexts, payload shape, unknown keys, null SVG/translation examples, and representative preview/example parity |
 | `test_template_admin.py` | `TemplateAdminPermissionTests` (10), `EmailTemplateAdminTests` (4), `TemplateFieldCatalogEndpointTests` (5), plus PDF admin/preview/override/download coverage | §5.7/§7.4: declarative permissions and mutation audits; admin email reads, owner invoice-email read only, with `?language=` selecting the shipped default; participant/unauthenticated read denials (`403`/`401`, no audit event); participant mutation denials (`403`, recorded as `DENIED`); CRUD validation; `fields` on single-template GET responses, and reduced PATCH/DELETE responses |
@@ -1728,6 +1782,13 @@ visibility, restored access, and strict selection with a second membership.
 - Billing rows keep the five progress icons; in the card layout (≤56rem) the next open or running step is also shown as visible text beside them (`InvoiceRowProgress`, `.invoice-progress-next`), since a card has room for words and no legend to decode. Problems already read as red text under the name, so they are not repeated. The PDF cell shows only a failed PDF (issue text) or a missing one (muted text), never a green "ready" mark, and the email-delivery column marks only a failed send (issue text) or a running one (info badge).
 - Template field definitions come from the backend catalogs. `frontend/src/lib/emailTemplateFields.ts` owns only `EMAIL_TEMPLATE_KEYS`/`EmailTemplateKey`, the four-key frontend route contract. `frontend/src/components/FieldReference.tsx` is shared by `ZevEmailTemplateFields`, `AdminEmailTemplatesPage`, and `AdminPdfTemplatesPage`; it renders API-provided groups (without the backend-only `sample_path`), examples, search, usage badges, and click-to-insert behavior. Insertion calculates state changes and restores the caret after controlled React updates rather than writing `element.value` directly. `frontend/tests/templates-hub.test.ts` covers the seven-tab hub and cross-category routing; `field-reference.test.ts`, `email-template-parity.test.ts`, and `dead-i18n-keys.test.ts` pin token helpers, syntax-aware counting, key/tab parity, backend description-key translations, and catalog-key reachability.
 - Annual-statement export card (admin/owner): prepare → poll → download with partial, failed and expired states. Polling stops on ZEV/year switch, and a create response that resolves after the user switched ZEV/year is discarded (the old selection's job is never shown under the new one); a failed job shows the backend's safe `error_message` when there is one; a single transient poll error is tolerated (only consecutive errors or a long wall-clock backstop end the poll); a failed download surfaces an error instead of crashing; an in-flight or completed export is restored after a reload (`AnnualStatementsExportCard`)
+- Invoice and credit action buttons appear only when `allowed_actions` offers
+  them (`isAllowed`, `features/invoices/invoiceStatus.ts`, which offers
+  nothing when the field is missing); `nextInvoiceWorkflowAction` picks the
+  primary step among the offered ones. Covered by `invoice-actions`,
+  `invoice-actions-hook`, `invoice-workflow-action`, `invoice-credits`,
+  `invoice-credit-application`, `invoice-payments` and `invoice-presentation`
+  (admin list hides Delete) tests.
 - `InvoiceWorkflowAction` shares `nextInvoiceWorkflowAction` with billing:
   draft → Approve, approved → Send email, sent → Mark paid. Detail adds the
   first two as one right-aligned next-action button, matching correction resolution; sent invoices retain the existing

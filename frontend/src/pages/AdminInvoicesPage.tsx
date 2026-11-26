@@ -13,6 +13,7 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { useToast } from '../lib/toast'
 import { InvoiceActionButton, InvoiceAmount, InvoiceLink, InvoiceStatusBadge } from '../components/InvoicePresentation'
 import type { Invoice } from '../types/api'
+import { isAllowed } from '../features/invoices/invoiceStatus'
 
 // Stable empty array so the useMemo below keeps a consistent dependency reference.
 const EMPTY_INVOICES: Invoice[] = []
@@ -132,14 +133,14 @@ export function AdminInvoicesContent() {
                 id: 'actions',
                 header: '',
                 enableSorting: false,
-                cell: (ctx) => (
+                cell: (ctx) => isAllowed(ctx.row.original, 'delete') ? (
                     <InvoiceActionButton action={{
                         label: t('adminInvoices.delete'),
                         onClick: () => handleDelete(ctx.row.original),
                         disabled: deleteMutation.isPending,
                         danger: true,
                     }} />
-                ),
+                ) : null,
             },
         ],
         [t, handleDelete, deleteMutation.isPending],

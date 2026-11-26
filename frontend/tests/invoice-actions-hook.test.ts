@@ -40,6 +40,17 @@ vi.mock('react-router-dom', () => ({
 
 const ELIGIBLE = { state: 'eligible', invoice_id: null, invoice_number: null }
 
+// What the server allows a manager of an active community, by status (a
+// cancelled invoice here was never approved).
+const MANAGER_ACTIONS: Record<string, string[]> = {
+  draft: ['approve', 'delete'],
+  approved: ['mark_sent', 'send_email'],
+  sent: ['send_email', 'mark_paid', 'record_payment'],
+  paid: ['correct', 'adjust'],
+  cancelled: ['delete'],
+}
+const managed = <T extends { status: string }>(invoice: T) => ({ allowed_actions: MANAGER_ACTIONS[invoice.status], ...invoice })
+
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries }),
   useMutation: (options: Record<string, unknown>) => {
@@ -97,29 +108,29 @@ function createHarness(
         },
         {
           participant_id: 'participant-2',
-          invoice: {
+          invoice: managed({
             id: 'invoice-draft',
             status: 'draft',
             pdf_url: null,
             email_logs: [],
             invoice_number: 'INV-001',
-          },
+          }),
           generation_eligibility: null,
         },
         {
           participant_id: 'participant-3',
-          invoice: {
+          invoice: managed({
             id: 'invoice-approved',
             status: 'approved',
             pdf_url: null,
             email_logs: [],
             invoice_number: 'INV-002',
-          },
+          }),
           generation_eligibility: null,
         },
         {
           participant_id: 'participant-4',
-          invoice: {
+          invoice: managed({
             id: 'invoice-sent',
             status: 'sent',
             pdf_url: '/pdf/invoice-sent.pdf',
@@ -132,11 +143,10 @@ function createHarness(
               },
             ],
             invoice_number: 'INV-003',
-          },
+          }),
           generation_eligibility: null,
         },
       ] as any,
-      userRole: 'participant',
       onDeleteClick: vi.fn(),
       onRecordPaymentClick: vi.fn(),
       onPdfQueued,
@@ -211,7 +221,7 @@ describe('useInvoiceActions hook', () => {
   })
 
   it('prioritizes correction review in Actions and keeps ordinary workflow actions in the menu', () => {
-    const row = { participant_id: 'participant-3', invoice: { id: 'invoice-approved', status: 'approved', needs_data_review: true, paid_chf: '0.00', email_logs: [] } } as any
+    const row = { participant_id: 'participant-3', invoice: managed({ id: 'invoice-approved', status: 'approved', needs_data_review: true, paid_chf: '0.00', email_logs: [] }) } as any
     const { Harness, getResult } = createHarness([row])
     act(() => root.render(createElement(Harness)))
     const review = getResult()!.getPrimaryRowAction(row)
@@ -236,9 +246,9 @@ describe('useInvoiceActions hook', () => {
     expect(result).not.toBeNull()
 
     const noInvoiceAction = result!.getPrimaryRowAction({ participant_id: 'participant-1', invoice: null } as any)
-    const draftAction = result!.getPrimaryRowAction({ participant_id: 'participant-2', invoice: { status: 'draft' } as any } as any)
-    const approvedAction = result!.getPrimaryRowAction({ participant_id: 'participant-3', invoice: { id: 'invoice-approved', status: 'approved' } as any } as any)
-    const sentAction = result!.getPrimaryRowAction({ participant_id: 'participant-4', invoice: { id: 'invoice-sent', status: 'sent' } as any } as any)
+    const draftAction = result!.getPrimaryRowAction({ participant_id: 'participant-2', invoice: managed({ status: 'draft' }) } as any)
+    const approvedAction = result!.getPrimaryRowAction({ participant_id: 'participant-3', invoice: managed({ id: 'invoice-approved', status: 'approved' }) } as any)
+    const sentAction = result!.getPrimaryRowAction({ participant_id: 'participant-4', invoice: managed({ id: 'invoice-sent', status: 'sent' }) } as any)
 
     expect(noInvoiceAction?.label).toBe('pages.invoices.generateInvoice')
     expect(draftAction?.label).toBe('pages.invoices.approve')
@@ -246,7 +256,7 @@ describe('useInvoiceActions hook', () => {
     expect(sentAction?.label).toBe('pages.invoices.markPaid')
     // participant-1 has no invoice yet, so generation outranks approval.
     expect(result!.recommendedBatchAction?.label).toBe('pages.invoices.batch.generateAllCount:1')
-    expect(result!.getRowMenuItems({ participant_id: 'participant-4', invoice: { id: 'invoice-sent', status: 'sent', pdf_url: '/pdf/invoice-sent.pdf', email_logs: [], invoice_number: 'INV-003' } as any } as any)).toEqual(
+    expect(result!.getRowMenuItems({ participant_id: 'participant-4', invoice: managed({ id: 'invoice-sent', status: 'sent', pdf_url: '/pdf/invoice-sent.pdf', email_logs: [], invoice_number: 'INV-003' }) } as any)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ key: 'open-pdf', label: 'common.openPdf' }),
         expect.objectContaining({ key: 'regenerate-pdf' }),
@@ -254,7 +264,7 @@ describe('useInvoiceActions hook', () => {
       ]),
     )
     // The row menu opens a stored document; without one there is nothing to open.
-    expect(result!.getRowMenuItems({ participant_id: 'participant-2', invoice: { id: 'invoice-draft', status: 'draft', pdf_url: null, email_logs: [] } as any } as any)
+    expect(result!.getRowMenuItems({ participant_id: 'participant-2', invoice: managed({ id: 'invoice-draft', status: 'draft', pdf_url: null, email_logs: [] }) } as any)
       .map((item) => item.key)).not.toContain('open-pdf')
   })
 
@@ -263,10 +273,10 @@ describe('useInvoiceActions hook', () => {
     act(() => root.render(createElement(Harness)))
     const sent = (paidChf: string, outstandingChf: string) => ({
       participant_id: 'participant-4',
-      invoice: {
+      invoice: managed({
         id: 'invoice-sent', status: 'sent', paid_chf: paidChf, outstanding_chf: outstandingChf,
         total_chf: '100.00', amount_due_chf: '100.00',
-      },
+      }),
     } as any)
 
     expect(getResult()!.getPrimaryRowAction(sent('0.00', '100.00'))?.label).toBe('pages.invoices.markPaid')
@@ -278,52 +288,46 @@ describe('useInvoiceActions hook', () => {
     expect(markPaid.mutate).toHaveBeenCalledWith('invoice-sent')
   })
 
-  it('offers record payment in the row menu while a sent invoice still collects money', () => {
+  it('offers record payment in the row menu only when the server allows it', () => {
     const onRecordPaymentClick = vi.fn()
     const { Harness, getResult } = createHarness(undefined, undefined, { onRecordPaymentClick })
     act(() => root.render(createElement(Harness)))
     const result = getResult()!
-    const row = (invoice: Record<string, unknown>) => ({ participant_id: 'participant-4', invoice } as any)
+    const row = (allowed: string[]) => ({
+      participant_id: 'participant-4',
+      invoice: { id: 'invoice-sent', status: 'sent', pdf_url: null, allowed_actions: allowed },
+    } as any)
 
-    const sent = row({
-      id: 'invoice-sent', status: 'sent', pdf_url: null,
-      paid_chf: '25.00', outstanding_chf: '75.00', total_chf: '100.00', amount_due_chf: '100.00',
-    })
-    const item = result.getRowMenuItems(sent).find((entry) => entry.key === 'record-payment')
+    const item = result.getRowMenuItems(row(MANAGER_ACTIONS.sent)).find((entry) => entry.key === 'record-payment')
     expect(item?.label).toBe('pages.invoiceDetail.payments.record')
     item?.onClick()
     expect(onRecordPaymentClick).toHaveBeenCalledWith('invoice-sent')
 
-    // These invoices do not offer manual payment recording.
-    const cases: Array<[string, Record<string, unknown>]> = [
-      ['payout', {
-        id: 'invoice-payout', status: 'sent',
-        paid_chf: '0.00', outstanding_chf: '-40.00', amount_due_chf: '-40.00', total_chf: '-40.00',
-      }],
-      ['credit-covered', {
-        id: 'invoice-covered', status: 'sent',
-        paid_chf: '0.00', outstanding_chf: '0.00', amount_due_chf: '0.00', total_chf: '100.00',
-        credit_applied_chf: '100.00',
-      }],
-      ['settled', {
-        id: 'invoice-settled', status: 'sent',
-        paid_chf: '100.00', outstanding_chf: '0.00', amount_due_chf: '100.00', total_chf: '100.00',
-      }],
-      ['missing-outstanding', {
-        id: 'invoice-missing-balance', status: 'sent', amount_due_chf: '100.00', total_chf: '100.00',
-      }],
-      ['stale-outstanding', {
-        id: 'invoice-stale', status: 'sent',
-        paid_chf: '0.00', outstanding_chf: '75.00', amount_due_chf: '0.00', total_chf: '100.00',
-        credit_applied_chf: '100.00',
-      }],
-      ['paid', {
-        id: 'invoice-paid', status: 'paid',
-        paid_chf: '100.00', outstanding_chf: '0.00', amount_due_chf: '100.00', total_chf: '100.00',
-      }],
-    ]
-    for (const [name, invoice] of cases) {
-      expect(result.getRowMenuItems(row(invoice)).map((entry) => entry.key), name).not.toContain('record-payment')
+    // A payout, a credit-covered or a settled invoice: the server leaves record_payment out.
+    expect(result.getRowMenuItems(row(['send_email', 'mark_paid'])).map((entry) => entry.key)).not.toContain('record-payment')
+  })
+
+  it('shows delete, mark sent and resend only when the server allows them', () => {
+    const { Harness, getResult } = createHarness()
+    act(() => root.render(createElement(Harness)))
+    const result = getResult()!
+    const keys = (status: string, allowed: string[]) => result.getRowMenuItems({
+      participant_id: 'participant-4',
+      invoice: { id: `invoice-${status}`, status, pdf_url: null, email_logs: [], allowed_actions: allowed },
+    } as any).map((entry) => entry.key)
+
+    expect(keys('draft', MANAGER_ACTIONS.draft)).toContain('delete')
+    // An issued, credited or paid invoice keeps its number: no delete.
+    expect(keys('cancelled', [])).not.toContain('delete')
+    expect(keys('approved', MANAGER_ACTIONS.approved)).toContain('mark-sent')
+    expect(keys('sent', MANAGER_ACTIONS.sent)).toContain('resend-email')
+    // A viewer, or a disabled community: nothing that changes the invoice.
+    for (const status of ['draft', 'approved', 'sent']) {
+      expect(keys(status, [])).not.toContain('delete')
+      expect(keys(status, [])).not.toContain('mark-sent')
+      expect(keys(status, [])).not.toContain('resend-email')
+      expect(keys(status, [])).not.toContain('record-payment')
+      expect(result.getPrimaryRowAction({ participant_id: 'participant-4', invoice: { id: 'x', status, allowed_actions: [] } } as any)).toBeNull()
     }
   })
 
@@ -430,7 +434,7 @@ describe('recommendedBatchAction ordering', () => {
   const withStatus = (id: string, status: string) => ({
     participant_id: id,
     participant_email: `${id}@example.test`,
-    invoice: { id: `invoice-${id}`, status, pdf_url: null, email_logs: [], invoice_number: id },
+    invoice: managed({ id: `invoice-${id}`, status, pdf_url: null, email_logs: [], invoice_number: id }),
     generation_eligibility: status === 'cancelled' ? ELIGIBLE : null,
   })
 

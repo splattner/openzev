@@ -20,6 +20,7 @@ const base: Invoice = {
     status: 'approved', period_start: '2026-02-01', period_end: '2026-02-28', total_chf: '100.00', paid_chf: '0.00',
     total_local_kwh: '502.8933', total_grid_kwh: '161.7506', total_feed_in_kwh: '0.0000',
     payments: [], needs_data_review: true, open_data_impact_count: 1,
+    allowed_actions: ['mark_sent', 'send_email'],
 }
 const cleanups: Array<() => void> = []
 beforeEach(() => {
@@ -166,7 +167,7 @@ describe('invoice correction resolution', () => {
     })
 
     it.each(['paid', 'sent'])('opens the existing credit-note dialog for a %s invoice with payments', async (status) => {
-        const { container } = await mount({ ...base, status, paid_chf: '40.00' })
+        const { container } = await mount({ ...base, status, paid_chf: '40.00', allowed_actions: ['correct', 'adjust'] })
         expect(button('pages.invoices.dataReview.replace', container)).toBeUndefined()
         await click(button('pages.invoiceDetail.credits.correct', container))
         expect(document.querySelector<HTMLInputElement>('input[value="reversal"]')?.checked).toBe(true)

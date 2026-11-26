@@ -53,7 +53,10 @@ const approved = (id: string): InvoicePeriodParticipantRow => ({
   participant_valid_to: null, party_id: id, metering_point_labels: [],
   metering_data_complete: true, metering_points_total: 1, metering_points_with_data: 1, missing_meter_ids: [],
   generation_eligibility: null,
-  invoice: { id: `inv-${id}`, invoice_number: id, status: 'approved', email_logs: [], pdf_url: null } as never,
+  invoice: {
+    id: `inv-${id}`, invoice_number: id, status: 'approved', email_logs: [], pdf_url: null,
+    allowed_actions: ['mark_sent', 'send_email'],
+  } as never,
 })
 
 type Hook = ReturnType<typeof useInvoiceActions>
@@ -65,7 +68,7 @@ const hook: { current: Hook | null } = { current: null }
 
 function Harness({ options }: { options: Options }) {
   const result = useInvoiceActions({
-    selectedZevId: 'zev-1', period, rows, userRole: 'admin', accountId: 1, canWrite: true,
+    selectedZevId: 'zev-1', period, rows, accountId: 1, canWrite: true,
     onDeleteClick: vi.fn(), onRecordPaymentClick: vi.fn(), onPdfQueued: vi.fn(), ...options,
   })
   useEffect(() => { hook.current = result })

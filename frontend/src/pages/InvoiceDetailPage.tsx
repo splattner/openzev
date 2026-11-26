@@ -17,7 +17,8 @@ import { PdfPreview } from '../components/PdfPreview'
 import { InvoiceAccessLinkCard } from '../features/invoices/InvoiceAccessLinkCard'
 import { InvoiceAppliedCreditsCard } from '../features/invoices/InvoiceAppliedCreditsCard'
 import { InvoiceCreditsCard } from '../features/invoices/InvoiceCreditsCard'
-import { amountDueChf, canCorrectInvoice, hasCreditApplied } from '../features/invoices/invoiceCredits'
+import { amountDueChf, hasCreditApplied } from '../features/invoices/invoiceCredits'
+import { isAllowed } from '../features/invoices/invoiceStatus'
 import { InvoicePaymentsCard } from '../features/invoices/InvoicePaymentsCard'
 import { InvoiceDataReviewNotice } from '../features/invoices/InvoiceDataReviewNotice'
 import { InvoiceDataReviewActions } from '../features/invoices/InvoiceDataReviewActions'
@@ -260,10 +261,9 @@ export function InvoiceDetailPage() {
             )}
 
             {/* A credit note exists for the participant from the moment it is issued. */}
-            {((inv.credits ?? []).length > 0 || canCorrectInvoice(inv, canWriteInvoice)) && (
+            {((inv.credits ?? []).length > 0 || isAllowed(inv, 'correct')) && (
                 <InvoiceCreditsCard
                     invoice={inv}
-                    canManage={canWriteInvoice}
                     onChanged={handleInvoiceChanged}
                     onCreditChanged={handleCreditChanged}
                 />

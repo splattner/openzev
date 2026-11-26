@@ -1,4 +1,4 @@
-import type { Credit, Invoice } from '../../types/api'
+import type { Invoice } from '../../types/api'
 
 /** What was received in cash for the invoice and not yet credited, in CHF (never negative). */
 export function creditableChf(invoice: Pick<Invoice, 'paid_chf' | 'credits'>): number {
@@ -14,49 +14,9 @@ export function appliedCreditChf(invoice: Pick<Invoice, 'credit_applications'>):
     return Math.round(applied * 100) / 100
 }
 
-/**
- * An invoice that received money is open to correction: paid, or sent with
- * payments. A payout (nothing to collect) is out of scope.
- */
-function isCorrectable(invoice: Pick<Invoice, 'status' | 'paid_chf' | 'total_chf'>): boolean {
-    const received = Number(invoice.paid_chf ?? 0)
-    const eligible = invoice.status === 'paid' || (invoice.status === 'sent' && received > 0)
-    // An invoice settled by credit alone is `paid` with no payment: `received` is 0 there.
-    return eligible && Number(invoice.total_chf) > 0
-}
-
-/**
- * A manager can reverse an invoice when there is cash to credit back or credit
- * that was applied to it and can be released.
- */
-export function canCorrectInvoice(
-    invoice: Pick<Invoice, 'status' | 'paid_chf' | 'total_chf' | 'credits' | 'credit_applications'>,
-    canManage: boolean,
-): boolean {
-    if (!canManage || !isCorrectable(invoice)) return false
-    return creditableChf(invoice) > 0 || appliedCreditChf(invoice) > 0
-}
-
-/** A partial credit is capped by cash: an invoice settled by credit alone must be reversed instead. */
-export function canAdjustInvoice(
-    invoice: Pick<Invoice, 'status' | 'paid_chf' | 'total_chf' | 'credits' | 'credit_applications'>,
-    canManage: boolean,
-): boolean {
-    return canManage && isCorrectable(invoice) && creditableChf(invoice) > 0
-}
-
 /** Money still to pay on an invoice after credit; the total when no amount due is known. */
 export function amountDueChf(invoice: Pick<Invoice, 'total_chf' | 'amount_due_chf'>): number {
     return Number(invoice.amount_due_chf ?? invoice.total_chf)
-}
-
-/** Whether the invoice can accept a manual payment. */
-export function canRecordPayment(
-    invoice: Pick<Invoice, 'status' | 'total_chf' | 'amount_due_chf' | 'outstanding_chf'>,
-): boolean {
-    return invoice.status === 'sent'
-        && Number(invoice.outstanding_chf ?? 0) > 0
-        && amountDueChf(invoice) > 0
 }
 
 /** Show the amount due beside the total when credit reduced it (a cancelled invoice asks for nothing). */
@@ -68,9 +28,4 @@ export function hasCreditApplied(
         && Number(invoice.credit_applied_chf ?? 0) > 0
         && amountDueChf(invoice) !== Number(invoice.total_chf)
     )
-}
-
-/** A manager can pay out what remains of an open credit. */
-export function canRefundCredit(credit: Pick<Credit, 'status'>, canManage: boolean): boolean {
-    return canManage && credit.status === 'open'
 }

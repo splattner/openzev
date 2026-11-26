@@ -7,9 +7,6 @@ import type { Credit, Invoice } from '../src/types/api'
 import {
     amountDueChf,
     appliedCreditChf,
-    canAdjustInvoice,
-    canCorrectInvoice,
-    canRefundCredit,
     hasCreditApplied,
 } from '../src/features/invoices/invoiceCredits'
 import { MemoryRouter } from 'react-router-dom'
@@ -55,11 +52,14 @@ const partlyCredit: Invoice = {
     period_start: '2026-02-01', period_end: '2026-02-28', status: 'paid', total_chf: '100.00',
     credit_applied_chf: '30.00', amount_due_chf: '70.00', paid_chf: '70.00', outstanding_chf: '0.00',
     payments: [], credits: [], credit_applications: [application],
+    allowed_actions: ['correct', 'adjust'],
 }
 
 // Settled by credit alone: paid without any payment.
 const creditOnly: Invoice = {
     ...partlyCredit, total_chf: '30.00', credit_applied_chf: '30.00', amount_due_chf: '0.00', paid_chf: '0.00',
+    // Nothing received in cash: the server allows a reversal, not a partial credit.
+    allowed_actions: ['correct'],
 }
 
 const openCredit: Credit = {
@@ -68,7 +68,7 @@ const openCredit: Credit = {
     vat_mode: 'not_registered', vat_rate: '0.0000', vat_chf: '0.00', embedded_vat_chf: null, remaining_chf: '20.00',
     refunded_chf: '0.00', refunded_on: null, refund_note: '', status: 'open', pdf_url: 'http://x/pdf/', pdf_status: 'ready',
     applications: [{ id: 'ap1', invoice: 'i1', invoice_number: 'INV-1', amount_chf: '30.00', released_at: null }],
-    created_by_name: 'Olga', created_at: '2026-03-02T08:00:00Z',
+    created_by_name: 'Olga', created_at: '2026-03-02T08:00:00Z', allowed_actions: ['refund'],
 }
 
 async function render(node: ReturnType<typeof createElement>) {
@@ -130,22 +130,17 @@ describe('correcting an invoice that used credit', () => {
         expect(appliedCreditChf({ credit_applications: [{ ...application, released_at: '2026-03-01T00:00:00Z' }] })).toBe(0)
     })
 
-    it('allows a reversal with applications only, but not a partial credit', () => {
-        expect(canCorrectInvoice(creditOnly, true)).toBe(true)
-        expect(canAdjustInvoice(creditOnly, true)).toBe(false)
-        expect(canCorrectInvoice(partlyCredit, true)).toBe(true)
-        expect(canAdjustInvoice(partlyCredit, true)).toBe(true)
-        expect(canCorrectInvoice(creditOnly, false)).toBe(false)
-    })
-
-    it('has nothing to reverse once the credit was released and the cash credited', () => {
-        const released = { ...creditOnly, credit_applications: [{ ...application, released_at: '2026-03-01T00:00:00Z' }] }
-        expect(canCorrectInvoice(released, true)).toBe(false)
+    it('has nothing to reverse once the server no longer allows it', async () => {
+        const released = { ...creditOnly, credit_applications: [{ ...application, released_at: '2026-03-01T00:00:00Z' }], allowed_actions: [] }
+        const { container, root } = await render(createElement(InvoiceCreditsCard, { invoice: released, onChanged: vi.fn() }))
+        expect(container.querySelector('section')).toBeNull()
+        act(() => root.unmount())
+        container.remove()
     })
 
     it('offers no partial credit in the dialog for a credit-only invoice, and explains the release', async () => {
         const { container, root } = await render(createElement(InvoiceCreditsCard, {
-            invoice: creditOnly, canManage: true, onChanged: vi.fn(),
+            invoice: creditOnly, onChanged: vi.fn(),
         }))
         await act(async () => { byText(container, 'pages.invoiceDetail.credits.correct')?.click() })
         const form = document.querySelector('form') as HTMLFormElement
@@ -162,13 +157,18 @@ describe('correcting an invoice that used credit', () => {
 
 describe('InvoicePaymentsCard with credit applied', () => {
     it('offers recording a payment only while an amount is due', async () => {
-        const sent: Invoice = { ...partlyCredit, status: 'sent', paid_chf: '0.00', outstanding_chf: '70.00' }
+        const sent: Invoice = {
+            ...partlyCredit, status: 'sent', paid_chf: '0.00', outstanding_chf: '70.00',
+            allowed_actions: ['send_email', 'mark_paid', 'record_payment'],
+        }
         const due = await render(createElement(InvoicePaymentsCard, { invoice: sent, canManage: true, onChanged: vi.fn() }))
         expect(byText(due.container, 'pages.invoiceDetail.payments.record')).toBeTruthy()
         act(() => due.root.unmount())
         due.container.remove()
 
-        const covered: Invoice = { ...creditOnly, status: 'sent', paid_chf: '0.00', outstanding_chf: '0.00' }
+        const covered: Invoice = {
+            ...creditOnly, status: 'sent', paid_chf: '0.00', outstanding_chf: '0.00', allowed_actions: ['send_email', 'mark_paid'],
+        }
         const none = await render(createElement(InvoicePaymentsCard, { invoice: covered, canManage: true, onChanged: vi.fn() }))
         expect(byText(none.container, 'pages.invoiceDetail.payments.record')).toBeUndefined()
         expect(byText(none.container, 'pages.invoices.markPaid')).toBeTruthy()
@@ -178,16 +178,9 @@ describe('InvoicePaymentsCard with credit applied', () => {
 })
 
 describe('refunding a credit note', () => {
-    it('is offered to managers on an open credit only', () => {
-        expect(canRefundCredit(openCredit, true)).toBe(true)
-        expect(canRefundCredit(openCredit, false)).toBe(false)
-        expect(canRefundCredit({ ...openCredit, status: 'used' }, true)).toBe(false)
-        expect(canRefundCredit({ ...openCredit, status: 'refunded' }, true)).toBe(false)
-    })
-
     it('shows the remaining amount, the status and where the credit was applied', async () => {
         const { container, root } = await render(createElement(InvoiceCreditsCard, {
-            invoice: { ...partlyCredit, credits: [openCredit] }, canManage: false, onChanged: vi.fn(),
+            invoice: { ...partlyCredit, credits: [{ ...openCredit, allowed_actions: [] }] }, onChanged: vi.fn(),
         }))
         expect(container.textContent).toContain('20.00')
         expect(container.textContent).toContain('pages.invoiceDetail.credits.status.open')
@@ -201,7 +194,7 @@ describe('refunding a credit note', () => {
         refundCredit.mockResolvedValue({ ...openCredit, status: 'refunded', remaining_chf: '0.00' })
         const onCreditChanged = vi.fn()
         const { container, root } = await render(createElement(InvoiceCreditsCard, {
-            invoice: { ...partlyCredit, credits: [openCredit] }, canManage: true, onChanged: vi.fn(), onCreditChanged,
+            invoice: { ...partlyCredit, credits: [openCredit] }, onChanged: vi.fn(), onCreditChanged,
         }))
         await act(async () => {
             (container.querySelector('button[aria-label^="pages.invoiceDetail.credits.refund"]') as HTMLButtonElement).click()

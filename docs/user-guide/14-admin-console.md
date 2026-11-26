@@ -527,7 +527,7 @@ The admin invoice page provides a searchable, sortable table of **every invoice 
 | **Period** | Billing period date range |
 | **Total (CHF)** | Invoice total; the header names the currency, so the cells show the amount only |
 | **Status** | Badge showing `Draft`, `Approved`, `Sent`, `Paid`, or `Cancelled` |
-| **Actions** | Delete button |
+| **Actions** | Delete button, where the invoice can be deleted |
 
 ### Searching and Filtering
 
@@ -537,7 +537,9 @@ The admin invoice page provides a searchable, sortable table of **every invoice 
 
 ### Deleting Invoices
 
-Admins can delete any invoice directly from this page:
+Admins can delete an invoice directly from this page unless payments were
+recorded for it or credit notes issued for it; those rows show no Delete
+button (correct such an invoice by credit note instead):
 
 1. Click the **Delete** button in the Actions column.
 2. Confirm the deletion in the confirmation dialog.

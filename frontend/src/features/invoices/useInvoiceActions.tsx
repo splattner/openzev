@@ -43,33 +43,20 @@ import { liveInvoice, type InvoiceRowWork } from './invoiceRowState'
 import { getLatestEmailLog } from './emailLogs'
 import { useEmailDelivery } from './useEmailDelivery'
 import { invoiceRowCounts } from './invoiceRowFilters'
-import { canRecordPayment } from './invoiceCredits'
-import { isPartlyPaid, nextInvoiceWorkflowAction } from './invoiceStatus'
+import { isAllowed, isPartlyPaid, nextInvoiceWorkflowAction } from './invoiceStatus'
 import type { RecordPaymentValues } from './RecordPaymentModal'
 import type { ActionMenuItem } from '../../components/ActionMenu'
-import type { Invoice, InvoicePeriodParticipantRow } from '../../types/api'
+import type { InvoicePeriodParticipantRow } from '../../types/api'
 
 /** Send all queues approved invoices that have a recipient. */
 function isSendable(row: InvoicePeriodParticipantRow): boolean {
     return row.invoice?.status === 'approved' && !!row.participant_email
 }
 
-/**
- * Mirrors the backend: an invoice with payments is never deleted; admins may
- * delete any other; managers only a draft or cancelled invoice that was never
- * approved, since an issued one keeps its number for good (ADR 0037).
- */
-export function hasDeletePermission(invoice: Invoice, role: string | undefined): boolean {
-    if (Number(invoice.paid_chf ?? 0) !== 0) return false
-    if (role === 'admin') return true
-    return (invoice.status === 'draft' || invoice.status === 'cancelled') && !invoice.approved_at
-}
-
 export function useInvoiceActions({
     selectedZevId,
     period,
     rows,
-    userRole,
     onDeleteClick,
     onRecordPaymentClick,
     onPdfQueued,
@@ -81,7 +68,6 @@ export function useInvoiceActions({
     selectedZevId: string
     period: { period_start: string; period_end: string }
     rows: InvoicePeriodParticipantRow[]
-    userRole: string | undefined
     generationParticipantIds?: string[]
     canGenerate?: boolean
     canWrite?: boolean
@@ -568,7 +554,7 @@ export function useInvoiceActions({
             }
         }
 
-        if (invoice.status === 'approved') {
+        if (isAllowed(invoice, 'mark_sent')) {
             items.push({
                 key: 'mark-sent',
                 label: t('pages.invoices.markSent'),
@@ -579,7 +565,7 @@ export function useInvoiceActions({
             })
         }
 
-        if (canRecordPayment(invoice)) {
+        if (isAllowed(invoice, 'record_payment')) {
             items.push({
                 key: 'record-payment',
                 label: t('pages.invoiceDetail.payments.record'),
@@ -590,7 +576,7 @@ export function useInvoiceActions({
             })
         }
 
-        if (hasDeletePermission(invoice, userRole)) {
+        if (isAllowed(invoice, 'delete')) {
             items.push({
                 key: 'delete',
                 label: t('pages.invoices.deleteInvoice'),
@@ -621,7 +607,7 @@ export function useInvoiceActions({
             disabled: pdfMutation.isPending,
         })
 
-        if (invoice.status === 'sent') {
+        if (invoice.status === 'sent' && isAllowed(invoice, 'send_email')) {
             items.push({
                 key: 'resend-email',
                 label: t('pages.invoices.resendEmail'),

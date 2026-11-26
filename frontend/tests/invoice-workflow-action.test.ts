@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { InvoiceWorkflowAction } from '../src/features/invoices/InvoiceWorkflowAction'
-import type { EmailLog, Invoice } from '../src/types/api'
+import type { EmailLog, Invoice, InvoiceAction } from '../src/types/api'
 
 const api = vi.hoisted(() => ({ approve: vi.fn(), send: vi.fn(), toast: vi.fn() }))
 vi.mock('../src/lib/api/invoices', () => ({ approveInvoice: api.approve, sendInvoiceEmail: api.send, openInvoicePdf: vi.fn() }))
@@ -13,7 +13,13 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => k
 const base: Invoice = {
     id: 'invoice-1', invoice_number: 'INV-1', zev: 'invoice-community', zev_name: 'Community', participant: 'participant-1', participant_name: 'Anna',
     period_start: '2026-07-01', period_end: '2026-09-30', status: 'draft', total_chf: '100.00', email_logs: [],
+    allowed_actions: ['approve', 'delete'],
 }
+// What the server answers for a manager in each status.
+const ALLOWED: Record<string, InvoiceAction[]> = {
+    approved: ['mark_sent', 'send_email'], sent: ['send_email', 'mark_paid', 'record_payment'], paid: ['correct', 'adjust'], cancelled: [],
+}
+const inStatus = (status: string): Invoice => ({ ...base, status, allowed_actions: ALLOWED[status] })
 function emailLog(id: string, status: EmailLog['status']): EmailLog {
     return { id, invoice: base.id, recipient: 'anna@example.com', subject: 'Invoice', status, created_at: '2026-11-05T12:00:00Z' }
 }
@@ -40,7 +46,7 @@ async function click(container: ParentNode) { await act(async () => container.qu
 
 describe('invoice detail workflow action', () => {
     it('approves the invoice and replaces the one button with Send email', async () => {
-        api.approve.mockResolvedValue({ ...base, status: 'approved' })
+        api.approve.mockResolvedValue(inStatus('approved'))
         const { container, changed } = await mount()
         expect(container.querySelectorAll('button')).toHaveLength(1)
         expect(container.textContent).toContain('pages.invoices.approve')
@@ -54,7 +60,7 @@ describe('invoice detail workflow action', () => {
     it('polls the actual detail after queuing email and allows retry after failed delivery', async () => {
         api.send.mockResolvedValue({ queued: true })
         const intervals = vi.spyOn(window, 'setInterval')
-        const approved = { ...base, status: 'approved' }
+        const approved = inStatus('approved')
         const { container, client, changed, show } = await mount(approved)
         const invalidate = vi.spyOn(client, 'invalidateQueries')
         await click(container)
@@ -77,7 +83,7 @@ describe('invoice detail workflow action', () => {
     })
 
     it('observes an email already pending when detail opens and unlocks after its failure', async () => {
-        const pending: Invoice = { ...base, status: 'approved', last_email_status: 'pending', email_logs: [emailLog('pending-log', 'pending')] }
+        const pending: Invoice = { ...inStatus('approved'), last_email_status: 'pending', email_logs: [emailLog('pending-log', 'pending')] }
         const { container, show } = await mount(pending)
         expect(container.querySelector('button')?.disabled).toBe(true)
         await show({ ...pending, last_email_status: 'failed', email_logs: [{ ...pending.email_logs![0], status: 'failed' }] })
@@ -87,7 +93,7 @@ describe('invoice detail workflow action', () => {
 
     it('offers a read-only status refresh after the delivery deadline without resending', async () => {
         const timeouts = vi.spyOn(window, 'setTimeout')
-        const pending: Invoice = { ...base, status: 'approved', last_email_status: 'pending', email_logs: [emailLog('pending-log', 'pending')] }
+        const pending: Invoice = { ...inStatus('approved'), last_email_status: 'pending', email_logs: [emailLog('pending-log', 'pending')] }
         const { container, client, show } = await mount(pending)
         const expire = timeouts.mock.calls.find(call => Number(call[1]) > 89000)?.[0]
         expect(typeof expire).toBe('function')
@@ -106,7 +112,9 @@ describe('invoice detail workflow action', () => {
 
     it.each([
         ['read-only', base, false], ['correction review', { ...base, needs_data_review: true }, true],
-        ['sent', { ...base, status: 'sent' }, true], ['paid', { ...base, status: 'paid' }, true], ['cancelled', { ...base, status: 'cancelled' }, true],
+        ['sent', inStatus('sent'), true], ['paid', inStatus('paid'), true], ['cancelled', inStatus('cancelled'), true],
+        // The server allows nothing here (a viewer, or a disabled community): no button, whatever the status.
+        ['a draft the server does not let approve', { ...base, allowed_actions: [] }, true],
     ] as const)('omits an ordinary action for %s', async (_state, invoice, allowed) => {
         const { container } = await mount(invoice, allowed)
         expect(container.querySelector('button')).toBeNull()
@@ -129,7 +137,7 @@ describe('invoice detail workflow action', () => {
         const { container, changed, show } = await mount()
         await click(container)
         await show(base, false)
-        await act(async () => resolve({ ...base, status: 'approved' }))
+        await act(async () => resolve(inStatus('approved')))
         await flush()
         expect(changed).not.toHaveBeenCalled()
         expect(api.toast).not.toHaveBeenCalled()
