@@ -24,6 +24,10 @@ from .services import _audit
 logger = logging.getLogger(__name__)
 
 
+class DocumentEmailNotSent(RuntimeError):
+    """The mail backend accepted no message, so the audit names the cause, not just ``RuntimeError``."""
+
+
 def queue_document_emails(documents) -> tuple[int, int]:
     """Queue one email per document once the surrounding transaction commits.
 
@@ -76,18 +80,28 @@ def render_document_email(document) -> tuple[str, str]:
 
 
 def send_document_email(document) -> bool:
-    """Send the email for ``document``; ``False`` when it no longer applies. Raises on a send failure."""
+    """Send the email and attempt to audit it. Return False if skipped and raise on send failure."""
     participant = document.participant
     if participant is None or not participant.email or not document.is_current:
         return False
     subject, body = render_document_email(document)
-    EmailMessage(
+    sent = EmailMessage(
         subject=subject, body=body, from_email=settings.DEFAULT_FROM_EMAIL, to=[participant.email]
     ).send(fail_silently=False)
-    _audit(
-        "emailed", document, source=AuditEventSource.CELERY,
-        summary=f"Emailed the participant that “{document.title}” was delivered.",
-    )
+    if sent != 1:
+        raise DocumentEmailNotSent("The mail backend did not send the document email.")
+
+    # Retrying after a successful send would send the email again.
+    try:
+        _audit(
+            "emailed", document, source=AuditEventSource.CELERY,
+            summary=f"Emailed the participant that “{document.title}” was delivered.",
+        )
+    except Exception as exc:
+        logger.error(
+            "Email for document %s was sent but the audit write failed (%s)",
+            document.pk, type(exc).__name__,
+        )
     return True
 
 
@@ -100,5 +114,8 @@ def record_email_failure(document, exc: Exception) -> None:
             status=AuditEventStatus.FAILED,
             metadata={"error": type(exc).__name__},
         )
-    except Exception:
-        logger.exception("The failed email for document %s could not be audited", document.pk)
+    except Exception as audit_exc:
+        logger.error(
+            "The failed email for document %s could not be audited (%s)",
+            document.pk, type(audit_exc).__name__,
+        )
