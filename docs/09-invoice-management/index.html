@@ -2649,7 +2649,7 @@ appear under <strong>More</strong>.</p>
 <tr>
 <td>Draft</td>
 <td><strong>Approve</strong></td>
-<td>Regenerate invoice, Delete invoice, Open PDF, Generate/Regenerate PDF</td>
+<td>Regenerate invoice (or Review conflict / View covering invoice, see below), Delete invoice, Open PDF, Generate/Regenerate PDF</td>
 </tr>
 <tr>
 <td>Approved</td>
@@ -2715,7 +2715,10 @@ tariff configuration. Processing timeouts offer a status refresh.</p>
 <p>While an invoice is a <strong>Draft</strong>, <strong>More → Regenerate invoice</strong> replaces it with a
 freshly calculated one. Use this after correcting metering data or tariff
 configuration. Approved, sent and paid invoices are locked and cannot be
-regenerated.</p>
+regenerated. When another invoice blocks the regeneration (an issued one, or a
+draft reaching past the period), the menu offers <strong>Review conflict</strong> instead;
+when sent or paid invoices of other periods already cover the period, it offers
+<strong>View covering invoice</strong>.</p>
 <p>Regeneration keeps one-off <a href="../07-tariff-configuration/#one-off-charges">charges</a>:
 they are stored separately and added to the new draft again.</p>
 <blockquote>
