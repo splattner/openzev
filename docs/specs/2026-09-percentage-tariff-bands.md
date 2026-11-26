@@ -137,26 +137,12 @@ with periods prefetched as today). This replaces `and tariff.percentage`.
 `period` is the tariff's band at `ts` (`resolve_band`, memoised). It returns `(period.percentage, period)`,
 or `(Decimal("0"), None)` when the tariff has no band.
 
-**`_price_energy`** (the energy part is unchanged):
-
-```
-pct_prices = []
-for tariff in tariffs.percentage(energy_type, day):
-    pct, period = tariffs.percentage_at(tariff, ts)
-    if pct:                       # a 0 % band at ts produces nothing and does not
-        pct_prices.append(...)    # resolve the grid base, as a 0 % tariff did before
-if not pct_prices: return
-grid_base = sum(price_at(t, ts)[0] for t in tariffs.energy(GRID, day))
-for tariff, pct, period in pct_prices:
-    acc.add(tariff=..., quantity=..., total=sign*quantity*grid_base*pct/100,
-            unit="kWh", base_total=quantity*grid_base, bucket=bucket, period=period)
-```
-
-Because `period` is now passed, `ItemAccumulator` splits a percentage
-tariff's line per band exactly as for energy tariffs when
-`Zev.itemize_tariff_bands` is on and the tariff has more than one band. Producer
-credits (§4.5.1 of the baseline) go through `_price_energy` with `sign=-1`, so
-they use the band that matches the timestamp without further changes.
+Skip zero-percent bands before looking up grid prices. For each remaining band,
+apply its percentage to the grid base defined in §4.8 of the
+[billing spec](2026-03-tariffs-and-billing-engine.md#48-vat-resolution). Accumulate
+the amount under the resolved band so a multi-band tariff can itemise it when
+`Zev.itemize_tariff_bands` is on. Local producer credits use the same band and
+grid base as charges for the same timestamp.
 
 **`preflight_dynamic_prices`**: `percentage_tariffs` keeps the percentage tariffs
 of energy type local or grid that have at least one band (prefetch periods on

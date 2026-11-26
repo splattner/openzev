@@ -1431,7 +1431,7 @@ def _build_item_payloads(
     the ZEV itemises bands, in which case the group is that tariff's bands.
 
     ``gross_rate`` is non-zero only for a ZEV on ``VatMode.INCLUSIVE``: each
-    VAT-bearing line (grid energy, grid fees, levies, metering) has its raw
+    positive VAT-bearing line (grid energy, grid fees, levies, metering) has its raw
     total multiplied by ``1 + gross_rate`` before rounding, so the derived
     unit price comes out gross too. The third return value is the
     non-recoverable VAT thus folded in, summed over those lines.
