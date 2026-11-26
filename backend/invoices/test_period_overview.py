@@ -8,6 +8,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import UserRole
 from invoices.models import InvoiceStatus
+from invoices.readiness import compute_readiness
 from invoices.test_helpers import make_invoice, make_participant, make_user, make_zev
 from metering.models import MeterReading, ReadingDirection, ReadingResolution
 from testing.helpers import authenticate as auth
@@ -258,13 +259,51 @@ class GenerationEligibilityTests(TestCase):
             {"state": "eligible", "invoice_id": None, "invoice_number": None},
         )
 
-    def test_live_invoice_row_has_no_eligibility(self):
+    def test_draft_exact_row_is_eligible_for_regeneration(self):
         make_invoice(
             self.zev, self.participant, InvoiceStatus.DRAFT,
             period=(date(2026, 1, 1), date(2026, 3, 31)),
         )
         row = self._rows()[self.participant.full_name]
         self.assertIsNotNone(row["invoice"])
+        self.assertEqual(
+            row["generation_eligibility"],
+            {"state": "eligible", "invoice_id": None, "invoice_number": None},
+        )
+
+    def test_draft_exact_row_is_blocked_by_overlapping_paid_invoice(self):
+        make_invoice(
+            self.zev, self.participant, InvoiceStatus.DRAFT,
+            period=(date(2026, 1, 1), date(2026, 3, 31)),
+        )
+        paid = make_invoice(
+            self.zev, self.participant, InvoiceStatus.PAID,
+            period=(date(2026, 1, 1), date(2026, 1, 31)),
+        )
+        row = self._rows()[self.participant.full_name]
+        self.assertEqual(
+            row["generation_eligibility"],
+            {
+                "state": "blocked",
+                "invoice_id": str(paid.id),
+                "invoice_number": paid.invoice_number,
+            },
+        )
+        # Readiness asks whether an invoice exists, not whether it can be
+        # regenerated: the draft counts as generated and is no conflict.
+        steps = {
+            step["key"]: step
+            for step in compute_readiness(self.zev, date(2026, 1, 1), date(2026, 3, 31))["steps"]
+        }
+        self.assertEqual(steps["generated"]["status"], "done")
+        self.assertEqual(steps["generation_conflicts"]["status"], "ok")
+
+    def test_issued_exact_row_has_no_eligibility(self):
+        make_invoice(
+            self.zev, self.participant, InvoiceStatus.APPROVED,
+            period=(date(2026, 1, 1), date(2026, 3, 31)),
+        )
+        row = self._rows()[self.participant.full_name]
         self.assertIsNone(row["generation_eligibility"])
 
     def test_partially_locked_row_is_blocked_with_destination(self):
@@ -316,6 +355,30 @@ class GenerationEligibilityTests(TestCase):
             period=(date(2026, 3, 1), date(2026, 3, 31)),
         )
         row = self._rows()[self.participant.full_name]
+        self.assertEqual(
+            row["generation_eligibility"],
+            {
+                "state": "covered",
+                "invoice_id": str(first.id),
+                "invoice_number": first.invoice_number,
+            },
+        )
+
+    def test_draft_exact_row_fully_settled_elsewhere_is_covered(self):
+        make_invoice(
+            self.zev, self.participant, InvoiceStatus.DRAFT,
+            period=(date(2026, 1, 1), date(2026, 3, 31)),
+        )
+        first = make_invoice(
+            self.zev, self.participant, InvoiceStatus.PAID,
+            period=(date(2026, 1, 1), date(2026, 2, 28)),
+        )
+        make_invoice(
+            self.zev, self.participant, InvoiceStatus.SENT,
+            period=(date(2026, 3, 1), date(2026, 3, 31)),
+        )
+        row = self._rows()[self.participant.full_name]
+        self.assertEqual(row["invoice"]["status"], InvoiceStatus.DRAFT)
         self.assertEqual(
             row["generation_eligibility"],
             {
