@@ -2441,7 +2441,7 @@ cancelled later, generating the period again creates a new invoice next to it
 instead of replacing it, so no invoice number ever goes missing. Only a draft,
 or a cancelled invoice that was never approved, is replaced or can be deleted
 by a manager. Admins can delete other invoices too, except one that has
-received payments.</p>
+received payments or has a credit note issued for it.</p>
 <p>Approval freezes the issuer and recipient details and discards the draft PDF.
 Use <strong>Generate PDF</strong> to view the approved document. Emailing generates a
 missing PDF automatically. <strong>Mark sent</strong> records manual delivery without
@@ -2671,7 +2671,7 @@ appear under <strong>More</strong>.</p>
 <p><strong>More</strong> groups invoice actions first, then PDF and email actions. <strong>Open PDF</strong>
 appears once the invoice has a stored document.</p>
 <p>Admins also see <strong>Delete invoice</strong> for approved, sent and paid invoices without
-payments. A cancelled invoice that had been approved offers no <strong>Delete
+payments or credit notes. A cancelled invoice that had been approved offers no <strong>Delete
 invoice</strong> to managers: it stays on record with its number.</p>
 <p>The filter above the table counts the period's rows: <strong>All</strong>, <strong>Drafts</strong>,
 <strong>Approved</strong>, <strong>Sent</strong> and <strong>Issues</strong> (rows with missing metering data, a
