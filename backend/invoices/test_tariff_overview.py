@@ -393,6 +393,24 @@ class TariffOverviewContentTests(TariffOverviewTestCase):
         self.assertEqual(overview_row["amount"], contract_row["rate_rp"])
         self.assertIsNone(overview_row["footnote"])
 
+    def test_all_versions_labels_expired_percentage_price_as_illustrative(self):
+        local = self._local_pct("50.00")
+        local.valid_to = date(2026, 5, 31)
+        local.save()
+        grid = self._energy_tariff(name="Grid", energy_type=EnergyType.GRID, valid_from=date(2026, 6, 1))
+        _flat_period(grid, "0.20000")
+
+        ctx = _build_template_context(self.zev, date(2026, 6, 1), "all")
+        row = next(t for group in ctx["groups"] for t in group["tariffs"] if t["name"] == local.name)
+        self.assertFalse(row["is_current"])
+        self.assertEqual(row["inline_price"]["amount"], "10.00")
+        pdf = generate_tariff_overview_pdf(self.zev, date(2026, 6, 1), "all")
+        self.assertIn("31.05.2026 · Beispielpreis mit Netztarifen vom 01.06.2026", _squash(_pdf_text(pdf)))
+
+        before_grid = _build_template_context(self.zev, date(2025, 12, 31), "all")
+        future_row = next(t for group in before_grid["groups"] for t in group["tariffs"] if t["name"] == local.name)
+        self.assertEqual(future_row["grid_base_note"], "Stichtag für Netztarife 31.12.2025")
+
     def test_percentage_base_spans_every_grid_category(self):
         """The base is the whole grid price, not just its ENERGY component.
 

@@ -18,6 +18,7 @@ from django.utils.dateparse import parse_date
 from accounts.permissions import HasZevAccess
 from zev import access
 from allocation.validity import period_window
+from .display_pricing import build_tariff_display_summaries
 from .dynamic.fetch import coverage_gaps
 from .dynamic.storage import PriceSeriesConflict
 from .dynamic.evidence import lock_sources
@@ -199,9 +200,13 @@ class TariffViewSet(TariffErrorResponseMixin, AuditedUpdateMixin, ZevScopedQuery
     def get_queryset(self):
         return self.scope_queryset(Tariff.objects.all())
 
-    def list(self, request, *args, **kwargs):
-        from invoices.tariff_pricing import prepare_tariff_display_summaries
+    def _display_context(self, tariffs, *, as_of):
+        return {
+            **self.get_serializer_context(),
+            "display_summaries": build_tariff_display_summaries(tariffs, as_of=as_of),
+        }
 
+    def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset()).prefetch_related("periods")
         page = self.paginate_queryset(queryset)
         tariffs = list(page if page is not None else queryset)
@@ -211,8 +216,8 @@ class TariffViewSet(TariffErrorResponseMixin, AuditedUpdateMixin, ZevScopedQuery
                         if tariff.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY},
             billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,
         ).exclude(pk__in=[tariff.pk for tariff in tariffs]).prefetch_related("periods"))
-        prepare_tariff_display_summaries([*tariffs, *grids], as_of=timezone.localdate())
-        data = self.get_serializer(tariffs, many=True).data
+        context = self._display_context([*tariffs, *grids], as_of=timezone.localdate())
+        data = self.get_serializer(tariffs, many=True, context=context).data
         return self.get_paginated_response(data) if page is not None else Response(data)
 
     def perform_create(self, serializer):
@@ -284,11 +289,8 @@ class TariffViewSet(TariffErrorResponseMixin, AuditedUpdateMixin, ZevScopedQuery
         for tariff in tariffs:
             grouped.setdefault(series_key(tariff), []).append(tariff)
 
-        # Batch both direct summaries and percentage bases: historical bases
-        # need their own date, without a price query for every tariff version.
-        from invoices.tariff_pricing import prepare_tariff_display_summaries
-
-        prepare_tariff_display_summaries(tariffs, as_of=today)
+        # Batch price reads across version-specific reference dates.
+        context = self._display_context(tariffs, as_of=today)
 
         payload = []
         for versions in grouped.values():
@@ -309,8 +311,8 @@ class TariffViewSet(TariffErrorResponseMixin, AuditedUpdateMixin, ZevScopedQuery
                     {'start': gap.start.isoformat(), 'end': gap.end.isoformat()}
                     for gap in find_gaps(ordered)
                 ],
-                'versions': TariffSerializer(
-                    list(reversed(ordered)), many=True, context={'request': request},
+                'versions': self.get_serializer(
+                    list(reversed(ordered)), many=True, context=context,
                 ).data,
             })
 

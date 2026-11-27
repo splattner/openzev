@@ -12,6 +12,8 @@ from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from accounts.models import UserRole
 from tariffs.dynamic.models import DynamicPricePoint, DynamicTariffSource
@@ -32,17 +34,27 @@ def make_source(**overrides) -> DynamicTariffSource:
 
 
 class TestPickingASourceThroughTheTariffApi:
-    def test_series_and_detail_return_the_same_historical_percentage_base(self, api_client):
+    @pytest.mark.parametrize(("valid_from", "valid_to", "reference_date", "expected_price", "status"), [
+        (date(2026, 1, 1), date(2026, 6, 30), "2026-06-30", "0.10000", "partial"),
+        (date(2026, 11, 1), None, "2026-11-01", None, "unavailable"),
+        (date(2027, 1, 1), None, "2027-01-01", "0", None),
+    ], ids=["expired", "future_no_prices", "future_no_grid"])
+    def test_percentage_base_agrees_across_endpoints(
+        self, api_client, valid_from, valid_to, reference_date, expected_price, status,
+    ):
         owner = make_user("percentage_owner", UserRole.USER)
         zev = factories.ZevFactory(owner=owner)
         # The requests run on a patched "today" in the past; start the owner's
         # manager grant (created on the real today) before it (#761).
         ZevAccessGrant.objects.filter(zev=zev).update(valid_from=date(2026, 1, 1))
         source = make_source()
-        factories.TariffFactory(zev=zev, dynamic_source=source, energy_type="grid", valid_from=date(2026, 1, 1))
+        factories.TariffFactory(
+            zev=zev, dynamic_source=source, energy_type="grid",
+            valid_from=date(2026, 1, 1), valid_to=date(2026, 12, 31),
+        )
         percentage = factories.TariffFactory(
             zev=zev, name="Local", billing_mode="percentage_of_energy", energy_type="local",
-            valid_from=date(2026, 1, 1), valid_to=date(2026, 6, 30),
+            valid_from=valid_from, valid_to=valid_to,
         )
         factories.TariffPeriodFactory(
             tariff=percentage, period_type="flat", price_chf_per_kwh=None, percentage=Decimal("50"),
@@ -52,12 +64,17 @@ class TestPickingASourceThroughTheTariffApi:
             source.points.create(valid_from=start, valid_to=start + timedelta(minutes=15), price_chf_per_kwh=price)
         authenticate(api_client, owner)
         with patch("django.utils.timezone.localdate", return_value=date(2026, 9, 12)):
-            series = api_client.get(f"/api/v1/tariffs/tariffs/series/?zev_id={zev.pk}")
+            listing = api_client.get(f"/api/v1/tariffs/tariffs/?zev_id={zev.pk}")
             detail = api_client.get(f"/api/v1/tariffs/tariffs/{percentage.pk}/")
-        assert series.status_code == detail.status_code == 200
+            with CaptureQueriesContext(connection) as queries:
+                series = api_client.get(f"/api/v1/tariffs/tariffs/series/?zev_id={zev.pk}")
+        assert listing.status_code == series.status_code == detail.status_code == 200
+        assert sum(DynamicPricePoint._meta.db_table in query["sql"] for query in queries) == 1
+        listed = next(row for row in listing.data["results"] if row["name"] == "Local")
         version = next(item for item in series.data if item["name"] == "Local")["versions"][0]
-        assert version["percentage_base_summary"] == detail.data["percentage_base_summary"] == {
-            "price_chf_per_kwh": "0.10000", "dynamic_status": "partial", "reference_date": "2026-06-30",
+        assert listed == version == detail.data
+        assert version["percentage_base_summary"] == {
+            "price_chf_per_kwh": expected_price, "dynamic_status": status, "reference_date": reference_date,
         }
 
     def test_an_owner_can_create_a_tariff_linked_to_an_existing_source(self, api_client):

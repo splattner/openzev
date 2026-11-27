@@ -1,10 +1,4 @@
-"""``tariff_pricing``'s dynamic branch: the average shown on a printed
-document for a tariff whose price has no single figure at all.
-
-See the module docstring in ``tariff_pricing.py`` for why a printed document
-needs a static number where the engine resolves a live one, and why the two
-must not silently disagree.
-"""
+"""Tariff displays need a representative price when there is no consumption timestamp."""
 
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -12,17 +6,14 @@ from decimal import Decimal
 
 import pytest
 
+from tariffs.display_pricing import build_tariff_display_summaries, display_grid_base_summary
 from tariffs.dynamic.models import DynamicPricePoint, DynamicTariffSource
 from tariffs.dynamic.pricing import summarize_dynamic_tariff, summarize_requests
 from tariffs.serializers import TariffSerializer
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
 from testing import factories
 
-from .tariff_pricing import (
-    display_grid_base_summary,
-    grid_base_is_multiband,
-    prepare_tariff_display_summaries,
-)
+from .tariff_pricing import grid_base_is_multiband
 
 pytestmark = pytest.mark.django_db
 
@@ -205,7 +196,34 @@ class TestDisplayGridBaseWithDynamicTariffs:
         tariff = static_tariff(factories.ZevFactory())
         for index, kind in enumerate(types, start=1):
             TariffPeriod.objects.create(tariff=tariff, period_type=kind, price_chf_per_kwh=Decimal(index) / 10)
-        assert display_grid_base_summary([tariff]).price_chf_per_kwh == Decimal(expected)
+        assert display_grid_base_summary([tariff], as_of=date(2026, 1, 1)).price_chf_per_kwh == Decimal(expected)
+
+    @pytest.mark.parametrize(("kind", "price", "base_price", "status", "displayable"), [
+        ("empty", None, "0", None, False),
+        ("static", "0.00000", "0.00000", None, False),
+        ("static", "-0.20000", "-0.20000", None, False),
+        ("dynamic", "0.00000", "0.00000", "partial", True),
+        ("dynamic", "-0.20000", "-0.20000", "partial", True),
+        ("dynamic", None, None, "unavailable", False),
+    ])
+    def test_grid_base_amount_and_pdf_eligibility(self, kind, price, base_price, status, displayable):
+        zev = factories.ZevFactory()
+        grids = []
+        if kind == "static":
+            grid = static_tariff(zev)
+            TariffPeriod.objects.create(tariff=grid, price_chf_per_kwh=Decimal(price))
+            grids.append(grid)
+        elif kind == "dynamic":
+            source = make_source()
+            grids.append(dynamic_tariff(zev, source))
+            if price is not None:
+                store(source, datetime(2026, 1, 1, tzinfo=UTC), price)
+
+        base = display_grid_base_summary(grids, as_of=date(2026, 1, 1))
+        assert base.as_dict() == {
+            "price_chf_per_kwh": base_price, "dynamic_status": status, "reference_date": "2026-01-01",
+        }
+        assert base.has_effective_price is displayable
 
     @pytest.mark.parametrize("reverse", [False, True])
     def test_unavailable_wins_over_partial_in_either_order(self, reverse):
@@ -218,7 +236,7 @@ class TestDisplayGridBaseWithDynamicTariffs:
         assert base.price_chf_per_kwh is None
         assert base.dynamic_status == "unavailable"
 
-    def test_percentage_bases_share_one_source_query_but_not_a_reference_date(self, django_assert_num_queries):
+    def test_percentage_bases_share_one_source_query_but_not_a_reference_date(self, django_assert_max_num_queries):
         zev = factories.ZevFactory()
         source = make_source()
         grid = dynamic_tariff(zev, source)
@@ -229,18 +247,20 @@ class TestDisplayGridBaseWithDynamicTariffs:
         store(source, datetime(2026, 6, 30, tzinfo=UTC), "0.1")
         store(source, datetime(2026, 9, 12, tzinfo=UTC), "0.9")
         tariffs = list(zev.tariffs.prefetch_related("periods"))
-        # Two queries for the whole batch — the coverage anchors for
-        # period-published sources, then the points — and two however many
-        # tariffs, versions or shared sources it holds. The budget is here to
-        # catch a per-tariff query, not to pin the constant.
-        with django_assert_num_queries(2):
-            prepare_tariff_display_summaries(tariffs, as_of=date(2026, 9, 12))
-            payload = {row["id"]: row for row in TariffSerializer(tariffs, many=True).data}
+        # One shared source needs at most a coverage lookup and a price-point query.
+        with django_assert_max_num_queries(2):
+            summaries = build_tariff_display_summaries(tariffs, as_of=date(2026, 9, 12))
+        reloaded = list(zev.tariffs.prefetch_related("periods"))
+        with django_assert_max_num_queries(0):
+            rows = TariffSerializer(reloaded, many=True, context={"display_summaries": summaries}).data
+        payload = {row["id"]: row for row in rows}
         assert payload[str(past.pk)]["percentage_base_summary"] == {
             "price_chf_per_kwh": "0.10000", "dynamic_status": "partial", "reference_date": "2026-06-30",
         }
         assert payload[str(current.pk)]["percentage_base_summary"]["price_chf_per_kwh"] == "0.90000"
+        assert payload[str(current.pk)]["dynamic_price_summary"] is None
         assert payload[str(grid.pk)]["dynamic_price_summary"]["average_chf_per_kwh"] == "0.90000"
+        assert payload[str(grid.pk)]["percentage_base_summary"] is None
 
     def test_batch_summaries_are_keyed_by_persistent_tariff_id(self, django_assert_num_queries):
         zev = factories.ZevFactory()
@@ -324,46 +344,50 @@ class TestGridBaseFlags:
 
 @pytest.mark.parametrize("page_size", [1, 100])
 def test_plain_list_batches_percentage_bases_including_grids_outside_the_page(
-    owner_client, owner_user, page_size
+    owner_client, owner_user, monkeypatch, page_size
 ):
-    from unittest.mock import patch
     from django.db import connection
     from django.test.utils import CaptureQueriesContext
-    from rest_framework.pagination import PageNumberPagination
     from tariffs.views import TariffViewSet
+    from zev.models import ZevAccessGrant
 
     zev = factories.ZevFactory(owner=owner_user)
     # The request runs on a patched "today" in the past; start the owner's
     # manager grant (created on the real today) before it (#761).
-    from zev.models import ZevAccessGrant
-
     ZevAccessGrant.objects.filter(zev=zev).update(valid_from=date(2026, 1, 1))
     source = make_source()
-    dynamic_tariff(zev, source, name="Z grid")
+    grid = dynamic_tariff(zev, source, name="Z grid")
+    other_grid = static_tariff(factories.ZevFactory(), name="Other grid")
+    TariffPeriod.objects.create(tariff=other_grid, price_chf_per_kwh=Decimal("0.25000"))
     for name in ["A local", "B local", "C local"]:
         static_tariff(
             zev, name=name, energy_type="local", billing_mode="percentage_of_energy", percentage=50
         )
     store(source, datetime(2026, 9, 12, tzinfo=UTC), "0.9")
 
-    class Pagination(PageNumberPagination):
+    class TestPagination(TariffViewSet.pagination_class):
         pass
 
-    Pagination.page_size = page_size
-    with (
-        patch.object(TariffViewSet, "pagination_class", Pagination),
-        patch("tariffs.views.timezone.localdate", return_value=date(2026, 9, 12)),
-        CaptureQueriesContext(connection) as queries,
-    ):
-        response = owner_client.get("/api/v1/tariffs/tariffs/", {"zev_id": str(zev.pk)})
+    TestPagination.page_size = page_size
+    monkeypatch.setattr(TariffViewSet, "pagination_class", TestPagination)
+    monkeypatch.setattr("django.utils.timezone.localdate", lambda: date(2026, 9, 12))
+    with CaptureQueriesContext(connection) as queries:
+        response = owner_client.get("/api/v1/tariffs/tariffs/")
     assert response.status_code == 200
-    percentages = [
-        row for row in response.json()["results"] if row["billing_mode"] == "percentage_of_energy"
-    ]
-    assert percentages
-    assert all(
-        row["percentage_base_summary"]["price_chf_per_kwh"] == "0.90000" for row in percentages
-    )
-    assert (
-        len([query for query in queries if 'FROM "tariffs_dynamicpricepoint"' in query["sql"]]) == 1
-    )
+    assert response.data["count"] == 4
+    rows = response.data["results"]
+    if page_size == 1:
+        assert [row["name"] for row in rows] == ["A local"]
+        assert str(grid.pk) not in {row["id"] for row in rows}
+    percentages = [row for row in rows if row["billing_mode"] == BillingMode.PERCENTAGE_OF_ENERGY]
+    assert len(percentages) == min(page_size, 3)
+    expected_base = {
+        "price_chf_per_kwh": "0.90000", "dynamic_status": "partial", "reference_date": "2026-09-12",
+    }
+    assert all(row["percentage_base_summary"] == expected_base for row in percentages)
+    assert sum(DynamicPricePoint._meta.db_table in query["sql"] for query in queries) == 1
+
+    detail = owner_client.get(f"/api/v1/tariffs/tariffs/{percentages[0]['id']}/")
+    assert detail.status_code == 200
+    assert detail.data["percentage_base_summary"] == expected_base
+    assert owner_client.get(f"/api/v1/tariffs/tariffs/{other_grid.pk}/").status_code == 404

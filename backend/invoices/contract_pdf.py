@@ -16,8 +16,9 @@ from .contract_translations import CONTRACT_TRANSLATIONS
 from .dates import format_date_value
 from .document_parties import issuer_context
 from .pdf_render import render_pdf
-from .tariff_pricing import display_grid_base_summary, percentage_band_rows
+from .tariff_pricing import percentage_band_rows
 
+from tariffs.display_pricing import display_grid_base_summary
 from tariffs.models import BillingMode, EnergyType, PeriodType
 from zev.models import MeteringPointType
 
@@ -60,10 +61,6 @@ def _build_local_tariff_display(zev, tr: dict, date_pattern: str, as_of: date) -
         if _active(t, local=False) and t.billing_mode == BillingMode.ENERGY
     ]
 
-    # Sum the flat / HT prices of active GRID tariffs once: this is the base
-    # price every percentage-of-grid-tariff local tariff is computed from.
-    # Shared with the tariff overview PDF via tariff_pricing, so the two
-    # documents cannot print two different answers for the same tariff.
     grid_base = display_grid_base_summary(grid_tariffs, as_of=as_of)
     grid_sum_chf = grid_base.price_chf_per_kwh
 

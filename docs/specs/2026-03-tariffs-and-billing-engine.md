@@ -183,12 +183,9 @@ Only what this spec's own algorithm needs to know:
   other billing modes): `price_chf_per_kwh` (decimal string or null),
   `dynamic_status` (`complete`, `partial`, `unavailable`, or null for static
   bases), and `reference_date` (ISO date). Today is clamped to that version's
-  validity; both grid-version selection and dynamic averages use that date.
-  Plain list and series routes batch these summaries per source; paginated
-  lists include applicable grid versions outside the returned page.
-  The frontend consumes this shared backend calculation, without rebuilding
-  the base from differently dated grid summaries. Series responses batch all
-  requested windows into one bounded query per source.
+  validity for both grid-version selection and dynamic averages on list,
+  series, and detail. Paginated lists include applicable grid versions outside
+  the page.
 
 ### 3.2 TariffPeriod (price bands within a tariff)
 
