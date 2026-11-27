@@ -4670,7 +4670,6 @@ export const fr = {
         disconnectedNote: 'Cette source est déconnectée : plus aucune nouvelle donnée n\'arrive et l\'accès enregistré est supprimé. Les données déjà collectées sont conservées.',
         status: {
             pending: 'En attente des premières données',
-            ok: 'Fonctionne',
             error: 'Problème',
             reconnect_required: 'Reconnexion nécessaire',
             disabled: 'Déconnecté',

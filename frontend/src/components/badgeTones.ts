@@ -11,7 +11,6 @@ import type {
   DataQualitySeverity,
   DynamicTariffSource,
   EmailLog,
-  SupplementaryStatus,
   VseTariffCandidateStatus,
 } from '../types/api'
 
@@ -97,13 +96,6 @@ const STATUS_TONES = {
     expired: { tone: 'warning', quiet: true },
     expiring: { tone: 'warning', quiet: true },
   } satisfies Treatments<AccessCredential['status'] | ApiKeyStatus>,
-  supplementary: {
-    ok: { tone: 'success' },
-    pending: { tone: 'neutral' },
-    error: { tone: 'warning', quiet: true },
-    reconnect_required: { tone: 'danger', quiet: true },
-    disabled: { tone: 'neutral' },
-  } satisfies Treatments<SupplementaryStatus>,
   // `disabled` is the source switched off, shown in place of its last fetch.
   priceSource: {
     ok: { tone: 'success' },

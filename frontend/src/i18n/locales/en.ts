@@ -4681,7 +4681,6 @@ export const en = {
         disconnectedNote: 'This source is disconnected: no new data arrives and the stored credential is gone. The data already collected is kept.',
         status: {
             pending: 'Waiting for first data',
-            ok: 'Working',
             error: 'Problem',
             reconnect_required: 'Reconnect needed',
             disabled: 'Disconnected',

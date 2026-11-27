@@ -720,6 +720,6 @@ A metering point with `has_behind_meter_generation` can have one energy data sou
 participant who personally holds it ([2026-10-supplementary-energy-data.md](2026-10-supplementary-energy-data.md)). `MeteringPointSerializer` gains the read-only
 `supplementary_source_status` (`pending | ok | error | reconnect_required | disabled`, or `null`):
 `null` while the feature flag is off, without a source, and for anyone who could not read the
-source themselves. Clearing the flag is refused while a source exists. The metering-point list shows
-the status as a chip that opens a read-only panel (managers can switch off, delete data and remove).
+source themselves. Clearing the flag is refused while a source exists. The community's sources are managed in
+[ZEV settings → Energy data](2026-10-supplementary-energy-data.md#72-owner-the-energy-data-tab).
 Deleting a metering point deletes its source and readings.
