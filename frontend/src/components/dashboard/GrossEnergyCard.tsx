@@ -6,7 +6,7 @@ import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { AXIS_COLOR, CHART_GRIDLINE, CHART_LOCAL, FLOW_GRID_EXP, FLOW_LOCAL_CONS } from '../../lib/chartTokens'
 import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
 import { dashboardKwhFigure, kwhTick } from '../../lib/dashboardFormatting'
-import { formatBusinessWeekday } from '../../lib/dates'
+import { formatBusinessWeekday, zonedParts } from '../../lib/dates'
 import { formatKwh, formatPercent, formatPercentFigure } from '../../lib/numbers'
 import { grossRate, withheldReasonKey } from '../../lib/supplementary'
 import type { GrossEnergy } from '../../types/api'
@@ -23,8 +23,7 @@ interface Props {
     dayAxis?: boolean
 }
 
-const zurichHour = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Zurich', hour: '2-digit', hourCycle: 'h23' })
-const isMidnight = (bucket: string) => Number(zurichHour.format(new Date(bucket))) === 0
+const isMidnight = (bucket: string) => zonedParts(new Date(bucket)).hours === 0
 const dayTick = (bucket: string) => formatBusinessWeekday(new Date(bucket))
 
 /**
