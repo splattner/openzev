@@ -251,6 +251,11 @@ describe('buildRateLines', () => {
         })
     })
 
+    it('prints a negative fee (a credit) with the typographic minus of formatChf', () => {
+        const credit = energyVersion([], { fixed_price_chf: '-5.00' })
+        expect(buildRateLines(energySeries({ billing_mode: 'monthly_fee' }), credit, t, DAY_NAMES, MONTH_NAMES, formatDate)[0].price).toBe('\u22125.00')
+    })
+
     it('reports a version without bands instead of an empty row', () => {
         const series = energySeries({})
         const version = energyVersion([])
