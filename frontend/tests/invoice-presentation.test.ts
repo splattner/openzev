@@ -155,6 +155,26 @@ describe('shared invoice presentation', () => {
         expect(deleteButton('INV-2')).toBeNull()
     })
 
+    it('refreshes the billing views and drops the cached detail after an admin deletes an invoice', async () => {
+        api.remove.mockResolvedValue(undefined)
+        const { container, client } = await mount(createElement(AdminInvoicesContent))
+        client.setQueryData(['invoices', 'detail', 'i1'], invoice)
+        const invalidate = vi.spyOn(client, 'invalidateQueries')
+        const row = [...container.querySelectorAll('tbody tr')].find(row => row.querySelector('a')?.textContent === 'INV-1')!
+        await act(async () => row.querySelector<HTMLButtonElement>('button.button-danger')!.click())
+        const dialog = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')]
+            .find(dialog => dialog.textContent?.includes('adminInvoices.confirmDeleteTitle'))!
+        await act(async () => dialog.querySelector<HTMLButtonElement>('button.button-danger')!.click())
+        const keys = () => invalidate.mock.calls.map(([filters]) => JSON.stringify(filters?.queryKey))
+        await vi.waitFor(() => {
+            for (const key of ['list', 'period-overview', 'readiness', 'readiness-list', 'attention']) {
+                expect(keys(), key).toContain(JSON.stringify(['invoices', key]))
+            }
+        })
+        expect(api.remove).toHaveBeenCalledWith('i1')
+        expect(client.getQueryData(['invoices', 'detail', 'i1'])).toBeUndefined()
+    })
+
     it('shows only the load error for an initial admin invoice failure', async () => {
         api.list.mockRejectedValue(new Error('Offline'))
         const { container } = await mount(createElement(AdminInvoicesContent))

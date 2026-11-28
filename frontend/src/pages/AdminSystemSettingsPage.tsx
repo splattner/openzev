@@ -118,6 +118,8 @@ export function AdminSystemSettingsPage() {
             void queryClient.invalidateQueries({ queryKey: queryKeys.auth.featureFlags() })
             // A flag decides what the shell offers and what the health tab reports; the energy data
             // flag in particular drives the eligibility check, the sources and the meters' status chip.
+            void queryClient.invalidateQueries({ queryKey: queryKeys.feasibility.enabled() })
+            void queryClient.invalidateQueries({ queryKey: queryKeys.live.enabled() })
             void queryClient.invalidateQueries({ queryKey: queryKeys.auth.systemHealth() })
             void queryClient.invalidateQueries({ queryKey: queryKeys.metering.supplementaryEligible() })
             void queryClient.invalidateQueries({ queryKey: queryKeys.metering.supplementarySources() })
