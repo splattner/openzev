@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { act } from 'react'
@@ -7,6 +7,7 @@ import { MantineProvider } from '@mantine/core'
 import { ToastProvider } from '../src/lib/toast'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ZevListPage } from '../src/pages/ZevListPage'
+import { updateZev } from '../src/lib/api/zev'
 import type { Zev } from '../src/types/api'
 
 vi.mock('react-i18next', () => ({
@@ -49,6 +50,7 @@ const ZEV = {
 vi.mock('../src/lib/api/zev', () => ({
     fetchZevs: () => Promise.resolve([ZEV]),
     fetchParticipants: () => Promise.resolve([]),
+    fetchGridOperators: () => Promise.resolve({ operators: [], source: '', cube: '', licence: '', period: '', fetched_on: '' }),
     createZevWithOwner: vi.fn(),
     updateZev: vi.fn(),
     disableZev: vi.fn(),
@@ -63,6 +65,7 @@ vi.mock('../src/lib/api/auth', () => ({
 vi.mock('../src/lib/appSettings', () => ({
     useAppSettings: () => ({ settings: {} }),
     formatShortDate: (d: string) => d,
+    toDayJsDateFormat: () => 'DD.MM.YYYY',
 }))
 
 vi.mock('../src/components/ConfirmDialog', () => ({
@@ -76,35 +79,30 @@ vi.mock('../src/components/ConfirmDialog', () => ({
     }),
 }))
 
+const cleanups: Array<() => void> = []
+afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()))
+
+async function mount() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    cleanups.push(() => { act(() => root.unmount()); container.remove() })
+    await act(async () => {
+        root.render(createElement(MemoryRouter, null, createElement(MantineProvider, null, createElement(ToastProvider, null,
+            createElement(QueryClientProvider, { client }, createElement(ZevListPage))))))
+    })
+    const flush = () => act(async () => { await new Promise((r) => setTimeout(r, 0)) })
+    await vi.waitFor(async () => {
+        await flush()
+        expect(container.querySelector('tbody tr')).not.toBeNull()
+    })
+    return { container, client, flush }
+}
+
 describe('ZevListPage Manage action', () => {
     it('enters ZEV scope (select + go to /) from platform scope', async () => {
-        const container = document.createElement('div')
-        document.body.appendChild(container)
-        const root = createRoot(container)
-        await act(async () => {
-            root.render(
-                createElement(
-                    MemoryRouter,
-                    null,
-                    createElement(
-                        MantineProvider,
-                        null,
-                        createElement(
-                            ToastProvider,
-                            null,
-                            createElement(
-                                QueryClientProvider,
-                                { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
-                                createElement(ZevListPage),
-                            ),
-                        ),
-                    ),
-                ),
-            )
-        })
-        await act(async () => {
-            await new Promise((r) => setTimeout(r, 0))
-        })
+        const { container } = await mount()
         const button = Array.from(container.querySelectorAll('button')).find((b) =>
             b.textContent?.includes('pages.zevs.manage'),
         )
@@ -114,7 +112,25 @@ describe('ZevListPage Manage action', () => {
         })
         expect(mockSetSelectedZevId).toHaveBeenCalledWith('z1')
         expect(mockNavigate).toHaveBeenCalledWith('/')
-        act(() => root.unmount())
-        container.remove()
+    })
+
+    it('invalidates billing readiness for the edited community', async () => {
+        vi.mocked(updateZev).mockResolvedValue(ZEV)
+        const { container, client, flush } = await mount()
+        const invalidate = vi.spyOn(client, 'invalidateQueries')
+        await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="common.editNamed"]')!.click() })
+        const dialog = Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"]'))
+            .find((d) => d.textContent?.includes('pages.zevs.editModalTitle'))!
+        const save = Array.from(dialog.querySelectorAll<HTMLButtonElement>('button[type="submit"]'))
+            .find((b) => b.textContent?.includes('pages.zevs.saveZev'))!
+        await act(async () => { save.click() })
+        expect(updateZev).toHaveBeenCalledWith('z1', expect.any(Object))
+        const keys = () => invalidate.mock.calls.map(([filters]) => JSON.stringify(filters?.queryKey))
+        await vi.waitFor(async () => {
+            await flush()
+            for (const expected of [['zev', 'list'], ['invoices', 'readiness', 'z1'], ['invoices', 'readiness-list', 'z1']]) {
+                expect(keys(), expected.join('/')).toContain(JSON.stringify(expected))
+            }
+        })
     })
 })

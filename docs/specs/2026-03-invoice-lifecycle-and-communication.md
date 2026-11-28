@@ -1502,7 +1502,9 @@ period rows retain participants without invoices, metering details, eligibility
 and workflow actions; since #862 a participant's own invoices are the rows of
 My documents (SPEC-2026-11-participant-document-inbox §7.1), not a live list;
 `AdminInvoicesContent`
-retains sorting, filtering, pagination, stable row IDs, and confirmed deletion. Invoice numbers link to detail;
+retains sorting, filtering, pagination, stable row IDs, and confirmed deletion. Deleting an invoice
+updates the invoice lists, period overviews and billing cockpit (readiness, readiness list, attention), and
+drops the deleted invoice's cached detail. Invoice numbers link to detail;
 period links carry their exact return period, own links carry `/me/documents`,
 and platform links return admins to `/admin/invoices`. Money cells use
 `formatChf`. Delivery cells prefer `last_email_status` and otherwise use the
@@ -1792,7 +1794,7 @@ visibility, restored access, and strict selection with a second membership.
   primary step among the offered ones. Covered by `invoice-actions`,
   `invoice-actions-hook`, `invoice-workflow-action`, `invoice-credits`,
   `invoice-credit-application`, `invoice-payments` and `invoice-presentation`
-  (admin list hides Delete) tests.
+  (admin list offers Delete only where `allowed_actions` does; a delete refreshes the billing views) tests.
 - `InvoiceWorkflowAction` shares `nextInvoiceWorkflowAction` with billing:
   draft → Approve, approved → Send email, sent → Mark paid. Detail adds the
   first two as one right-aligned next-action button, matching correction resolution; sent invoices retain the existing

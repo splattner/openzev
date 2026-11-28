@@ -169,7 +169,7 @@ describe('the Functions tab', () => {
         expect(switchOf(container).disabled).toBe(true)
     })
 
-    it('refreshes what depends on a flag after it is toggled: health, eligibility, sources and meters', async () => {
+    it('invalidates dependent queries after a flag toggle', async () => {
         flagApi.updateFeatureFlag.mockResolvedValue(flag({ enabled: false }))
         const container = await renderFeatures([flag()])
         const invalidate = vi.spyOn(lastClient, 'invalidateQueries')
@@ -181,6 +181,7 @@ describe('the Functions tab', () => {
         for (const expected of [
             ['auth', 'feature-flags'], ['auth', 'system-health'], ['metering', 'supplementary-eligible'],
             ['metering', 'supplementary-sources'], ['metering', 'points'],
+            ['feasibility', 'enabled'], ['live', 'enabled'],
         ]) {
             expect(keys, expected.join('/')).toContain(JSON.stringify(expected))
         }

@@ -182,12 +182,14 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
 
     const updateMutation = useMutation({
         mutationFn: ({ id, payload }: { id: string; payload: Partial<ZevInput> }) => updateZev(id, payload),
-        onSuccess: () => {
+        onSuccess: (_saved, variables) => {
             setEditingId(null)
             setEditForm(getDefaultZevForm())
             setShowEditModal(false)
             setEditError(null)
             void queryClient.invalidateQueries({ queryKey: queryKeys.zev.list() })
+            void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.readiness(variables.id) })
+            void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.readinessList(variables.id) })
         },
         onError: (error) => setEditError(formatApiError(error, t('pages.zevs.messages.updateFailed'))),
     })

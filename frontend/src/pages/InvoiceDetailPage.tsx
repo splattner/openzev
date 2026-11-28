@@ -24,6 +24,7 @@ import { InvoiceDataReviewNotice } from '../features/invoices/InvoiceDataReviewN
 import { InvoiceDataReviewActions } from '../features/invoices/InvoiceDataReviewActions'
 import { InvoiceEnergyChanges } from '../features/invoices/InvoiceEnergyChanges'
 import { InvoiceWorkflowAction } from '../features/invoices/InvoiceWorkflowAction'
+import { refreshInvoiceViews } from '../features/invoices/refreshInvoiceViews'
 import type { Invoice } from '../types/api'
 
 import { usePdfObjectUrl } from '../lib/usePdfObjectUrl'
@@ -134,13 +135,7 @@ export function InvoiceDetailPage() {
     // A payment changes the status and totals every invoice list shows.
     const handleInvoiceChanged = (updated: Invoice) => {
         queryClient.setQueryData(queryKeys.invoices.detail(updated.id), updated)
-        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.lists() })
-        void queryClient.invalidateQueries({ queryKey: ['invoices', 'period-overview'] })
-        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.mine() })
-        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.credits() })
-        for (const key of ['readiness', 'readiness-list', 'attention']) {
-            void queryClient.invalidateQueries({ queryKey: ['invoices', key] })
-        }
+        refreshInvoiceViews(queryClient)
     }
 
     // A refund leaves the invoice's own payload alone but changes what its credit notes show.

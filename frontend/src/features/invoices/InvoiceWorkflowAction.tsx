@@ -13,6 +13,7 @@ import { useWriteScope } from '../../lib/useWriteScope'
 import type { Invoice } from '../../types/api'
 import { getLatestEmailLog } from './emailLogs'
 import { nextInvoiceWorkflowAction } from './invoiceStatus'
+import { refreshInvoiceViews } from './refreshInvoiceViews'
 import { useEmailDelivery } from './useEmailDelivery'
 
 export function InvoiceWorkflowAction({ invoice, canManage, onChanged }: {
@@ -30,15 +31,7 @@ export function InvoiceWorkflowAction({ invoice, canManage, onChanged }: {
     const refreshInvoice = useCallback(() => {
         void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.detail(invoice.id) })
     }, [queryClient, invoice.id])
-    const refreshRelated = useCallback(() => {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.lists() })
-        void queryClient.invalidateQueries({ queryKey: ['invoices', 'period-overview'] })
-        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.mine() })
-        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.credits() })
-        for (const key of ['readiness', 'readiness-list', 'attention']) {
-            void queryClient.invalidateQueries({ queryKey: ['invoices', key] })
-        }
-    }, [queryClient])
+    const refreshRelated = useCallback(() => refreshInvoiceViews(queryClient), [queryClient])
     const rows = useMemo(() => [{ invoice }], [invoice])
     const delivery = useEmailDelivery({ rows, scope, refreshOverview: refreshInvoice, refreshRelated, showTimeoutToast: false })
     const latestLog = getLatestEmailLog(invoice)

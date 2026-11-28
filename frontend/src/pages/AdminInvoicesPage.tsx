@@ -14,6 +14,7 @@ import { useToast } from '../lib/toast'
 import { InvoiceActionButton, InvoiceAmount, InvoiceLink, InvoiceStatusBadge } from '../components/InvoicePresentation'
 import type { Invoice } from '../types/api'
 import { isAllowed } from '../features/invoices/invoiceStatus'
+import { refreshInvoiceViews } from '../features/invoices/refreshInvoiceViews'
 
 // Stable empty array so the useMemo below keeps a consistent dependency reference.
 const EMPTY_INVOICES: Invoice[] = []
@@ -32,9 +33,9 @@ export function AdminInvoicesContent() {
 
     const deleteMutation = useMutation({
         mutationFn: (id: string) => deleteInvoice(id),
-        onSuccess: () => {
-            void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.lists() })
-            void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.mine() })
+        onSuccess: (_data, id) => {
+            queryClient.removeQueries({ queryKey: queryKeys.invoices.detail(id) })
+            refreshInvoiceViews(queryClient)
             pushToast(t('adminInvoices.deleted'), 'success')
         },
         onError: (error) => pushToast(formatApiError(error), 'error'),
