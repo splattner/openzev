@@ -2,8 +2,8 @@ amqp==5.4.2
 asgiref==3.13.0
 attrs==26.1.0
 billiard==4.3.2
-boto3==1.44.3  # direct: S3-compatible backup destinations (SPEC-2026-09-backup-and-restore)
-botocore==1.44.3
+boto3==1.44.13  # direct: S3-compatible backup destinations (SPEC-2026-09-backup-and-restore)
+botocore==1.44.13
 brotli==1.2.1
 cbor2==6.3.0
 celery==5.7.0
@@ -12,7 +12,7 @@ click==8.5.1
 click-didyoumean==0.3.1
 click-plugins==1.1.1.2
 click-repl==0.4.1
-coverage==7.17.3
+coverage==7.17.5
 cron-descriptor==1.4.5
 cryptography==50.0.2  # direct: Fernet encryption of the TOTP secret at rest (ADR 0021)
 cssselect2==0.10.1
@@ -28,8 +28,8 @@ drf-spectacular==0.30.0
 et_xmlfile==2.0.0
 execnet==2.1.2
 factory_boy==3.3.3
-Faker==40.54.0
-fonttools==4.68.0
+Faker==40.63.0
+fonttools==4.69.1
 gunicorn==27.0.1
 inflection==0.5.1
 iniconfig==2.3.1
@@ -38,9 +38,9 @@ jmespath==1.1.0
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
 kombu==5.7.0
-lxml==6.1.3
+lxml==6.2.0
 openpyxl==3.1.5
-packaging==26.3
+packaging==26.4
 pillow==13.0.0
 pluggy==1.7.0
 prompt_toolkit==3.0.53
@@ -50,8 +50,8 @@ pyasn1_modules==0.4.2
 pycparser==3.12
 pydyf==0.13.0
 pyOpenSSL==26.4.0
-pyotp==2.10.0  # direct: TOTP secret generation and code verification
-pypdf==7.1.0
+pyotp==2.12.2  # direct: TOTP secret generation and code verification
+pypdf==7.2.0
 Pygments==2.21.0
 PyJWT==2.15.1
 pyphen==0.18.1
@@ -62,13 +62,13 @@ pytest-xdist==3.8.0
 python-crontab==3.4.0
 python-dateutil==2.9.0.post0  # direct: lenient timestamp parsing in the metering CSV import
 python-stdnum==2.2
-PyYAML==6.0.3
+PyYAML==6.0.4
 qrbill==1.2.0
 qrcode==8.2
-redis==8.1.0
+redis==8.2.0
 referencing==0.37.0
 rpds-py==2026.9.1
-ruff==0.17.5
+ruff==0.17.6
 s3transfer==0.19.3
 six==1.17.0
 sqlparse==0.6.1
@@ -80,7 +80,7 @@ tzlocal==5.4.5
 uritemplate==4.2.0
 urllib3==2.8.0
 vine==5.1.0
-wcwidth==0.9.4
+wcwidth==0.9.5
 weasyprint==70.0
 webauthn==3.0.1  # direct: WebAuthn/passkey registration and authentication ceremonies
 webencodings==0.6.1
