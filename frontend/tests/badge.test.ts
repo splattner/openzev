@@ -5,15 +5,6 @@ import { Badge, type BadgeProps } from '../src/components/Badge'
 import { statusTreatment } from '../src/components/badgeTones'
 
 describe('statusTreatment', () => {
-    it('maps each supplementary status to a tone', () => {
-        expect(statusTreatment('ok', 'supplementary')).toEqual({ tone: 'success' })
-        expect(statusTreatment('error', 'supplementary')).toEqual({ tone: 'warning', quiet: true })
-        expect(statusTreatment('reconnect_required', 'supplementary')).toEqual({ tone: 'danger', quiet: true })
-        expect(statusTreatment('pending', 'supplementary')).toEqual({ tone: 'neutral' })
-        expect(statusTreatment('disabled', 'supplementary')).toEqual({ tone: 'neutral' })
-        expect(statusTreatment(null, 'supplementary')).toEqual({ tone: 'neutral' })
-    })
-
     it('keeps a word that differs by workflow apart', () => {
         expect(statusTreatment('sent', 'invoice')).toEqual({ tone: 'tag' })
         expect(statusTreatment('sent', 'email')).toEqual({ tone: 'success' })

@@ -4670,7 +4670,6 @@ export const de = {
         disconnectedNote: 'Diese Quelle ist getrennt: Es kommen keine neuen Daten und der gespeicherte Zugang ist gelöscht. Bereits gesammelte Daten bleiben erhalten.',
         status: {
             pending: 'Wartet auf erste Daten',
-            ok: 'Funktioniert',
             error: 'Problem',
             reconnect_required: 'Neu verbinden',
             disabled: 'Getrennt',

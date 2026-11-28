@@ -4670,7 +4670,6 @@ export const it = {
         disconnectedNote: 'Questa fonte è scollegata: non arrivano più nuovi dati e l\'accesso salvato è eliminato. I dati già raccolti vengono conservati.',
         status: {
             pending: 'In attesa dei primi dati',
-            ok: 'Funziona',
             error: 'Problema',
             reconnect_required: 'Riconnessione necessaria',
             disabled: 'Scollegato',

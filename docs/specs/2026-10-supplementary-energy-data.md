@@ -607,7 +607,7 @@ their dashboard call to action and a link on their own meter in the metering-poi
 backend already treats them as the owner of their source (`permissions.role_for` checks ownership
 before the manager role), so connecting, replacing the key and the rest work as for any participant. **Files:** `frontend/src/pages/MyMeteringPointsPage.tsx`;
 `features/supplementary/MeteringPointDataCard.tsx`, `CapabilityRows.tsx`, `SourceDialog.tsx`,
-`useSourceActions.ts`, `SupplementarySourceModal.tsx`, `SourceStatusBadge`, `ReconciliationSummary`,
+`useSourceActions.ts`, `SupplementarySourceModal.tsx`, `ReconciliationSummary`,
 `PushTokenPanel`, `CsvImport`.
 
 **What it lists.** In the participant shell, the metering points of the selected community that
@@ -618,10 +618,10 @@ community's, so there the page shows only the meters the user holds with generat
 - Held personally today (an `eligible` entry of the selected community): **one card per meter**,
   `MeteringPointDataCard`: meter id, community, the behind-the-meter badge and **View metering data**
   in the header, then a row per capability the point is eligible for (live data adds a **Live (now)**
-  row next to **History (15 min)**; SPEC-2026-live-energy-data §7.2). The history row shows the source
-  (provider and name, a button that opens the source in the page's pane), its status chip and the date it is synced
-  through; an unconnected row says "Not connected" with a **Connect** for that capability, and one
-  primary **Connect energy data** opens the single connect flow while something is unconnected.
+  row next to **History (15 min)**). The history row shows a source button (provider and name), status
+  text (SPEC-2026-live-energy-data §7.2), and `up to <date>` or "No data received yet". An unconnected
+  row says "Not connected" and offers **Connect**. The primary **Connect energy data** opens the shared
+  flow when both History and Live are eligible and unconnected.
   Reconnect-required and error banners of the history source stay on the card.
 - **Source pane** (`SourcePane` beside the cards; `SourceDialog`, a `FormModal`, has the same body for the managers' live
   dialogs): everything about one source. The pane is in flow beside the cards (the selection is `?source=<id>`, X and Back
@@ -1020,8 +1020,8 @@ CI runs `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-he
 `npm run test:unit` and `npm run build`.
 
 - **`tests/supplementary-helpers.test.ts`** (10): `grossRate` never shows a withheld rate and keeps
-  a real zero; the withheld reason keys; status tones; the push address for a relative and an
-  absolute API base.
+  a real zero; the withheld reason keys; the push address for a relative and an absolute API base.
+  The original status-tone test moved to `tests/badge.test.ts` and was later removed with the unused badge.
 - **`tests/gross-energy-card.test.ts`** (9): both rates and the "reported by your own system" label;
   a dash and the reason for low coverage and no data while the energy is still shown; the
   participant's name for an owner; the call to action links to "My metering points"; `NetMeteredRate` with a

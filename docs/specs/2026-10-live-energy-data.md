@@ -899,9 +899,7 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   held point (an `eligible` entry) of the selected community, so no ZEV-held, connection-point or
   other holder's source. One row per source: provider and label, the metering points it feeds (the
   meter ids as a list; always one today), a `badge-tag` per capability it provides (**History
-  (15 min)**, **Live (now)**, **Forecast**) followed by a problem only when there is one
-  (`capabilityProblem`: switched off and "no data yet" as muted text, a stale live source, a source in error or
-  needing a new key as `IssueText`), never a status for a source that simply works (UI patterns §10.1), and an
+  (15 min)**, **Live (now)**, **Forecast**) with the same status text as the capability rows below, and an
   **Open** button that asks the page to open the source in its pane (§ pane below). There is no
   Connect here, that stays on the meter cards. It is a view only: a source still feeds exactly one metering
   point. The classes are `connection-*` (`styles/components/connections.css`). Tests:
@@ -921,11 +919,12 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   one row per capability the point is eligible for (`historyEligible` / `liveEligible`; an entry without
   `eligible_capabilities` is history only; a **Forecast** row for a producing point): **History (15 min)** and **Live
   (now)**. A row is the capability, the source that provides it as a `button-ghost` link (`provider · label`) that
-  opens the source in the page's pane, a problem as text only when there is one (`capabilityProblem` through
-  `CapabilityProblemText`: a stale live source or a source in error as `IssueText`, switched off or "no data" muted;
-  a source that works carries no pill and no "OK") and a muted freshness line (history "up to <synced through>", live
-  "last value <time>", forecast "updated <time>"); a push source providing both is in both rows and
-  opens the same pane. An unconnected row says "Not connected" with a secondary **Connect** that opens
+  opens the source in the page's pane, status text and a muted freshness line. `CapabilityProblemText` uses muted text
+  for disabled sources ("Disconnected"), pending history or forecast, and live sources that have never reported. `IssueText`
+  shows errors, reconnect requests and stale live data. A working source has no status label (UI patterns §10.1).
+  History shows `up to <date>` or "No data received yet". Live shows `last value <time>` unless the source has never
+  reported. A forecast.solar row shows `updated <time>` or "No data received yet". A push source providing history and live
+  opens the same pane from either row. An unconnected row says "Not connected" with a secondary **Connect** that opens
   the connect flow with that capability preselected. One primary **Connect energy data** shows only while **two or more**
   capabilities that share the connect flow (history, live) are unconnected (preselecting them); with one left, its own
   row's **Connect** is the only button. Connect and the row Connect are disabled while
@@ -1042,9 +1041,9 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   `supplementaryEligible()`, `supplementaryZevEligibleAll()` (prefix of
   `supplementaryZevEligible(zevId)`), the dashboard summary and `['metering','points']`.
 - **Forecast setup (PR 5).** The capability rows gain **Forecast** (`RowCapability`, `sourceFor(..., 'forecast')`,
-  `forecastEligible`) for a producing point: the source as a button with its status badge and, for forecast.solar, "updated
-  <time>". Its **Connect** opens `ForecastConnectDialog` instead of the shared connect flow (forecast.solar needs no
-  credential or consent): what the forecast is, what leaves the instance (location rounded to a kilometre and the planes'
+  `forecastEligible`) for a producing point. **Connect** opens
+  `ForecastConnectDialog` instead of the shared connect flow (forecast.solar needs no credential or consent):
+  what the forecast is, what leaves the instance (location rounded to a kilometre and the planes'
   size, tilt and direction), that the roof planes and the building's location must have been entered (the server's refusal
   "Add the roof planes ..." is replaced by a translated text, `setupMissingManager` or `setupMissingParticipant`, that says
   who adds what; any other refusal is shown as the server words it). **Who adds what follows the user's management rights in
@@ -1056,9 +1055,10 @@ Shipped in PR 3b; Solar Manager live arrived with PR 4 and the forecast with PR 
   between that connection (default; consent checkbox, `PATCH {provides_forecast: true, consent: true}` instead of a new source) and
   forecast.solar. It creates `{provider: forecast_solar, provides_forecast: true, provides_history: false,
   provides_live: false, held_by, target: metering_point, consent: false}`. A holder's card hosts it directly; the
-  manager's **Connect a source** dialog (§7.3) shows `Live` and `Forecast` rows for the meter chosen and opens it with `holder="zev"`. **My connections** shows a Forecast chip (with its own status only when the source has no history) and passes the meter's forecast
-  eligibility to the source dialog. `SourceDialog` shows the forecast capability and its last update, **Refresh
-  forecast** (`sync`) and **Test** for a forecast.solar source, and for a Solar Manager source **Also use the Solar
+  manager's **Connect a source** dialog (§7.3) shows `Live` and `Forecast` rows for the meter chosen and opens it with `holder="zev"`.
+  The page passes the meter's forecast eligibility to `SourcePane`. The forecast section shows the last update
+  for forecast.solar or a source without history. `SourceDialog` offers **Refresh forecast** (`sync`) and **Test**
+  for a forecast.solar source, and for a Solar Manager source **Also use the Solar
   Manager forecast** (consent confirmation, `PATCH {provides_forecast: true, consent: true}`) and **Stop forecast**; stopping
   any capability is offered while another remains.
 - **Roof planes** (`features/meteringPoints/PvPlanesDialog.tsx`): the metering-point menu of a producing or bidirectional point
