@@ -688,6 +688,10 @@ version, *, replace=None)` rewrites a current export as an older format
 FIELDS_EXCLUDED_FROM_ARCHIVE[section])` for every section/model pair, `PAYMENT_FIELDS`
 against `Payment` included (exclusions: `id`, `user`, `created_by`, `zev`/parent FKs, `party` (travels as `party_id`),
 `sort_name` (derived), `created_at`, `updated_at`, `pdf_file`); `test_reading_csv_columns_exist_on_the_reading_model`.
+The equality test also covers `PV_PLANE_FIELDS`, `CHARGE_FIELDS` and `DELIVERED_DOCUMENT_FIELDS`.
+`test_every_field_list_is_checked_or_exempt` requires every `*_FIELDS` name in `schema.py` to be either in
+`MODEL_BY_SECTION` or in `UNCHECKED_FIELD_LISTS`, never both; the only exempt list is `LEGACY_PARTICIPANT_FIELDS`
+(the format 1–4 participant layout).
 
 **`TransferEndpointTests`**: owner can export own ZEV; owner cannot export
 another's; section selection accepted; incomplete selection rejected with a

@@ -20,7 +20,8 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
-from invoices.models import Credit, CreditApplication, Invoice, InvoiceItem, InvoiceStatus, Payment
+from inbox.models import DeliveredDocument
+from invoices.models import Charge, Credit, CreditApplication, Invoice, InvoiceItem, InvoiceStatus, Payment
 from metering.models import ImportLog, MeterReading, QuarantinedReading, ReadingResolution, SupplementarySource
 from metering.importers.sdatch_importer import import_sdatch
 from testing.sdat import build_block, build_e66
@@ -1258,7 +1259,13 @@ class SchemaParityTests(TestCase):
         "CREDIT_FIELDS": Credit,
         "CREDIT_APPLICATION_FIELDS": CreditApplication,
         "SUPPLEMENTARY_SOURCE_FIELDS": SupplementarySource,
+        "PV_PLANE_FIELDS": PvPlane,
+        "CHARGE_FIELDS": Charge,
+        "DELIVERED_DOCUMENT_FIELDS": DeliveredDocument,
     }
+
+    # The participant layout of formats 1–4, which no current model matches.
+    UNCHECKED_FIELD_LISTS = {"LEGACY_PARTICIPANT_FIELDS"}
 
     # Fields that travel through dedicated keys instead of the field lists:
     # surrogate ids (top-level "id" and nested "participant_id"), ownership and
@@ -1353,7 +1360,34 @@ class SchemaParityTests(TestCase):
             "created_at",
             "updated_at",
         },
+        "PV_PLANE_FIELDS": {"id", "metering_point", "created_at", "updated_at"},
+        # Its participants (many-to-many) travel as ``participant_ids``.
+        "CHARGE_FIELDS": {"id", "zev", "created_at", "updated_at"},
+        # The importer stores the archived PDF and sets ``file`` and ``size_bytes``
+        # from it. Links travel as ``participant_id``, ``invoice_number`` and
+        # ``superseded_by_id``; ``contract_issue`` is not in the archive.
+        "DELIVERED_DOCUMENT_FIELDS": {
+            "id",
+            "zev",
+            "participant",
+            "file",
+            "size_bytes",
+            "invoice",
+            "contract_issue",
+            "delivered_by",
+            "batch_id",
+            "superseded_by",
+            "withdrawn_by",
+        },
     }
+
+    def test_every_field_list_is_checked_or_exempt(self):
+        from zev.transfer import schema
+
+        declared = {name for name in vars(schema) if name.endswith("_FIELDS")}
+        checked = set(self.MODEL_BY_SECTION)
+        self.assertEqual(checked & self.UNCHECKED_FIELD_LISTS, set())
+        self.assertEqual(declared, checked | self.UNCHECKED_FIELD_LISTS)
 
     def test_field_lists_match_their_models_exactly(self):
         from zev.transfer import schema
