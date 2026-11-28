@@ -17,7 +17,7 @@
   gap: 0.4rem;
   padding: 0.15rem 0.6rem;
   border: 1px solid var(--border-default);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-card);
   color: var(--text-body);
   font: inherit;

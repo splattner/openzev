@@ -71,7 +71,7 @@
 .filter-tab-count {
   min-width: 1.4rem;
   padding: 0.05rem 0.4rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--neutral-100);
   color: var(--ink-soft);
   font-size: 0.78rem;

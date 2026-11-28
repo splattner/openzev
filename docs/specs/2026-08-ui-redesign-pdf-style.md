@@ -84,6 +84,8 @@ Top-level keys:
 | `semantics` | `object` | Alias map `semanticName → primitiveName` (e.g. `"--app-bg": "var(--surface)"`). Components reference semantics only. |
 | `themes` | `object<string, object>` | The default theme is expressed by `semantics` directly (emitted as `:root`). `themes` holds only *alternate* maps (`paper-light`, `high-contrast`, etc.) once one ships — deferred until a tested use case exists. Adding a theme is a token-file change only (pure data: reassignment of the same semantic names to primitives/ramp steps; no component code branches). |
 | `fields` | `object` | Frontend-only form-field dimensions (`--field-*`: height, type, radius, insets, label/help sizes, gaps). Dimension literals only — never hex, never `var()`; emitted to the frontend stylesheet only, so chart/PDF outputs stay color-only |
+| `radius` | `object` | `--radius-xs/sm/md/lg/xl` (`0.375rem` → `1rem`) + `--radius-pill` `999px`. Dimension literals; frontend-only, like `fields` |
+| `shadow` | `object` | `--shadow-sheet` (hairline lift), `--shadow-raised`, `--shadow-overlay`. Each value is offsets plus `rgba()` layers (no hex, no `var()`); frontend-only |
 | `charts` | `object` | Mirrors `invoices/pdf_charts.py:7-18` 1:1 (see §4.3) |
 | `type` | `object` | Font families for screen (`'Inter Variable', Inter, …`) and print (`Inter, "Helvetica Neue", Helvetica, Arial, sans-serif` — Inter installed in the backend image, ADR 0032). Both stacks are validated as plain font-family lists (no `;{}<>`) and emitted: screen as `--font-sans` (`tokens.css`), print as `--font-print` (`pdf/_tokens.css`) and `_CHART_FONT_FAMILY` (`generated_chart_tokens.py`). Additional scale/tracking/numeric-policy properties are deferred until they are consumed by generated outputs.
 
@@ -155,7 +157,7 @@ All five are pure derivations; hand-editing them is a lint/test error.
 
 | File | Consumes | Consumed by |
 |---|---|---|
-| `frontend/src/styles/tokens.css` | `primitives + semantics + themes + fields` → `:root` map (alternate `[data-theme]` maps only when a second theme ships), plus `--font-sans` from `type.fontFamily.screen` (`index.css` `:root { font-family: var(--font-sans) }`) | Imported in `frontend/src/main.tsx` before `index.css`; every component uses `var(--semantic)` (colors) and `var(--field-*)` (field dimensions) |
+| `frontend/src/styles/tokens.css` | `primitives + semantics + themes + fields + radius + shadow` → `:root` map (alternate `[data-theme]` maps only when a second theme ships), plus `--font-sans` from `type.fontFamily.screen` (`index.css` `:root { font-family: var(--font-sans) }`) | Imported in `frontend/src/main.tsx` before `index.css`; every component uses `var(--semantic)` (colors) and `var(--field-*)` (field dimensions) |
 | `frontend/src/styles/generatedTheme.ts` | Mantine theme object: `primitives.brand` ramp + semantics (`primaryColor: "brand"`, `primaryShade: 6`, `fontFamily` sync with `index.css:2`) — replaces sky ramp `#f0f9ff … #0c4a6e` | Imported by `MantineProvider` in `main.tsx`; the entrypoint stays hand-written — generated code lives only in visibly generated files |
 | `frontend/src/lib/chartTokens.ts` | `charts` block, emitted as **resolved literal strings** (Recharts props and SVG `fill="…"` need real color values; they do not resolve `var(--…)`) | dashboard cards (`components/dashboard/`), `MeteringChartPage`, `TariffPriceHistoryChart`, `DynamicPriceHistoryModal`, `AnnualReportSection`, feasibility charts, `EnergyFlowChart`, `RawMeteringTable` (recharts); `BuildingsMap` (building footprints, Leaflet) |
 | `backend/invoices/generated_chart_tokens.py` | `charts` block as plain Python constants (same literals as `chartTokens.ts`), plus `_CHART_FONT_FAMILY` from `type.fontFamily.print` | imported by `invoices/pdf_charts.py` and `invoices/annual_statement.py` (its SVG chart) — no duplicated color literals in Python; every chart `<svg>` root sets `font-family='{_CHART_FONT_FAMILY}'` because inline SVG does not inherit the document font |
@@ -723,7 +725,7 @@ Existing suites stay green (contract: 59 tests in `test_contract_context.py`; te
 ### Frontend
 
 - `npm run test:unit` (if present) + `npm run build` green; `stylelint` step green ( `pr-quality.yml`).
-- `scripts/generate-tokens.mjs` idempotence test `design/tokens.test.mjs`: write→read→generate→diff → `0`; brand-ramp monotonicity negative test: inverted/tied ramp in a temp tree → non-zero exit in both generate and `--check` modes.
+- `scripts/generate-tokens.mjs` idempotence test `design/tokens.test.mjs`: write→read→generate→diff → `0`; brand-ramp monotonicity negative test: inverted/tied ramp in a temp tree → non-zero exit in both generate and `--check` modes; malformed `fields`, `radius` and `shadow` values in a temp tree → non-zero exit with that group's message; every `var(--radius-*)`/`var(--shadow-*)` in `frontend/src` names a key in `tokens.json`.
 - Playwright `npm run screenshots` captures the guide against seeded demo data with reduced motion, so charts render without animating. The `capture-data` project (`capture.setup.ts`) prepares the data the captures share (the 08b invoice PDF) before any of them runs. Each capture is rewritten in place as a 256-colour palette PNG (`quantizePng` in `screenshots/helpers.ts`, via `sharp`), which keeps the set at about a third of its raw size; the output is deterministic, so an unchanged screen yields an unchanged file.
 - Participant captures impersonate the seeded Anna (`anna@openzev.local`) and fail unless she is a plain user with a live participation in the flagship ZEV and no management access; the dynamic-source capture additionally requires the configured demo tariff described in `capture.spec.ts`.
 - `npm run test:pdf-helpers` (`screenshots/pdf-helpers.spec.ts`) covers native PDF loading, sidebar closing, and failure cases without the demo stack. `tests/screenshots-pdf.test.ts` covers transient-frame retries.
@@ -956,10 +958,9 @@ contracts are unchanged.
 - `backend/Dockerfile` and `Dockerfile.fullstack` install `fonts-inter` and
   fail the build when `fc-match Inter` resolves to another face.
   `frontend/src/main.tsx` imports `@fontsource-variable/inter/opsz.css`.
-- `styles/base.css` `:root` adds the shape/depth scale: `--radius-xs/sm/md/lg/xl`,
-  `--shadow-sheet` (hairline lift for sheets), `--shadow-raised`,
-  `--shadow-overlay` (menus, dialogs, toasts), and the sheet padding
-  `--sheet-pad-block`/`--sheet-pad-inline`. Tinted translucency (the dialog
+- `design/tokens.json` defines the radius and shadow scales (§4.2);
+  `--radius-pill` rounds every fully rounded shape. Sheet padding stays in
+  `styles/components/sheet.css`. Tinted translucency (the dialog
   and drawer scrims) uses `color-mix()` over `var(--brand-ink)` — no new raw
   colour literal. `h1–h4` use `--text-heading`; `hr` is a hairline.
   `mantineTheme.ts` sets `shadows.sm/md` to the raised/overlay shadows, the

@@ -45,7 +45,7 @@ function relativeLuminance(hex) {
 }
 
 function validate(tokens) {
-  const required = ['primitives', 'semantics', 'fields', 'themes', 'charts', 'type']
+  const required = ['primitives', 'semantics', 'fields', 'radius', 'shadow', 'themes', 'charts', 'type']
   for (const k of required) {
     assert(tokens[k] !== undefined, `Missing top-level key: ${k}`)
     assert(tokens[k] !== null && typeof tokens[k] === 'object' && !Array.isArray(tokens[k]), `Top-level key ${k} must be an object`)
@@ -76,6 +76,24 @@ function validate(tokens) {
     assert(k.startsWith('--field-'), `Field key must start with --field-: ${k}`)
     assert(typeof v === 'string' && FIELD_RE.test(v), `Field ${k} must be a dimension literal, got: ${v}`)
     assert(!HEX_CONTAINS.test(v), `Field ${k} must not contain raw hex`)
+  }
+
+  // Frontend-only, like fields.
+  for (const [k, v] of Object.entries(tokens.radius)) {
+    assert(/^--radius-[a-z0-9-]+$/.test(k), `Radius key must be --radius-<name>: ${k}`)
+    assert(/^(\d*\.?\d+rem|\d+px)$/.test(v), `Radius ${k} must be a dimension literal, got: ${v}`)
+  }
+  // A layer is x and y offsets, optional blur and spread, then rgba(r, g, b, a).
+  // Offsets and spread may be negative; blur may not.
+  const isShadowLayer = (layer) => {
+    const m = /^(.+?)\s+rgba\(\d{1,3},\s*\d{1,3},\s*\d{1,3},\s*(0|1|0?\.\d+)\)$/.exec(layer.trim())
+    const lengths = m ? m[1].split(/\s+/) : []
+    return lengths.length >= 2 && lengths.length <= 4
+      && lengths.every((l, i) => /^(0|\d*\.?\d+px)$/.test(i === 2 ? l : l.replace(/^-/, '')))
+  }
+  for (const [k, v] of Object.entries(tokens.shadow)) {
+    assert(/^--shadow-[a-z0-9-]+$/.test(k), `Shadow key must be --shadow-<name>: ${k}`)
+    assert(typeof v === 'string' && v.split(/,(?![^(]*\))/).every(isShadowLayer), `Shadow ${k} must be offsets + rgba(...) layers, got: ${v}`)
   }
 
   // themes: each theme is map semantic -> var(--primitive)
@@ -155,6 +173,12 @@ function generateTokensCss(tokens) {
   const fieldKeys = Object.keys(tokens.fields).sort()
   for (const k of fieldKeys) {
     lines.push(`  ${k}: ${tokens.fields[k]};`)
+  }
+  // shape and depth, in tokens.json order
+  for (const group of ['radius', 'shadow']) {
+    for (const [k, v] of Object.entries(tokens[group])) {
+      lines.push(`  ${k}: ${v};`)
+    }
   }
   // The screen face; the print face is emitted to the PDF tokens.
   lines.push(`  --font-sans: ${tokens.type.fontFamily.screen};`)

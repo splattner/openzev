@@ -40,7 +40,7 @@ props) are unlayered and win; they only set what the component was asked to set.
 | Folder / file | Holds |
 | --- | --- |
 | `tokens.css` | Generated design tokens (`design/tokens.json`) — never edit by hand |
-| `base.css` | `:root` scale (radius, shadow), reset, typography, field-token sizing of native inputs (skips Mantine's own) |
+| `base.css` | Reset, typography, field-token sizing of native inputs (skips Mantine's own) |
 | `native-controls.css` | Native element defaults a Mantine class must beat (labels, checkbox width); layer `native` |
 | `layout/` | App shell, sidebar, account menu, page header, footer; `responsive.css` is its own `responsive` layer |
 | `components/` | Shared, reusable pieces, one file per piece, named after it: `table.css`, `sheet.css`, `button.css`, `badge.css`, `status-dot.css`, `toast.css`, `dialog.css`, … |

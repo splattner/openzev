@@ -6,7 +6,7 @@
   display: inline-block;
   width: 0.5rem;
   height: 0.5rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   flex-shrink: 0;
   background: var(--muted);
 }
