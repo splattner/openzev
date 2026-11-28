@@ -266,7 +266,7 @@
 .metering-holder-more {
   padding: 0 0.4rem;
   border: 1px solid var(--border-default);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 0.75rem;
   color: var(--text-muted);
 }

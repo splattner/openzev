@@ -80,7 +80,7 @@
 .sidebar-top::-webkit-scrollbar-thumb,
 .table-scroll::-webkit-scrollbar-thumb {
   background: rgba(148, 163, 184, 0.45);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .sidebar-fixed::-webkit-scrollbar-track,

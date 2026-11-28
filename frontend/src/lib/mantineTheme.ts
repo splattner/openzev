@@ -66,7 +66,7 @@ const fieldInputVars = (_theme: MantineTheme, props: InputProps, ctx?: InputFact
 export const mantineTheme: MantineThemeOverride = {
   ...generatedTheme,
   defaultRadius: 'md',
-  // Overlays share the app's depth scale (styles/base.css `--shadow-*`).
+  // Overlays share the app's depth scale (`--shadow-*` from design/tokens.json).
   shadows: { sm: 'var(--shadow-raised)', md: 'var(--shadow-overlay)' },
   components: {
     Popover: { defaultProps: overlay },

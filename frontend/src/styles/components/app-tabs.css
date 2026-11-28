@@ -68,7 +68,7 @@
   width: 0.45rem;
   height: 0.45rem;
   margin-inline-start: 0.4rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--accent-rule);
   vertical-align: middle;
 }

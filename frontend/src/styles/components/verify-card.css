@@ -15,7 +15,7 @@
   background: var(--brand-pale);
   color: var(--brand-mid);
   border: 1px solid var(--brand-glow);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.2rem 0.75rem;
   width: fit-content;
 }
