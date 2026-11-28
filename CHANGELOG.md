@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.33.0](https://github.com/splattner/openzev/compare/v1.32.0...v1.33.0) (2026-11-28)
+
+
+### Features
+
+* **invoices:** serve allowed invoice actions from the workflow ([#1336](https://github.com/splattner/openzev/issues/1336)) ([55bd74c](https://github.com/splattner/openzev/commit/55bd74c1b1f05b84f61de711e6fa2bde3ce3acb2))
+
+
+### Bug Fixes
+
+* **frontend:** format fixed tariff fees through formatChf ([#1348](https://github.com/splattner/openzev/issues/1348)) ([f1ea5ff](https://github.com/splattner/openzev/commit/f1ea5ff6b76bcf20b602fe5985415b0724157580))
+* **frontend:** refresh views left stale by invoice delete, community save and feature toggles ([#1353](https://github.com/splattner/openzev/issues/1353)) ([b119ead](https://github.com/splattner/openzev/commit/b119eadcdfc730332c6b61f3becd9a9cc1c90761))
+* **inbox:** prevent resends when the document email audit fails ([#1331](https://github.com/splattner/openzev/issues/1331)) ([598d5df](https://github.com/splattner/openzev/commit/598d5df8fdaf9b61bde3f0cad80ddd8e5e2c70cc))
+* **invoices:** correct blended percentage display ([#1333](https://github.com/splattner/openzev/issues/1333)) ([41a938b](https://github.com/splattner/openzev/commit/41a938bd9572c5e26bc76e06dcab478940a9c2c1))
+* **invoices:** draft rows respect regeneration blockers ([#1338](https://github.com/splattner/openzev/issues/1338)) ([aaeb7bf](https://github.com/splattner/openzev/commit/aaeb7bf7a9054bc03afc91fabfaf10b38943be2f))
+* **invoices:** readiness reports drafts that block regeneration ([#1335](https://github.com/splattner/openzev/issues/1335)) ([88e147d](https://github.com/splattner/openzev/commit/88e147dff0d9f10cbb742f2a687f58d5d85fd8b9))
+* **metering:** share daily CSV row interpretation ([#1339](https://github.com/splattner/openzev/issues/1339)) ([19db943](https://github.com/splattner/openzev/commit/19db943938a23bc9cd4eb1ee07d0ae3371d41d1a))
+
 ## [1.32.0](https://github.com/splattner/openzev/compare/v1.31.0...v1.32.0) (2026-11-24)
 
 
