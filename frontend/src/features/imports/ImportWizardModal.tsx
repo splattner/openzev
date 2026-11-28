@@ -190,29 +190,29 @@ function FilePreviewBlock({ entry, heading }: { entry: FilePreview; heading: boo
                     )}
 
                     {rows.length > 0 && (
-                        <div style={{ maxHeight: 250, overflow: 'auto', border: '1px solid var(--border-default)', borderRadius: 6 }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <div className="import-preview-scroll">
+                            <table className="compact-table">
                                 <thead>
                                     <tr>
-                                        <SortableHeader {...sorting.header('row')} style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.row')}</SortableHeader>
-                                        <SortableHeader {...sorting.header('meterId')} style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.meterId')}</SortableHeader>
-                                        <SortableHeader {...sorting.header('status')} style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.status')}</SortableHeader>
-                                        <SortableHeader {...sorting.header('timestamp')} style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.timestamp')}</SortableHeader>
-                                        <SortableHeader {...sorting.header('direction')} style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.direction')}</SortableHeader>
-                                        <SortableHeader {...sorting.header('existingData')} style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.existingData')}</SortableHeader>
+                                        <SortableHeader {...sorting.header('row')}>{t('pages.imports.preview.row')}</SortableHeader>
+                                        <SortableHeader {...sorting.header('meterId')}>{t('pages.imports.preview.meterId')}</SortableHeader>
+                                        <SortableHeader {...sorting.header('status')}>{t('pages.imports.preview.status')}</SortableHeader>
+                                        <SortableHeader {...sorting.header('timestamp')}>{t('pages.imports.preview.timestamp')}</SortableHeader>
+                                        <SortableHeader {...sorting.header('direction')}>{t('pages.imports.preview.direction')}</SortableHeader>
+                                        <SortableHeader {...sorting.header('existingData')}>{t('pages.imports.preview.existingData')}</SortableHeader>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {sorting.rows.map((row) => (
-                                        <tr key={`${row.row}-${row.meter_id ?? 'empty'}`} style={{ borderTop: '1px solid var(--border-default)' }}>
-                                            <td style={{ padding: '0.4rem 0.6rem' }}>{row.row}</td>
-                                            <td style={{ padding: '0.4rem 0.6rem' }}>{row.meter_id ?? '-'}</td>
-                                            <td style={{ padding: '0.4rem 0.6rem' }}>
+                                        <tr key={`${row.row}-${row.meter_id ?? 'empty'}`}>
+                                            <td>{row.row}</td>
+                                            <td>{row.meter_id ?? '-'}</td>
+                                            <td>
                                                 <CheckBadge label={row.metering_point_exists ? t('pages.imports.preview.exists') : t('pages.imports.preview.missing')} ok={row.metering_point_exists} />
                                             </td>
-                                            <td style={{ padding: '0.4rem 0.6rem' }}>{row.timestamp ?? '-'}</td>
-                                            <td style={{ padding: '0.4rem 0.6rem' }}>{formatDirections(row.directions, t)}</td>
-                                            <td style={{ padding: '0.4rem 0.6rem' }}>
+                                            <td>{row.timestamp ?? '-'}</td>
+                                            <td>{formatDirections(row.directions, t)}</td>
+                                            <td>
                                                 {row.existing_data == null ? '-' : row.existing_data ? t('pages.imports.preview.yes') : t('pages.imports.preview.no')}
                                             </td>
                                         </tr>

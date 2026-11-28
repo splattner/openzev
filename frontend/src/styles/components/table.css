@@ -23,6 +23,11 @@
   vertical-align: top;
 }
 
+/* Compact padding overrides the page-stack header and sheet edge padding. */
+.page-stack .compact-table :is(th, td) {
+  padding: 0.4rem 0.6rem;
+}
+
 /* Wide record tables (DataTable) keep columns closer together. */
 
 .data-table th,
